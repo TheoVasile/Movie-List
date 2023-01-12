@@ -7,13 +7,17 @@
 
 import SwiftUI
 
+
 struct ContentView: View {
     var body: some View {
         VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundColor(.accentColor)
-            Text("Hello, world!")
+            Text("Movies List")
+            Button("View List"){}
+                .buttonStyle(.bordered)
+            Button("Add Movie"){}
+                .buttonStyle(.bordered)
+            Button("Compare Movies"){}
+                .buttonStyle(.bordered)
         }
         .padding()
     }
