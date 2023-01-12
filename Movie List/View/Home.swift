@@ -52,12 +52,9 @@ struct Home: View {
                             }
                         }
                 }
-                Button("View List"){}
-                    .buttonStyle(.bordered)
-                Button("Add Movie"){}
-                    .buttonStyle(.bordered)
-                Button("Compare Movies"){}
-                    .buttonStyle(.bordered)
+                NavigationLink("View List", destination: List())
+                NavigationLink("Add Movie", destination: AddMovieView())
+                NavigationLink("Compare Movies", destination: CompareMovieView())
             }
         }
         .padding()
