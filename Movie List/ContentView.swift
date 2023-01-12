@@ -7,19 +7,20 @@
 
 import SwiftUI
 
+func getDocumentsDirectory() -> URL {
+    // find all possible documents directories for this user
+    let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+
+    // just send back the first one, which ought to be the only one
+    return paths[0]
+}
 
 struct ContentView: View {
+    
+    @State var showingPopup = false
+    
     var body: some View {
-        VStack {
-            Text("Movies List")
-            Button("View List"){}
-                .buttonStyle(.bordered)
-            Button("Add Movie"){}
-                .buttonStyle(.bordered)
-            Button("Compare Movies"){}
-                .buttonStyle(.bordered)
-        }
-        .padding()
+        Home()
     }
 }
 
