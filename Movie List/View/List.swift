@@ -9,13 +9,76 @@ import Foundation
 import SwiftUI
 
 struct ListView: View {
+    
+    @State var showPopup: Bool = false
+    @State var listName: String
+    @State var movieName: String = ""
+    @State var movieYear: String = ""
+    
+    init(listName: String){
+        self.listName = listName
+    }
+    
     var body: some View{
-        Text("List View")
+        var movieArray = db.getMovieList(list: listName) ?? []
+        let _ = print(movieArray)
+        ZStack{
+            NavigationView{
+                VStack{
+                    Text(listName)
+                    if movieArray.count == 0{
+                        Text("No Movies Added Yet")
+                    }
+                    ForEach(movieArray, id: \.self){movieName in
+                        Text(movieName)
+                    }
+                    
+                }
+                .toolbar{
+                    ToolbarItem(placement: .navigationBarTrailing){
+                        Button{
+                            withAnimation{showPopup.toggle()}
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+            }
+            .popupNavigationView(horizontalPadding: 40, show: $showPopup){
+                VStack{
+                    TextField("Movie Name", text: $movieName)
+                    TextField("Movie Year", text: $movieYear)
+                        .navigationTitle("Add New Movie")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar{
+                            ToolbarItem(placement: .navigationBarLeading){
+                                Button("Close"){
+                                    withAnimation{
+                                        showPopup.toggle()
+                                    }
+                                }
+                            }
+                            ToolbarItem(placement: .bottomBar){
+                                Button("Add"){
+                                    if movieName.count > 0 && movieYear.count > 0{
+                                        if db.addMovie(list: listName, name: movieName, year: Int64(movieYear) ?? 0, rank: 0) < 0{
+                                            print("failed to add Movie")
+                                        }
+                                        movieName = ""
+                                        movieYear = ""
+                                        withAnimation{showPopup.toggle()}
+                                    }
+                                }
+                            }
+                        }
+                }
+            }
+        }
     }
 }
 
 struct List_Previews: PreviewProvider{
     static var previews: some View{
-        ListView()
+        ListView(listName: "Test List")
     }
 }

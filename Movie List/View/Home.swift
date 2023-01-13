@@ -7,13 +7,14 @@
 
 import SwiftUI
 
+let db = DataAccess()
+
 struct Home: View {
     
     @State var showPopup: Bool = false
     @State var listName: String = ""
     
     var body: some View{
-        let db = DataAccess()
         let array = db.getLists() ?? []
         ZStack{
             NavigationView{
@@ -22,8 +23,9 @@ struct Home: View {
                         Text("No Lists, Add One Now!")
                     }
                     ForEach(array, id: \.self) {list in
-                        NavigationLink(list, destination: ListView())
+                        NavigationLink(list, destination: ListView(listName: list))
                     }
+                    .padding(10)
                 }
                 .navigationTitle("Movie Lists")
                 .navigationBarTitleDisplayMode(.inline)
@@ -53,7 +55,6 @@ struct Home: View {
                         ToolbarItem(placement: .bottomBar){
                             Button("Add"){
                                 if listName.count > 0{
-                                    let db = DataAccess()
                                     if db.addMovie(list: listName, name: "", year: 0, rank: 0) < 0{
                                         print("failed to add list")
                                     }

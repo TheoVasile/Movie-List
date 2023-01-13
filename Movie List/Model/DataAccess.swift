@@ -9,11 +9,13 @@ import Foundation
 import SwiftUI
 import SQLite
 
-class DataAccess {
+struct DataAccess {
     
-    let db_name = "movies"
+    let db_movies = "movies"
+    let db_lists = "lists"
     
     let listName = Expression<String>("list_name")
+    let id = Expression<Int64>("id")
     let movieName = Expression<String>("movie_name")
     let movieYear = Expression<Int64>("movie_year")
     let movieRank = Expression<Int64>("movie_rank")
@@ -29,10 +31,20 @@ class DataAccess {
         do {
             let db = try Connection(fileName())
             
-            let movies = Table(db_name)
+            var id_ = getListId(list: list)
+            if id_ < 0 {
+                id_ = getNewId()
+            }
+            
+            let movies = Table(db_movies)
+            let lists = Table(db_lists)
 
-            let rowId = try db.run(movies.insert(
+            try db.run(lists.insert(
                 listName <- list,
+                id <- id_))
+            
+            let rowId = try db.run(movies.insert(
+                id <- id_,
                 movieName <- name,
                 movieYear <- year,
                 movieRank <- rank))
@@ -52,9 +64,11 @@ class DataAccess {
         var moviesFromList = [String]()
         do {
             let db = try Connection(fileName())
-            let movies = Table(db_name)
-            for movie in try db.prepare(movies) {
-                if movie[listName] == list {
+            let id_ = getListId(list: list)
+            let movies = Table(db_movies)
+            let rowIterator = try db.prepareRowIterator(movies)
+            for movie in try Array(rowIterator) {
+                if movie[id] == id_ || true {
                     moviesFromList.append(movie[movieName])
                 }
             }
@@ -66,6 +80,47 @@ class DataAccess {
         return nil
     }
     
+    func getNewId() -> Int64{
+        /**
+         Return an id that doesnt exist in either table
+         Return -1 if there is an error
+         */
+        do {
+            var id_: Int64 = 0
+            let db = try Connection(fileName())
+            let lists = Table(db_lists)
+            let rowIterator = try db.prepareRowIterator(lists)
+            for list_ in try Array(rowIterator) {
+                if list_[id] > id_{
+                    id_ += 1
+                }
+            }
+            return id_
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
+    func getListId(list: String) -> Int64{
+        /**
+         Return the corresponding id of a list
+         */
+        do {
+            let db = try Connection(fileName())
+            let lists = Table(db_lists)
+            let rowIterator = try db.prepareRowIterator(lists)
+            for list_ in try Array(rowIterator) {
+                if list_[listName] == list{
+                    return list_[id]
+                }
+            }
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
     func getLists() -> Array<String>?{
         /**
         Returns a list containing the names of each unique list stored in the database
@@ -73,11 +128,9 @@ class DataAccess {
         var movieLists = [String]()
         do {
             let db = try Connection(fileName())
-            let movies = Table(db_name)
-            for movie in try db.prepare(movies) {
-                if !movieLists.contains(movie[listName]){
-                    movieLists.append(movie[listName])
-                }
+            let lists = Table(db_lists)
+            for list in try db.prepare(lists) {
+                movieLists.append(list[listName])
             }
             
             return movieLists
@@ -111,8 +164,11 @@ class DataAccess {
         do {
             let db = try Connection(fileName())
             
-            let movies = Table(db_name)
-            try db.run(movies.drop(ifExists: true));
+            let movies = Table(db_movies)
+            let lists = Table(db_lists)
+            
+            try db.run(movies.drop(ifExists: true))
+            try db.run(lists.drop(ifExists: true))
             
         } catch {
             print("ERROR: \(error)")
@@ -120,14 +176,21 @@ class DataAccess {
     }
     
     private func initMoviesTable(db: Connection) throws {
-        let movies = Table(db_name)
+        let movies = Table(db_movies)
+        let lists = Table(db_lists)
         
         try db.run(movies.create(ifNotExists: true) { t in
-            t.column(listName, primaryKey: true)
+            t.column(id)
             t.column(movieName)
             t.column(movieYear)
             t.column(movieRank)
         })
+        
+        try db.run(lists.create(ifNotExists: true) { t in
+            t.column(listName)
+            t.column(id)
+        })
+        print("Created lists table")
     }
     
 }
