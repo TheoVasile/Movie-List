@@ -18,12 +18,17 @@ struct Home: View {
     
     
     var body: some View{
-        let array = ["1", "2", "3", "4"]
-        NavigationView{
-            VStack{
-                Text("Movie Lists")
-                ForEach(array, id: \.self) {list in
-                    NavigationLink(list, destination: ListView())
+        let db = DataAccess()
+        let array = db.getLists() ?? []
+        if array.count == 0{
+            Text("No Lists")
+        } else{
+            NavigationView{
+                VStack{
+                    Text("Movie Lists")
+                    ForEach(array, id: \.self) {list in
+                        NavigationLink(list, destination: ListView())
+                    }
                 }
             }
         }
