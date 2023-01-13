@@ -15,7 +15,7 @@ struct Home: View {
     @State var listName: String = ""
     
     var body: some View{
-        let array = db.getLists() ?? []
+        var array = db.getLists() ?? []
         ZStack{
             NavigationView{
                 VStack{
@@ -25,6 +25,11 @@ struct Home: View {
                     List{
                         ForEach(array, id: \.self) {list in
                             NavigationLink(list, destination: ListView(listName: list))
+                        }
+                        .onDelete { indexSet in
+                            if db.deleteList(list: array[indexSet.first ?? 0]) < 0 {
+                                print("Failed to delete list")
+                            }
                         }
                         .padding(10)
                     }

@@ -78,6 +78,50 @@ struct DataAccess {
         return -1
     }
     
+    func deleteList(list: String) -> Int64{
+        /**
+         Removes a list and all its movies from the database, returns -1 on failure, 0 otherwise
+         */
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            
+            let lists = Table(db_lists)
+            let movies = Table(db_movies)
+            
+            let deleted_movies = movies.filter(id == id_)
+            try db.run(deleted_movies.delete())
+            
+            let deleted_list = lists.filter(id == id_)
+            try db.run(deleted_list.delete())
+            
+            return 0
+        } catch{
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
+    func deleteMovie(list: String, name: String, year: Int64) -> Int64 {
+        /**
+         Removes a movie from a list, returns -1 on failure, 0 otherwise
+         */
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            
+            let movies = Table(db_movies)
+            
+            let deleted_movie = movies.filter(id == id_ && movieName == name && movieYear == year)
+            try db.run(deleted_movie.delete())
+            
+            return 0
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
     func getMovieList(list: String) -> Array<String>?{
         /**
         Returns a list containing the names of all the movies in the given list
