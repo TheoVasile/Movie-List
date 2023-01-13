@@ -24,7 +24,7 @@ extension View{
                         NavigationView{
                             content()
                         }
-                        .frame(width: size.width - horizontalPadding, height: size.height / 1.7, alignment: .center)
+                        .frame(width: size.width - horizontalPadding, height: 150, alignment: .center)
                         .cornerRadius(15)
                     }
                 }

@@ -18,6 +18,10 @@ class DataAccess {
     let movieYear = Expression<Int64>("movie_year")
     let movieRank = Expression<Int64>("movie_rank")
     
+    init() {
+        initTables()
+    }
+    
     func addMovie(list: String, name: String, year: Int64, rank: Int64) -> Int64 {
         /**
          Inserts a movies into a given <list> with the specified <name>, <year>, and <rank>

@@ -10,6 +10,7 @@ import SwiftUI
 struct Home: View {
     
     @State var showPopup: Bool = false
+    @State var listName: String = ""
     
     var body: some View{
         let db = DataAccess()
@@ -37,9 +38,9 @@ struct Home: View {
                 }
             }
             .popupNavigationView(horizontalPadding: 40, show: $showPopup){
-                Text("ListName")
+                TextField("ListName", text: $listName)
                     .disableAutocorrection(true)
-                    .navigationTitle("Popup")
+                    .navigationTitle("Add New Movie")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar{
                         ToolbarItem(placement: .navigationBarLeading){
@@ -49,8 +50,19 @@ struct Home: View {
                                 }
                             }
                         }
+                        ToolbarItem(placement: .bottomBar){
+                            Button("Add"){
+                                if listName.count > 0{
+                                    let db = DataAccess()
+                                    if db.addMovie(list: listName, name: "", year: 0, rank: 0) < 0{
+                                        print("failed to add list")
+                                    }
+                                    listName = ""
+                                    withAnimation{showPopup.toggle()}
+                                }
+                            }
+                        }
                     }
-                
             }
         }
     }
