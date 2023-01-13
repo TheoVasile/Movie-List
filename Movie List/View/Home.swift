@@ -47,6 +47,7 @@ struct Home: View {
                     .toolbar{
                         ToolbarItem(placement: .navigationBarLeading){
                             Button("Close"){
+                                listName = ""
                                 withAnimation{
                                     showPopup.toggle()
                                 }
@@ -55,7 +56,7 @@ struct Home: View {
                         ToolbarItem(placement: .bottomBar){
                             Button("Add"){
                                 if listName.count > 0{
-                                    if db.addMovie(list: listName, name: "", year: 0, rank: 0) < 0{
+                                    if db.addList(list: listName) < 0{
                                         print("failed to add list")
                                     }
                                     listName = ""

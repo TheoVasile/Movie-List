@@ -26,7 +26,7 @@ struct DataAccess {
     
     func addMovie(list: String, name: String, year: Int64, rank: Int64) -> Int64 {
         /**
-         Inserts a movies into a given <list> with the specified <name>, <year>, and <rank>
+         Inserts a movie into a given <list> with the specified <name>, <year>, and <rank>
          */
         do {
             let db = try Connection(fileName())
@@ -51,6 +51,27 @@ struct DataAccess {
             
             return rowId
             
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
+    func addList(list: String) -> Int64{
+        /**
+         Create a new movies list with no movies
+         */
+        do {
+            let db = try Connection(fileName())
+            var id_ = getNewId()
+            
+            let lists = Table(db_lists)
+            
+            let rowId = try db.run(lists.insert(
+                listName <- list,
+                id <- id_
+            ))
+            return rowId
         } catch {
             print("ERROR: \(error)")
         }
@@ -190,7 +211,6 @@ struct DataAccess {
             t.column(listName)
             t.column(id)
         })
-        print("Created lists table")
     }
     
 }
