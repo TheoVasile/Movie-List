@@ -5,10 +5,12 @@
 //  Created by Theo Vasile on 2023-01-07.
 //
 
+import Foundation
 import SwiftUI
 
 @main
 struct Movie_ListApp: App {
+
     var body: some Scene {
         WindowGroup {
             ContentView()
