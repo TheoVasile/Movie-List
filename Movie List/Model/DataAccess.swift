@@ -102,7 +102,7 @@ struct DataAccess {
         return -1
     }
     
-    func deleteMovie(list: String, name: String, year: Int64) -> Int64 {
+    func deleteMovie(list: String, name: String, year: Int64?) -> Int64 {
         /**
          Removes a movie from a list, returns -1 on failure, 0 otherwise
          */
@@ -112,7 +112,10 @@ struct DataAccess {
             
             let movies = Table(db_movies)
             
-            let deleted_movie = movies.filter(id == id_ && movieName == name && movieYear == year)
+            var deleted_movie = movies.filter(id == id_ && movieName == name)
+            if year != nil{
+                deleted_movie = movies.filter(id == id_ && movieName == name && movieYear == year ?? 0)
+            }
             try db.run(deleted_movie.delete())
             
             return 0

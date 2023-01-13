@@ -20,7 +20,7 @@ struct ListView: View {
     }
     
     var body: some View{
-        var movieArray = db.getMovieList(list: listName) ?? []
+        let movieArray = db.getMovieList(list: listName) ?? []
         let _ = print(movieArray)
         ZStack{
             NavigationView{
@@ -32,6 +32,11 @@ struct ListView: View {
                         
                         ForEach(movieArray, id: \.self){movieName in
                             Text(movieName)
+                        }
+                        .onDelete { indexSet in
+                            if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0], year: nil) < 0 {
+                                print("Failed to delete movie")
+                            }
                         }
                         
                     }
