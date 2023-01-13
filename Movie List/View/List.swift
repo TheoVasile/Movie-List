@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct List: View {
+struct ListView: View {
     var body: some View{
         Text("List View")
     }
@@ -16,6 +16,6 @@ struct List: View {
 
 struct List_Previews: PreviewProvider{
     static var previews: some View{
-        List()
+        ListView()
     }
 }

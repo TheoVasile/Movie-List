@@ -10,6 +10,7 @@ import SwiftUI
 struct Home: View {
     
     @State var showPopup: Bool = false
+    @State var showLists: Bool = false
     @State var listName: String = ""
     
     let userDefaults = UserDefaults.standard
@@ -17,51 +18,15 @@ struct Home: View {
     
     
     var body: some View{
-        ZStack{
-            NavigationView {
-                VStack{
-                    Text("Movies List")
-                    Button("New List"){
-                        withAnimation{
-                            showPopup.toggle()
-                        }
-                    }
-                    NavigationLink("View List", destination: List())
-                    NavigationLink("Add Movie", destination: AddMovieView())
-                    NavigationLink("Compare Movies", destination: CompareMovieView())
-                }
-            }
-            .popupNavigationView(horizontalPadding: 40, show: $showPopup){
-                TextField(
-                    "List Name",
-                    text: $listName
-                )
-                .disableAutocorrection(true)
-                .navigationTitle("Popup")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar{
-                    ToolbarItem(placement: .navigationBarTrailing){
-                        Button{
-                            
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                        .onTapGesture {
-                            let defaults = UserDefaults.standard
-                            defaults.set([], forKey: listName)
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarLeading){
-                        Button("Close"){
-                            withAnimation{
-                                showPopup.toggle()
-                            }
-                        }
-                    }
+        let array = ["1", "2", "3", "4"]
+        NavigationView{
+            VStack{
+                Text("Movie Lists")
+                ForEach(array, id: \.self) {list in
+                    NavigationLink(list, destination: ListView())
                 }
             }
         }
-        .padding()
     }
 }
 

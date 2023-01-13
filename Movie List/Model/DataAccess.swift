@@ -62,6 +62,27 @@ class DataAccess {
         return nil
     }
     
+    func getLists() -> Array<String>?{
+        /**
+        Returns a list containing the names of each unique list stored in the database
+         */
+        var movieLists = [String]()
+        do {
+            let db = try Connection(fileName())
+            let movies = Table(db_name)
+            for movie in try db.prepare(movies) {
+                if !movieLists.contains(movie[listName]){
+                    movieLists.append(movie[listName])
+                }
+            }
+            
+            return movieLists
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return nil
+    }
+    
     func fileName() -> String {
         let path = NSSearchPathForDirectoriesInDomains(
             .documentDirectory, .userDomainMask, true
