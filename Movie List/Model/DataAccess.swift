@@ -198,7 +198,9 @@ struct DataAccess {
             let db = try Connection(fileName())
             let lists = Table(db_lists)
             for list in try db.prepare(lists) {
-                movieLists.append(list[listName])
+                if !movieLists.contains(list[listName]){
+                    movieLists.append(list[listName])
+                }
             }
             
             return movieLists
