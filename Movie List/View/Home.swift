@@ -8,26 +8,26 @@
 import SwiftUI
 
 struct Home: View {
-    
-    @State var showPopup: Bool = false
-    @State var showLists: Bool = false
-    @State var listName: String = ""
-    
-    let userDefaults = UserDefaults.standard
-    let listsKey = "movie_lists"
-    
-    
     var body: some View{
         let db = DataAccess()
         let array = db.getLists() ?? []
-        if array.count == 0{
-            Text("No Lists")
-        } else{
-            NavigationView{
-                VStack{
-                    Text("Movie Lists")
-                    ForEach(array, id: \.self) {list in
-                        NavigationLink(list, destination: ListView())
+        NavigationView{
+            VStack{
+                if array.count == 0{
+                    Text("No Lists, Add One Now!")
+                }
+                ForEach(array, id: \.self) {list in
+                    NavigationLink(list, destination: ListView())
+                }
+            }
+            .navigationTitle("Movie Lists")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar{
+                ToolbarItem(placement: .navigationBarTrailing){
+                    Button{
+                        
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
