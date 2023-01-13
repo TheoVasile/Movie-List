@@ -22,10 +22,12 @@ struct Home: View {
                     if array.count == 0{
                         Text("No Lists, Add One Now!")
                     }
-                    ForEach(array, id: \.self) {list in
-                        NavigationLink(list, destination: ListView(listName: list))
+                    List{
+                        ForEach(array, id: \.self) {list in
+                            NavigationLink(list, destination: ListView(listName: list))
+                        }
+                        .padding(10)
                     }
-                    .padding(10)
                 }
                 .navigationTitle("Movie Lists")
                 .navigationBarTitleDisplayMode(.inline)
@@ -40,9 +42,9 @@ struct Home: View {
                 }
             }
             .popupNavigationView(horizontalPadding: 40, show: $showPopup){
-                TextField("ListName", text: $listName)
+                TextField("List Name:", text: $listName)
                     .disableAutocorrection(true)
-                    .navigationTitle("Add New Movie")
+                    .navigationTitle("Add New List")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar{
                         ToolbarItem(placement: .navigationBarLeading){

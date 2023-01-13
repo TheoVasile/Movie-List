@@ -63,7 +63,7 @@ struct DataAccess {
          */
         do {
             let db = try Connection(fileName())
-            var id_ = getNewId()
+            let id_ = getNewId()
             
             let lists = Table(db_lists)
             
@@ -89,7 +89,7 @@ struct DataAccess {
             let movies = Table(db_movies)
             let rowIterator = try db.prepareRowIterator(movies)
             for movie in try Array(rowIterator) {
-                if movie[id] == id_ || true {
+                if movie[id] == id_ {
                     moviesFromList.append(movie[movieName])
                 }
             }
@@ -190,6 +190,8 @@ struct DataAccess {
             
             try db.run(movies.drop(ifExists: true))
             try db.run(lists.drop(ifExists: true))
+            
+            print("Dropped tables")
             
         } catch {
             print("ERROR: \(error)")

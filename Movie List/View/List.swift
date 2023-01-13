@@ -25,15 +25,19 @@ struct ListView: View {
         ZStack{
             NavigationView{
                 VStack{
-                    Text(listName)
                     if movieArray.count == 0{
                         Text("No Movies Added Yet")
                     }
-                    ForEach(movieArray, id: \.self){movieName in
-                        Text(movieName)
+                    List {
+                        
+                        ForEach(movieArray, id: \.self){movieName in
+                            Text(movieName)
+                        }
+                        
                     }
-                    
                 }
+                .navigationTitle(listName)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){
                         Button{
