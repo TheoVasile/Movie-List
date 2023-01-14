@@ -24,8 +24,9 @@ extension View{
                         NavigationView{
                             content()
                         }
-                        .frame(width: size.width - horizontalPadding, height: 150, alignment: .center)
+                        .frame(height: 150, alignment: .center)
                         .cornerRadius(15)
+                        .padding(horizontalPadding)
                     }
                 }
             }

@@ -46,8 +46,9 @@ struct Home: View {
                     }
                 }
             }
-            .popupNavigationView(horizontalPadding: 40, show: $showPopup){
+            .popupNavigationView(horizontalPadding: 20, show: $showPopup){
                 TextField("List Name:", text: $listName)
+                    .padding()
                     .disableAutocorrection(true)
                     .navigationTitle("Add New List")
                     .navigationBarTitleDisplayMode(.inline)
