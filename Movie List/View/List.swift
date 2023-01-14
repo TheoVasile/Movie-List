@@ -51,6 +51,9 @@ struct ListView: View {
                             Image(systemName: "plus")
                         }
                     }
+                    ToolbarItem(placement: .navigationBarTrailing){
+                        NavigationLink("Compare", destination: CompareMovieView(listName: listName))
+                    }
                 }
             }
             .popupNavigationView(horizontalPadding: 40, show: $showPopup){
