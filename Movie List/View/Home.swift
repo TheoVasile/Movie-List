@@ -15,7 +15,7 @@ struct Home: View {
     @State var listName: String = ""
     
     var body: some View{
-        var array = db.getLists() ?? []
+        let array = db.getLists() ?? []
         ZStack{
             NavigationView{
                 VStack{

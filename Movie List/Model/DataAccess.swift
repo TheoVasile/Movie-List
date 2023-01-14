@@ -163,7 +163,7 @@ struct DataAccess {
                     id_ += 1
                 }
             }
-            return id_
+            return id_ + 1
         } catch {
             print("ERROR: \(error)")
         }
