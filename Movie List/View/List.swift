@@ -31,7 +31,11 @@ struct ListView: View {
                     List {
                         
                         ForEach(movieArray){movie in
-                            Text(movie.name)
+                            HStack{
+                                Text("\(String(movie.rank)).")
+                                Text(movie.name)
+                                Text("(\(String(movie.year)))")
+                            }
                         }
                         .onDelete { indexSet in
                             if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0].name, year: nil) < 0 {
