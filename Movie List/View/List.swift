@@ -30,11 +30,11 @@ struct ListView: View {
                     }
                     List {
                         
-                        ForEach(movieArray, id: \.self){movieName in
-                            Text(movieName)
+                        ForEach(movieArray){movie in
+                            Text(movie.name)
                         }
                         .onDelete { indexSet in
-                            if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0], year: nil) < 0 {
+                            if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0].name, year: nil) < 0 {
                                 print("Failed to delete movie")
                             }
                         }

@@ -10,7 +10,7 @@ import SwiftUI
 
 struct CompareMovieView: View {
     
-    @State var movieList: Array<String>
+    @State var movieList: Array<Movie>
     
     @State var movie1: String = "Movie 1"
     @State var movie2: String = "Movie 2"
@@ -21,8 +21,8 @@ struct CompareMovieView: View {
     }
     
     func selectMovies(){
-        self.movie1 = movieList.randomElement() ?? "Movie 1"
-        self.movie2 = movieList.randomElement() ?? "Movie 2"
+        self.movie1 = movieList.randomElement()?.name ?? "Movie 1"
+        self.movie2 = movieList.randomElement()?.name ?? "Movie 2"
     }
     
     var body: some View{

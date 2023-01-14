@@ -9,6 +9,23 @@ import Foundation
 import SwiftUI
 import SQLite
 
+
+class Movie: Identifiable {
+    var id: UUID?
+    
+    @State var name: String
+    @State var year: Int64
+    @State var rank: Int64
+    
+    init(name: String, year: Int64, rank: Int64){
+        self.id = UUID()
+        self.name = name
+        self.year = year
+        self.rank = rank
+    }
+}
+
+
 struct DataAccess {
     
     let db_movies = "movies"
@@ -125,11 +142,11 @@ struct DataAccess {
         return -1
     }
     
-    func getMovieList(list: String) -> Array<String>?{
+    func getMovieList(list: String) -> Array<Movie>?{
         /**
         Returns a list containing the names of all the movies in the given list
          */
-        var moviesFromList = [String]()
+        var moviesFromList = [Movie]()
         do {
             let db = try Connection(fileName())
             let id_ = getListId(list: list)
@@ -137,7 +154,8 @@ struct DataAccess {
             let rowIterator = try db.prepareRowIterator(movies)
             for movie in try Array(rowIterator) {
                 if movie[id] == id_ {
-                    moviesFromList.append(movie[movieName])
+                    let currMovie: Movie = Movie(name:movie[movieName], year: movie[movieYear], rank: movie[movieRank])
+                    moviesFromList.append(currMovie)
                 }
             }
             
