@@ -56,10 +56,12 @@ struct ListView: View {
                     }
                 }
             }
-            .popupNavigationView(horizontalPadding: 40, show: $showPopup){
+            .popupNavigationView(horizontalPadding: 20, show: $showPopup){
                 VStack{
                     TextField("Movie Name", text: $movieName)
+                        .padding()
                     TextField("Movie Year", text: $movieYear)
+                        .padding(.horizontal)
                         .navigationTitle("Add New Movie")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar{

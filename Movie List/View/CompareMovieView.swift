@@ -28,11 +28,27 @@ struct CompareMovieView: View {
     var body: some View{
         NavigationView{
             HStack{
-                Button(movie1){
+                Button{
                     selectMovies()
+                } label: {
+                    ZStack{
+                        RoundedRectangle(cornerRadius: 25)
+                            .fill(.white)
+                            .frame(width:150, height:150)
+                            .shadow(radius: 5)
+                        Text(movie1)
+                    }
                 }
-                Button(movie2){
+                Button{
                     selectMovies()
+                } label: {
+                    ZStack{
+                        RoundedRectangle(cornerRadius: 25)
+                            .fill(.white)
+                            .frame(width:150, height:150)
+                            .shadow(radius: 5)
+                        Text(movie2)
+                    }
                 }
             }
         }

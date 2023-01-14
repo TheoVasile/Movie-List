@@ -19,12 +19,10 @@ extension View{
                             .opacity(0.15)
                             .ignoresSafeArea()
                         
-                        let size = proxy.size
-                        
                         NavigationView{
                             content()
                         }
-                        .frame(height: 150, alignment: .center)
+                        .frame(height: 175, alignment: .center)
                         .cornerRadius(15)
                         .padding(horizontalPadding)
                     }
