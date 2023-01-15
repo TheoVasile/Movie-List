@@ -142,6 +142,24 @@ struct DataAccess {
         return -1
     }
     
+    func setRank(list: String, name: String, year: Int64, rank: Int64) -> Int {
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            
+            let movies = Table(db_movies)
+            
+            let movie = movies.filter(id == id_ && movieName == name && movieYear == year)
+            
+            try db.run(movie.update(movieRank <- rank))
+            
+            return 0
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
     func swapRanks(list: String, name1: String, year1: Int64, name2: String, year2: Int64) -> Int{
         do {
             let db = try Connection(fileName())

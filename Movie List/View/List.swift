@@ -105,13 +105,25 @@ struct ListView: View {
     }
     
     func move(from source: IndexSet, to destination: Int) {
-        print("SOURCE: \(source)")
-        print("DESTINATION: \(destination)")
-        let movie1 = movieArray[source.first ?? 1]
-        let movie2 = movieArray[min(destination, movieArray.count - 1)]
-        if db.swapRanks(list: listName, name1: movie2.name, year1: movie2.year, name2: movie1.name, year2: movie1.year) < 0 {
-            print("Unable to swap ranks")
+        
+        let fromIndex: Int = source.first ?? 0
+        var toIndex: Int = destination
+        if fromIndex < toIndex {
+            toIndex -= 1
         }
+        print("SOURCE: \(fromIndex)")
+        print("DESTINATION: \(toIndex)")
+        
+        let movie1 = movieArray[fromIndex]
+        let movie2 = movieArray[toIndex]
+        
+        if db.setRank(list: listName, name: movie1.name, year: movie1.year, rank: Int64(toIndex + 1)) < -1 {
+            print("Unable to set rank on movie 1")
+        }
+        if db.setRank(list: listName, name: movie2.name, year: movie2.year, rank: Int64(fromIndex + 1)) < 0 {
+            print("Unable to set rank on movie 2")
+        }
+        
         updateMovieList()
         
         movieArray.move(fromOffsets: source, toOffset: destination)
