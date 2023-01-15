@@ -83,9 +83,10 @@ struct ListView: View {
                             ToolbarItem(placement: .bottomBar){
                                 Button("Add"){
                                     if movieName.count > 0 && movieYear.count > 0{
-                                        if db.addMovie(list: listName, name: movieName, year: Int64(movieYear) ?? 0, rank: 0) < 0{
+                                        if db.addMovie(list: listName, name: movieName, year: Int64(movieYear) ?? 0, rank: Int64(movieArray.count + 1)) < 0{
                                             print("failed to add Movie")
                                         }
+                                        updateMovieList()
                                         movieName = ""
                                         movieYear = ""
                                         withAnimation{showPopup.toggle()}
@@ -96,6 +97,10 @@ struct ListView: View {
                 }
             }
         }
+    }
+    
+    func updateMovieList(){
+        movieArray = db.getMovieList(list: listName) ?? []
     }
     
     func move(from source: IndexSet, to destination: Int) {
