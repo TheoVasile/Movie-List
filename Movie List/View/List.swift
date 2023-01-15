@@ -105,8 +105,17 @@ struct ListView: View {
     }
     
     func move(from source: IndexSet, to destination: Int) {
-            movieArray.move(fromOffsets: source, toOffset: destination)
+        print("SOURCE: \(source)")
+        print("DESTINATION: \(destination)")
+        let movie1 = movieArray[source.first ?? 1]
+        let movie2 = movieArray[min(destination, movieArray.count - 1)]
+        if db.swapRanks(list: listName, name1: movie2.name, year1: movie2.year, name2: movie1.name, year2: movie1.year) < 0 {
+            print("Unable to swap ranks")
         }
+        updateMovieList()
+        
+        movieArray.move(fromOffsets: source, toOffset: destination)
+    }
 }
 
 struct List_Previews: PreviewProvider{

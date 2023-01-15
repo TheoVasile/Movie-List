@@ -119,7 +119,7 @@ struct DataAccess {
         return -1
     }
     
-    func deleteMovie(list: String, name: String, year: Int64?) -> Int64 {
+    func deleteMovie(list: String, name: String, year: Int64?) -> Int {
         /**
          Removes a movie from a list, returns -1 on failure, 0 otherwise
          */
@@ -134,6 +134,38 @@ struct DataAccess {
                 deleted_movie = movies.filter(id == id_ && movieName == name && movieYear == year ?? 0)
             }
             try db.run(deleted_movie.delete())
+            
+            return 0
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
+    func swapRanks(list: String, name1: String, year1: Int64, name2: String, year2: Int64) -> Int{
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            
+            let movies = Table(db_movies)
+            
+            let movie1 = movies.filter(id == id_ && movieName == name1 && movieYear == year1)
+            
+            var rowIterator = try db.prepareRowIterator(movie1)
+            let rank1 = try Array(rowIterator)[0][movieRank]
+            
+            //let rank1 = movie1[movieRank]
+            
+            let movie2 = movies.filter(id == id_ && movieName == name2 && movieYear == year2)
+            rowIterator = try db.prepareRowIterator(movie2)
+            let rank2 = try Array(rowIterator)[0][movieRank]
+            
+            if try db.run(movie1.update(movieRank <- rank2)) > 0{
+                print("\(movie1[movieName]) ID: \(movie1[movieRank])")
+            }
+            if try db.run(movie2.update(movieRank <- rank1)) > 0 {
+                print("\(movie2[movieName]) ID: \(movie2[movieRank])")
+            }
             
             return 0
         } catch {
