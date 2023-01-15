@@ -45,6 +45,7 @@ struct ListView: View {
                             if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0].name, year: nil) < 0 {
                                 print("Failed to delete movie")
                             }
+                            updateMovieList()
                         }
                         
                     }
