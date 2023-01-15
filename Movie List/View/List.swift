@@ -15,12 +15,15 @@ struct ListView: View {
     @State var movieName: String = ""
     @State var movieYear: String = ""
     
+    @State var movieArray: Array<Movie>
+    
     init(listName: String){
         self.listName = listName
+        
+        movieArray = db.getMovieList(list: listName) ?? []
     }
     
     var body: some View{
-        let movieArray = db.getMovieList(list: listName) ?? []
         let _ = print(movieArray)
         ZStack{
             NavigationView{
@@ -37,6 +40,7 @@ struct ListView: View {
                                 Text("(\(String(movie.year)))")
                             }
                         }
+                        .onMove(perform: move)
                         .onDelete { indexSet in
                             if db.deleteMovie(list: listName, name: movieArray[indexSet.first ?? 0].name, year: nil) < 0 {
                                 print("Failed to delete movie")
@@ -93,6 +97,10 @@ struct ListView: View {
             }
         }
     }
+    
+    func move(from source: IndexSet, to destination: Int) {
+            movieArray.move(fromOffsets: source, toOffset: destination)
+        }
 }
 
 struct List_Previews: PreviewProvider{
