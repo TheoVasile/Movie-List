@@ -30,9 +30,10 @@ struct ListView: View {
                 VStack{
                     if movieArray.count == 0{
                         Text("No Movies Added Yet")
+                    } else{
+                        Text("\(db.getListLength(list: listName)) Movies in the List")
                     }
                     List {
-                        
                         ForEach(movieArray){movie in
                             HStack{
                                 Text("\(String(movie.rank)).")
@@ -55,9 +56,10 @@ struct ListView: View {
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){
                         Menu("Options") {
-                            Button("Add Movie"){}
-                            Button("Compare Movies"){}
-                            Button("Recommend Movie"){}
+                            Button("Add Movie"){showPopup.toggle()}
+                            NavigationLink("Compare", destination: CompareMovieView(listName: listName))
+                            Button("Recommend Movie"){
+                            }
                                 }
                     }
                     /**

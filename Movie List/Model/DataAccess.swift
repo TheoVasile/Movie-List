@@ -143,11 +143,10 @@ struct DataAccess {
     }
     
     func setRank(list: String, name: String, year: Int64, rank: Int64) -> Int {
+        /**
+         Reorder the list if a rank is updated. Returns -1 if there is an error, 0 otherwise
+         */
         do {
-            /**
-             Reorder the list if a rank is updated. Returns -1 if there is an error, 0 otherwise
-             */
-            
             let db = try Connection(fileName())
             let id_ = getListId(list: list)
             
@@ -212,6 +211,28 @@ struct DataAccess {
             }
             
             return 0
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return -1
+    }
+    
+    func getListLength(list: String) -> Int{
+        /**
+         Returns the amount of movies in the given list. Returns -1 on error
+         */
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            
+            let moviesTable = Table(db_movies)
+            
+            let moviesInList = moviesTable.filter(id == id_)
+            
+            var rowIterator = try db.prepareRowIterator(moviesInList)
+            let movieCount = try Array(rowIterator).count
+            
+            return movieCount
         } catch {
             print("ERROR: \(error)")
         }
