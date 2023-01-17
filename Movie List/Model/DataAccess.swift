@@ -144,14 +144,40 @@ struct DataAccess {
     
     func setRank(list: String, name: String, year: Int64, rank: Int64) -> Int {
         do {
+            /**
+             Reorder the list if a rank is updated. Returns -1 if there is an error, 0 otherwise
+             */
+            
             let db = try Connection(fileName())
             let id_ = getListId(list: list)
             
             let movies = Table(db_movies)
+            let filteredMovie = movies.filter(id == id_ && movieName == name && movieYear == year) // The movie to reorient
+            var rowIterator = try db.prepareRowIterator(filteredMovie)
+            let targetMovie = try Array(rowIterator)[0]
             
-            let movie = movies.filter(id == id_ && movieName == name && movieYear == year)
+            let oldRank: Int64 = targetMovie[movieRank]
+            try db.run(filteredMovie.update(movieRank <- rank))
             
-            try db.run(movie.update(movieRank <- rank))
+            if rank > oldRank {
+                let moviesToShift = movies.filter(id == id_ && movieRank <= rank && movieRank > oldRank && !(movieName == name && movieYear == year))
+                rowIterator = try db.prepareRowIterator(moviesToShift)
+                for movie in try Array(rowIterator) {
+                    print("SHIFTING \(movie[movieName]) UP")
+                    let currRank: Int64 = movie[movieRank]
+                    try db.run(movies.filter(id == id_ && movieName == movie[movieName] && movieYear == movie[movieYear]).update(movieRank <- currRank - 1))
+                }
+            } else if rank < oldRank{
+                let moviesToShift = movies.filter(id == id_ && movieRank >= rank && movieRank < oldRank && !(movieName == name && movieYear == year))
+                rowIterator = try db.prepareRowIterator(moviesToShift)
+                for movie in try Array(rowIterator) {
+                    print("SHIFTING \(movie[movieName]) DOWN")
+                    let currRank: Int64 = movie[movieRank]
+                    try db.run(movies.filter(id == id_ && movieName == movie[movieName] && movieYear == movie[movieYear]).update(movieRank <- currRank + 1))
+                }
+            }
+            
+            
             
             return 0
         } catch {
@@ -201,7 +227,10 @@ struct DataAccess {
             let db = try Connection(fileName())
             let id_ = getListId(list: list)
             let movies = Table(db_movies)
-            let rowIterator = try db.prepareRowIterator(movies)
+            
+            let moviesInList = movies.filter(id == id_).order(movieRank)
+            
+            let rowIterator = try db.prepareRowIterator(moviesInList)
             for movie in try Array(rowIterator) {
                 if movie[id] == id_ {
                     let currMovie: Movie = Movie(name:movie[movieName], year: movie[movieYear], rank: movie[movieRank])

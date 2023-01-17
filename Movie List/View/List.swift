@@ -115,18 +115,12 @@ struct ListView: View {
         print("DESTINATION: \(toIndex)")
         
         let movie1 = movieArray[fromIndex]
-        let movie2 = movieArray[toIndex]
         
-        if db.setRank(list: listName, name: movie1.name, year: movie1.year, rank: Int64(toIndex + 1)) < -1 {
+        if db.setRank(list: listName, name: movie1.name, year: movie1.year, rank: Int64(toIndex + 1)) < 0 {
             print("Unable to set rank on movie 1")
-        }
-        if db.setRank(list: listName, name: movie2.name, year: movie2.year, rank: Int64(fromIndex + 1)) < 0 {
-            print("Unable to set rank on movie 2")
         }
         
         updateMovieList()
-        
-        movieArray.move(fromOffsets: source, toOffset: destination)
     }
 }
 
