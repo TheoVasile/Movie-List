@@ -54,6 +54,14 @@ struct ListView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){
+                        Menu("Options") {
+                            Button("Add Movie"){}
+                            Button("Compare Movies"){}
+                            Button("Recommend Movie"){}
+                                }
+                    }
+                    /**
+                    ToolbarItem(placement: .navigationBarTrailing){
                         Button{
                             withAnimation{showPopup.toggle()}
                         } label: {
@@ -63,6 +71,7 @@ struct ListView: View {
                     ToolbarItem(placement: .navigationBarTrailing){
                         NavigationLink("Compare", destination: CompareMovieView(listName: listName))
                     }
+                     */
                 }
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){
