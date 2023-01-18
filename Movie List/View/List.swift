@@ -8,6 +8,15 @@
 import Foundation
 import SwiftUI
 
+func recommendMovie(list: String) -> String{
+    let numMovies = Double(db.getListLength(list: list))
+    let selectedRank = Int((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
+    print("SELECTED RANK: \(selectedRank)")
+    let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))
+    
+    return selectedMovie!.name
+}
+
 struct ListView: View {
     
     @State var showPopup: Bool = false
@@ -16,11 +25,14 @@ struct ListView: View {
     @State var movieYear: String = ""
     
     @State var movieArray: Array<Movie>
+    @State var recommendedMovie: String
     
     init(listName: String){
         self.listName = listName
         
         movieArray = db.getMovieList(list: listName) ?? []
+        
+        recommendedMovie = recommendMovie(list: listName)
     }
     
     var body: some View{
@@ -28,6 +40,11 @@ struct ListView: View {
         ZStack{
             NavigationView{
                 VStack{
+                    Text("Movie of the Day: \(recommendedMovie)")
+                    Image("Babylon")
+                        .resizable()
+                        .frame(width: 200, height: 295)
+                        .cornerRadius(25)
                     if movieArray.count == 0{
                         Text("No Movies Added Yet")
                     }
@@ -57,11 +74,7 @@ struct ListView: View {
                             Button("Add Movie"){showPopup.toggle()}
                             NavigationLink("Compare", destination: CompareMovieView(listName: listName))
                             Button("Recommend Movie"){
-                                let numMovies = Double(db.getListLength(list: listName))
-                                let selectedRank = Int((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
-                                print("SELECTED RANK: \(selectedRank)")
-                                let selectedMovie = db.getMovieFromRank(list: listName, rank: Int64(selectedRank))
-                                print("RECOMMENDATION: \(selectedMovie!.name)")
+                                recommendedMovie = recommendMovie(list: listName)
                             }
                         }
                     }
