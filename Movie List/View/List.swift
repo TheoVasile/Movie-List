@@ -92,7 +92,7 @@ struct ListView: View {
                 }
                 .searchable(text: $searchText) {
                     ForEach(searchResults, id: \.self) { result in
-                        Text("\(result)")
+                        Text("\(result)").searchCompletion(result)
                     }
                 }
                 .navigationTitle(listName)
