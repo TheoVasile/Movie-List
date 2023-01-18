@@ -10,11 +10,22 @@ import SwiftUI
 
 func recommendMovie(list: String) -> String{
     let numMovies = Double(db.getListLength(list: list))
-    let selectedRank = Int((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
+    let selectedRank = round((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
     print("SELECTED RANK: \(selectedRank)")
     let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))
     
     return selectedMovie!.name
+}
+
+@ViewBuilder
+func header(recommendedMovie: String) -> some View {
+    VStack{
+        Text("Movie of the Day: \(recommendedMovie)")
+        Image("Babylon")
+            .resizable()
+            .frame(width: 200, height: 295)
+            .cornerRadius(25)
+    }
 }
 
 struct ListView: View {
@@ -36,19 +47,16 @@ struct ListView: View {
     }
     
     var body: some View{
-        let _ = print(movieArray)
         ZStack{
             NavigationView{
                 VStack{
-                    Text("Movie of the Day: \(recommendedMovie)")
-                    Image("Babylon")
-                        .resizable()
-                        .frame(width: 200, height: 295)
-                        .cornerRadius(25)
-                    if movieArray.count == 0{
-                        Text("No Movies Added Yet")
-                    }
                     List {
+                        Section("Movie of the Day: \(recommendedMovie)"){
+                            Image("Babylon")
+                                .resizable()
+                                .frame(width: 200, height: 295)
+                                .cornerRadius(25)
+                        }
                         ForEach(movieArray){movie in
                             HStack{
                                 Text("\(String(movie.rank)).")
@@ -63,7 +71,6 @@ struct ListView: View {
                             }
                             updateMovieList()
                         }
-                        
                     }
                 }
                 .navigationTitle(listName)
@@ -75,21 +82,10 @@ struct ListView: View {
                             NavigationLink("Compare", destination: CompareMovieView(listName: listName))
                             Button("Recommend Movie"){
                                 recommendedMovie = recommendMovie(list: listName)
+                                print("RECOMMENDATION: \(recommendedMovie)")
                             }
                         }
                     }
-                    /**
-                    ToolbarItem(placement: .navigationBarTrailing){
-                        Button{
-                            withAnimation{showPopup.toggle()}
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing){
-                        NavigationLink("Compare", destination: CompareMovieView(listName: listName))
-                    }
-                     */
                 }
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){
