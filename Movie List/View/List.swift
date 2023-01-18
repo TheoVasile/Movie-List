@@ -10,7 +10,7 @@ import SwiftUI
 
 func recommendMovie(list: String) -> String{
     let numMovies = Double(db.getListLength(list: list))
-    let selectedRank = round((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
+    let selectedRank = round((1 - Double.random(in: 0 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
     print("SELECTED RANK: \(selectedRank)")
     let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))
     
@@ -28,12 +28,21 @@ func header(recommendedMovie: String) -> some View {
     }
 }
 
+func getMovieNames(movieArray: Array<Movie>) -> [String]{
+    var movieNames: [String] = []
+    for movie in movieArray {
+        movieNames.append(movie.name)
+    }
+    return movieNames
+}
+
 struct ListView: View {
     
     @State var showPopup: Bool = false
     @State var listName: String
     @State var movieName: String = ""
     @State var movieYear: String = ""
+    @State var searchText: String = ""
     
     @State var movieArray: Array<Movie>
     @State var recommendedMovie: String
@@ -44,6 +53,14 @@ struct ListView: View {
         movieArray = db.getMovieList(list: listName) ?? []
         
         recommendedMovie = recommendMovie(list: listName)
+    }
+    
+    var searchResults: [String] {
+        if searchText.isEmpty {
+            return []
+        } else {
+            return getMovieNames(movieArray: movieArray).filter{$0.contains(searchText)}
+        }
     }
     
     var body: some View{
@@ -71,6 +88,11 @@ struct ListView: View {
                             }
                             updateMovieList()
                         }
+                    }
+                }
+                .searchable(text: $searchText) {
+                    ForEach(searchResults, id: \.self) { result in
+                        Text("\(result)")
                     }
                 }
                 .navigationTitle(listName)
