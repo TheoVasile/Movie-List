@@ -266,6 +266,26 @@ struct DataAccess {
         return nil
     }
     
+    func getMovieFromRank(list: String, rank: Int64) -> Movie?{
+        /**
+         Returns the movie that with the corresponding rank from the given list, nil on failure
+         */
+        do {
+            let db = try Connection(fileName())
+            let id_ = getListId(list: list)
+            let movies = Table(db_movies)
+            
+            let selectedMovie = movies.filter(id == id_ && movieRank == rank)
+            let movie = try Array(db.prepareRowIterator(selectedMovie))[0]
+            
+            return Movie(name: movie[movieName], year: movie[movieYear], rank: rank)
+            
+        } catch {
+            print("ERROR: \(error)")
+        }
+        return nil
+    }
+    
     func getNewId() -> Int64{
         /**
          Return an id that doesnt exist in either table

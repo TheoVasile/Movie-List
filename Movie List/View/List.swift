@@ -30,8 +30,6 @@ struct ListView: View {
                 VStack{
                     if movieArray.count == 0{
                         Text("No Movies Added Yet")
-                    } else{
-                        Text("\(db.getListLength(list: listName)) Movies in the List")
                     }
                     List {
                         ForEach(movieArray){movie in
@@ -59,8 +57,13 @@ struct ListView: View {
                             Button("Add Movie"){showPopup.toggle()}
                             NavigationLink("Compare", destination: CompareMovieView(listName: listName))
                             Button("Recommend Movie"){
+                                let numMovies = Double(db.getListLength(list: listName))
+                                let selectedRank = Int((Double.random(in: 1 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
+                                print("SELECTED RANK: \(selectedRank)")
+                                let selectedMovie = db.getMovieFromRank(list: listName, rank: Int64(selectedRank))
+                                print("RECOMMENDATION: \(selectedMovie!.name)")
                             }
-                                }
+                        }
                     }
                     /**
                     ToolbarItem(placement: .navigationBarTrailing){
