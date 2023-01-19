@@ -75,11 +75,15 @@ struct ListView: View {
             NavigationView{
                 VStack{
                     List {
-                        Section("Movie of the Day: \(recommendedMovie)"){
-                            Image("Babylon")
-                                .resizable()
-                                .frame(width: 200, height: 295)
-                                .cornerRadius(25)
+                        if db.getListLength(list: listName) > 0 {
+                            Section("Movie of the Day: \(recommendedMovie)"){
+                                Image("Babylon")
+                                    .resizable()
+                                    .frame(width: 200, height: 295)
+                                    .cornerRadius(25)
+                            }
+                        } else {
+                            Text("No Movies Added")
                         }
                         ForEach(movieArray){movie in
                             HStack{
