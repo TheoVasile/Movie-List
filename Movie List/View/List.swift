@@ -9,7 +9,14 @@ import Foundation
 import SwiftUI
 
 func recommendMovie(list: String) -> String{
+    /**
+     Return the name of a movie in the given list. More likely to return highly rated movies.
+     If there are no movies, return an empty string
+     */
     let numMovies = Double(db.getListLength(list: list))
+    if numMovies < 1 {
+        return ""
+    }
     let selectedRank = round((1 - Double.random(in: 0 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
     print("SELECTED RANK: \(selectedRank)")
     let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))

@@ -30,6 +30,7 @@ struct DataAccess {
     
     let db_movies = "movies"
     let db_lists = "lists"
+    let db_movieLists = "movie_lists"
     
     let listName = Expression<String>("list_name")
     let id = Expression<Int64>("id")
@@ -401,5 +402,4 @@ struct DataAccess {
             t.column(id)
         })
     }
-    
 }
