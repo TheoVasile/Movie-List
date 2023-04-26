@@ -14,6 +14,7 @@
 		FA10A9F1296A755900FDF445 /* Movie_ListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9F0296A755900FDF445 /* Movie_ListTests.swift */; };
 		FA10A9FB296A755900FDF445 /* Movie_ListUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9FA296A755900FDF445 /* Movie_ListUITests.swift */; };
 		FA10A9FD296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9FC296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift */; };
+		FA6F64C929F88B6E00B418DB /* Network.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6F64C829F88B6E00B418DB /* Network.swift */; };
 		FAE62ECC2970BAEA000654E1 /* Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ECB2970BAEA000654E1 /* Home.swift */; };
 		FAE62ECE2970BBE9000654E1 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ECD2970BBE9000654E1 /* Extensions.swift */; };
 		FAE62ED02970CF5A000654E1 /* List.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ECF2970CF5A000654E1 /* List.swift */; };
@@ -115,6 +116,7 @@
 		FA10A9F6296A755900FDF445 /* Movie ListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Movie ListUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA10A9FA296A755900FDF445 /* Movie_ListUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie_ListUITests.swift; sourceTree = "<group>"; };
 		FA10A9FC296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie_ListUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		FA6F64C829F88B6E00B418DB /* Network.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Network.swift; sourceTree = "<group>"; };
 		FAE62ECB2970BAEA000654E1 /* Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Home.swift; sourceTree = "<group>"; };
 		FAE62ECD2970BBE9000654E1 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		FAE62ECF2970CF5A000654E1 /* List.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = List.swift; sourceTree = "<group>"; };
@@ -226,6 +228,7 @@
 			isa = PBXGroup;
 			children = (
 				FAE62F392970E552000654E1 /* DataAccess.swift */,
+				FA6F64C829F88B6E00B418DB /* Network.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -453,6 +456,7 @@
 				FAE62ED42970D5C5000654E1 /* AddMovieView.swift in Sources */,
 				FAE62ECC2970BAEA000654E1 /* Home.swift in Sources */,
 				FA10A9E0296A755800FDF445 /* Movie_ListApp.swift in Sources */,
+				FA6F64C929F88B6E00B418DB /* Network.swift in Sources */,
 				FAE62ED02970CF5A000654E1 /* List.swift in Sources */,
 				FAE62ECE2970BBE9000654E1 /* Extensions.swift in Sources */,
 				FAE62F3A2970E552000654E1 /* DataAccess.swift in Sources */,

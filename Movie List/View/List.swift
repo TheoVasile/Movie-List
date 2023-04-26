@@ -45,6 +45,7 @@ func getMovieNames(movieArray: Array<Movie>) -> [String]{
 
 struct ListView: View {
     
+    @EnvironmentObject var network: Network
     @State var showPopup: Bool = false
     @State var listName: String
     @State var movieName: String = ""
@@ -53,6 +54,8 @@ struct ListView: View {
     
     @State var movieArray: Array<Movie>
     @State var recommendedMovie: String
+    
+    @State var otherSearchResults: [String] = []
     
     init(listName: String){
         self.listName = listName
@@ -123,10 +126,12 @@ struct ListView: View {
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){
                 VStack{
-                    TextField("Movie Name", text: $movieName)
-                        .padding()
-                    TextField("Movie Year", text: $movieYear)
-                        .padding(.horizontal)
+                    VStack{List{Text("")}}
+                        .searchable(text: $searchText){
+                            ForEach(network.movies) { movie in
+                                Text("\(movie.title)").searchCompletion(movie.title)
+                            }
+                        }
                         .navigationTitle("Add New Movie")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar{
@@ -138,15 +143,22 @@ struct ListView: View {
                                 }
                             }
                             ToolbarItem(placement: .bottomBar){
-                                Button("Add"){
-                                    if movieName.count > 0 && movieYear.count > 0{
-                                        if db.addMovie(list: listName, name: movieName, year: Int64(movieYear) ?? 0, rank: Int64(movieArray.count + 1)) < 0{
-                                            print("failed to add Movie")
+                                VStack{
+                                    Button("Search"){
+                                        if searchText.count > 0{
+                                            network.searchMovies(name: searchText)
                                         }
-                                        updateMovieList()
-                                        movieName = ""
-                                        movieYear = ""
-                                        withAnimation{showPopup.toggle()}
+                                        /*
+                                        if movieName.count > 0 && movieYear.count > 0{
+                                            network.searchMovies(name: movieName)
+                                            if db.addMovie(list: listName, name: movieName, year: Int64(movieYear) ?? 0, rank: Int64(movieArray.count + 1)) < 0{
+                                                print("failed to add Movie")
+                                            }
+                                            updateMovieList()
+                                            movieName = ""
+                                            movieYear = ""
+                                            withAnimation{showPopup.toggle()}
+                                        }*/
                                     }
                                 }
                             }

@@ -11,6 +11,7 @@ let db = DataAccess()
 
 struct Home: View {
     
+    @EnvironmentObject var network: Network
     @State var showPopup: Bool = false
     @State var listName: String = ""
     
@@ -24,7 +25,8 @@ struct Home: View {
                     }
                     List{
                         ForEach(array, id: \.self) {list in
-                            NavigationLink(list, destination: ListView(listName: list))
+                            NavigationLink(list, destination: ListView(listName: list)
+                                .environmentObject(network))
                         }
                         .onDelete { indexSet in
                             if db.deleteList(list: array[indexSet.first ?? 0]) < 0 {
