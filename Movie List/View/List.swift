@@ -8,22 +8,6 @@
 import Foundation
 import SwiftUI
 
-func recommendMovie(list: String) -> String{
-    /**
-     Return the name of a movie in the given list. More likely to return highly rated movies.
-     If there are no movies, return an empty string
-     */
-    let numMovies = Double(db.getListLength(list: list))
-    if numMovies < 1 {
-        return ""
-    }
-    let selectedRank = round((1 - Double.random(in: 0 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
-    print("SELECTED RANK: \(selectedRank)")
-    let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))
-    
-    return selectedMovie!.name
-}
-
 @ViewBuilder
 func header(recommendedMovie: String) -> some View {
     VStack{
@@ -46,23 +30,23 @@ func getMovieNames(movieArray: Array<Movie>) -> [String]{
 struct ListView: View {
     
     @EnvironmentObject var network: Network
+    @EnvironmentObject var db: DataAccess
+    @ObservedObject var viewModel: ListViewModel
     @State var showPopup: Bool = false
     @State var listName: String
     @State var movieName: String = ""
     @State var movieYear: String = ""
     @State var searchText: String = ""
     
-    @State var movieArray: Array<Movie>
-    @State var recommendedMovie: String
+    @State var movieArray: [Movie] = []
+    @State var recommendedMovie = ""
     
     @State var otherSearchResults: [String] = []
     
     init(listName: String){
         self.listName = listName
         
-        movieArray = db.getMovieList(list: listName) ?? []
-        
-        recommendedMovie = recommendMovie(list: listName)
+        _viewModel = ObservedObject(wrappedValue: ListViewModel.create(withDataAccess: DataAccess()))
     }
     
     var searchResults: [String] {
@@ -116,8 +100,9 @@ struct ListView: View {
                         Menu("Options") {
                             Button("Add Movie"){showPopup.toggle()}
                             NavigationLink("Compare", destination: CompareMovieView(listName: listName))
+                                .environmentObject(db)
                             Button("Recommend Movie"){
-                                recommendedMovie = recommendMovie(list: listName)
+                                recommendedMovie = viewModel.recommendMovie(list: listName)
                                 print("RECOMMENDATION: \(recommendedMovie)")
                             }
                         }
@@ -192,6 +177,34 @@ struct ListView: View {
         }
         
         updateMovieList()
+    }
+}
+
+class ListViewModel: ObservableObject {
+    var db: DataAccess
+    
+    init(db: DataAccess) {
+        self.db = db
+    }
+    
+    static func create(withDataAccess db: DataAccess) -> ListViewModel {
+        return ListViewModel(db: db)
+    }
+    
+    func recommendMovie(list: String) -> String{
+        /**
+         Return the name of a movie in the given list. More likely to return highly rated movies.
+         If there are no movies, return an empty string
+         */
+        let numMovies = Double(db.getListLength(list: list))
+        if numMovies < 1 {
+            return ""
+        }
+        let selectedRank = round((1 - Double.random(in: 0 ..< numMovies) / numMovies).squareRoot() * (numMovies - 1) + 1)
+        print("SELECTED RANK: \(selectedRank)")
+        let selectedMovie = db.getMovieFromRank(list: list, rank: Int64(selectedRank))
+        
+        return selectedMovie!.name
     }
 }
 

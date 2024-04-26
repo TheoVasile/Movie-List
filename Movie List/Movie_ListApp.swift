@@ -10,11 +10,14 @@ import SwiftUI
 
 @main
 struct Movie_ListApp: App {
-    var network = Network()
+    @StateObject private var network = Network()
+    @StateObject private var db = DataAccess()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(network)
+                .environmentObject(db)
         }
     }
 }

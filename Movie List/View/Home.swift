@@ -7,75 +7,120 @@
 
 import SwiftUI
 
-let db = DataAccess()
-
 struct Home: View {
     
     @EnvironmentObject var network: Network
+    @EnvironmentObject var db: DataAccess
+    @ObservedObject var viewModel: HomeViewModel
     @State var showPopup: Bool = false
-    @State var listName: String = ""
+    @State var listName = ""
+    
+    init() {
+        _viewModel = ObservedObject(wrappedValue: HomeViewModel.create(withDataAccess: DataAccess()))
+    }
     
     var body: some View{
-        let array = db.getLists() ?? []
         ZStack{
             NavigationView{
                 VStack{
-                    if array.count == 0{
-                        Text("No Lists, Add One Now!")
-                    }
-                    List{
-                        ForEach(array, id: \.self) {list in
-                            NavigationLink(list, destination: ListView(listName: list)
-                                .environmentObject(network))
-                        }
-                        .onDelete { indexSet in
-                            if db.deleteList(list: array[indexSet.first ?? 0]) < 0 {
-                                print("Failed to delete list")
-                            }
-                        }
-                        .padding(10)
-                    }
+                    movieListsView
                 }
                 .navigationTitle("Movie Lists")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){
                         Button{
-                            withAnimation{showPopup.toggle()}
+                            withAnimation{ showPopup.toggle() }
                         } label: {
                             Image(systemName: "plus")
                         }
                     }
                 }
             }
-            .popupNavigationView(horizontalPadding: 20, show: $showPopup){
-                TextField("List Name:", text: $listName)
-                    .padding()
-                    .disableAutocorrection(true)
-                    .navigationTitle("Add New List")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar{
-                        ToolbarItem(placement: .navigationBarLeading){
-                            Button("Close"){
-                                listName = ""
-                                withAnimation{
-                                    showPopup.toggle()
-                                }
-                            }
-                        }
-                        ToolbarItem(placement: .bottomBar){
-                            Button("Add"){
-                                if listName.count > 0{
-                                    if db.addList(list: listName) < 0{
-                                        print("failed to add list")
-                                    }
-                                    listName = ""
-                                    withAnimation{showPopup.toggle()}
-                                }
-                            }
-                        }
-                    }
+            .popupNavigationView(horizontalPadding: 20, show: $showPopup){ newListPopup }
+        }
+    }
+}
+
+private extension Home {
+    var movieListsView: some View {
+        Group {
+            if viewModel.lists.isEmpty {
+                Text("No Lists, Add one Now!")
+            } else {
+                movieLists
             }
+        }
+    }
+    var movieLists: some View {
+        List {
+            ForEach(viewModel.lists, id: \.self) { list in
+                NavigationLink(list, destination: ListView(listName: list)
+                    .environmentObject(network))
+                    .environmentObject(db)
+            }
+            .onDelete(perform: viewModel.deleteList)
+            .padding(10)
+        }
+    }
+    
+    func closePopup() {
+        withAnimation{ showPopup.toggle() }
+    }
+    
+    func addNewList() {
+        if listName.count > 0 {
+            viewModel.addList(named: listName)
+            withAnimation { showPopup.toggle() }
+        }
+    }
+    
+    var newListPopup: some View {
+            TextField("List Name:", text: $listName)
+                .padding()
+                .disableAutocorrection(true)
+                .navigationTitle("Add New List")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Close") { closePopup() }
+                    }
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Add") { addNewList() }
+                    }
+                }
+        }
+}
+
+class HomeViewModel: ObservableObject {
+    @Published var lists: [String] = []
+    var db: DataAccess
+    
+    init(db: DataAccess) {
+        self.db = db
+        loadLists()
+    }
+    
+    static func create(withDataAccess db: DataAccess) -> HomeViewModel {
+        return HomeViewModel(db: db)
+    }
+    
+    func loadLists() {
+        lists = db.getLists() ?? []
+        print(lists)
+    }
+    
+    func addList(named name: String) {
+        if name.count > 0 {
+            if db.addList(list: name) < 0 {
+                print("failed to add list")
+            }
+        }
+    }
+    
+    func deleteList(at offsets: IndexSet) {
+        if db.deleteList(list: lists[offsets.first ?? 0]) < 0 {
+            print("Failed to delete list")
         }
     }
 }

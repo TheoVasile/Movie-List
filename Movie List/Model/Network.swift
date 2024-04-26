@@ -21,7 +21,7 @@ struct APIMovie: Identifiable, Decodable {
     var overview: String?
 }
 
-class Network: ObservableObject{
+class Network: ObservableObject {
     
     @Published var movies: [APIMovie] = []
     

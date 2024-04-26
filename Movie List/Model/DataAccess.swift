@@ -26,7 +26,7 @@ class Movie: Identifiable {
 }
 
 
-struct DataAccess {
+class DataAccess: ObservableObject {
     
     let db_movies = "movies"
     let db_lists = "lists"

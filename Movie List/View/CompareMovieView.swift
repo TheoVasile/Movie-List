@@ -10,14 +10,16 @@ import SwiftUI
 
 struct CompareMovieView: View {
     
+    @EnvironmentObject var db: DataAccess
     @State var movieList: Array<Movie>
+    var listName: String
     
     @State var movie1: String = "Movie 1"
     @State var movie2: String = "Movie 2"
     
     init(listName: String){
-        self.movieList = db.getMovieList(list: listName) ?? []
-        selectMovies()
+        self.listName = listName
+        _movieList = State(initialValue: [])
     }
     
     func selectMovies(){
@@ -54,6 +56,10 @@ struct CompareMovieView: View {
                     }
                 }
             }
+        }
+        .onAppear{
+            movieList = db.getMovieList(list: listName) ?? []
+            selectMovies()
         }
         .navigationTitle("Compare Movies")
         .navigationBarTitleDisplayMode(.inline)
