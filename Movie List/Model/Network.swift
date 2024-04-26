@@ -7,43 +7,68 @@
 
 import SwiftUI
 
-let api_key = "X"
+let environment = ProcessInfo.processInfo.environment
+let api_key = environment["api_key"] ?? "default_value"
 
 struct Search: Decodable {
-    var searchType: String
-    var expression: String
     var results: [APIMovie]
 }
 
 struct APIMovie: Identifiable, Decodable {
-    var id: String
-    var resultType: String
-    var image: String
+    var id: Int
+    var poster_path: String?
     var title: String
-    var description: String
+    var overview: String?
 }
 
-class Network: ObservableObject {
+class Network: ObservableObject{
     
     @Published var movies: [APIMovie] = []
     
-    func searchMovies(name: String) {
-        let newName = name.replacingOccurrences(of: " ", with: "%20", options: .literal, range: nil)
-        guard let url = URL(string: "https://imdb-api.com/en/API/SearchMovie/\(api_key)/\(newName)") else { fatalError("Missing URL") }
+    func searchMovies(name: String) async {
+        let url = URL(string: "https://api.themoviedb.org/3/search/movie")!
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        let queryItems: [URLQueryItem] = [
+          URLQueryItem(name: "query", value: name),
+          URLQueryItem(name: "include_adult", value: "false"),
+          URLQueryItem(name: "language", value: "en-US"),
+          URLQueryItem(name: "page", value: "1"),
+        ]
+        components.queryItems = components.queryItems.map { $0 + queryItems } ?? queryItems
 
-        let urlRequest = URLRequest(url: url)
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        request.allHTTPHeaderFields = [
+          "accept": "application/json",
+          "Authorization": "Bearer \(api_key)"
+        ]
 
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            //print(String(decoding: data, as: UTF8.self))
+            let decodedMovies = try JSONDecoder().decode(Search.self, from: data)
+            print("succeeded")
+            
+            await MainActor.run() {
+                self.movies = decodedMovies.results
+            }
+        } catch {
+            print("request failed \(error)")
+        }
+        /*
         let dataTask = URLSession.shared.dataTask(with: urlRequest) { (data, response, error) in
             if let error = error {
-                print("Request error: ", error)
-                return
+            print("Request error: ", error)
+            return
             }
 
             guard let response = response as? HTTPURLResponse else { return }
 
             if response.statusCode == 200 {
-                guard let data = data else { return }
-                DispatchQueue.main.async {
+            guard let data = data else { return }
+            DispatchQueue.main.async {
                     do {
                         let decodedMovies = try JSONDecoder().decode(Search.self, from: data)
                         self.movies = decodedMovies.results
@@ -57,8 +82,6 @@ class Network: ObservableObject {
             }
         }
 
-        dataTask.resume()
-        
+        dataTask.resume()*/
     }
-    
 }

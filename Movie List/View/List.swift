@@ -146,7 +146,10 @@ struct ListView: View {
                                 VStack{
                                     Button("Search"){
                                         if searchText.count > 0{
-                                            network.searchMovies(name: searchText)
+                                            Task {
+                                                await network.searchMovies(name: searchText)
+                                                
+                                            }
                                         }
                                         /*
                                         if movieName.count > 0 && movieYear.count > 0{
