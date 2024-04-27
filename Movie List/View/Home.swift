@@ -16,7 +16,7 @@ struct Home: View {
     @State var listName = ""
     
     init() {
-        _viewModel = ObservedObject(wrappedValue: HomeViewModel.create(withDataAccess: DataAccess()))
+        _viewModel = ObservedObject(wrappedValue: HomeViewModel())
     }
     
     var body: some View{
@@ -39,6 +39,10 @@ struct Home: View {
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ newListPopup }
         }
+        .onAppear {
+                    print("APPEARED")
+                    viewModel.setup(db: db, network: network)
+                }
     }
 }
 
@@ -55,9 +59,7 @@ private extension Home {
     var movieLists: some View {
         List {
             ForEach(viewModel.lists, id: \.self) { list in
-                NavigationLink(list, destination: ListView(listName: list)
-                    .environmentObject(network))
-                    .environmentObject(db)
+                NavigationLink(list, destination: ListView(listName: list))
             }
             .onDelete(perform: viewModel.deleteList)
             .padding(10)
@@ -94,32 +96,34 @@ private extension Home {
 
 class HomeViewModel: ObservableObject {
     @Published var lists: [String] = []
-    var db: DataAccess
+    var db: DataAccess? = nil
+    var network: Network? = nil
     
-    init(db: DataAccess) {
+    init(){ }
+    
+    func setup(db: DataAccess, network: Network) {
         self.db = db
-        loadLists()
-    }
-    
-    static func create(withDataAccess db: DataAccess) -> HomeViewModel {
-        return HomeViewModel(db: db)
+        self.network = network
+        self.loadLists()
+        print("setup")
     }
     
     func loadLists() {
-        lists = db.getLists() ?? []
+        lists = db?.getLists() ?? []
         print(lists)
     }
     
     func addList(named name: String) {
         if name.count > 0 {
-            if db.addList(list: name) < 0 {
+            lists.append(name)
+            if (db?.addList(list: name) ?? -1) < 0 {
                 print("failed to add list")
             }
         }
     }
     
     func deleteList(at offsets: IndexSet) {
-        if db.deleteList(list: lists[offsets.first ?? 0]) < 0 {
+        if (db?.deleteList(list: lists[offsets.first ?? 0]) ?? -1) < 0 {
             print("Failed to delete list")
         }
     }
@@ -128,5 +132,7 @@ class HomeViewModel: ObservableObject {
 struct Home_Previews: PreviewProvider{
     static var previews: some View{
         Home()
+            .environmentObject(Network())
+            .environmentObject(DataAccess())
     }
 }
