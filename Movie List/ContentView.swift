@@ -9,12 +9,12 @@ import Foundation
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var network: Network
-    @EnvironmentObject var db: DataAccess
+    @EnvironmentObject var network: NetworkService
+    @EnvironmentObject var db: DatabaseService
     @State var showingPopup = false
     
     var body: some View {
-        Home()
+        Home(viewModel: HomeViewModel())
             .environmentObject(network)
             .environmentObject(db)
     }
@@ -23,7 +23,7 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
-            .environmentObject(Network())
-            .environmentObject(DataAccess())
+            .environmentObject(NetworkService())
+            .environmentObject(DatabaseService())
     }
 }

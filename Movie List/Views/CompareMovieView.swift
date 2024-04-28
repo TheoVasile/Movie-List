@@ -10,7 +10,7 @@ import SwiftUI
 
 struct CompareMovieView: View {
     
-    @EnvironmentObject var db: DataAccess
+    @EnvironmentObject var db: DatabaseService
     @State var movieList: Array<Movie>
     var listName: String
     
@@ -69,8 +69,8 @@ struct CompareMovieView: View {
 struct CompareMovieView_Previews: PreviewProvider{
     static var previews: some View{
         CompareMovieView(listName: "Test List")
-            .environmentObject(DataAccess())
-            .environmentObject(Network())
+            .environmentObject(DatabaseService())
+            .environmentObject(NetworkService())
     }
 }
 

@@ -10,8 +10,8 @@ import SwiftUI
 
 @main
 struct Movie_ListApp: App {
-    @StateObject private var network = Network()
-    @StateObject private var db = DataAccess()
+    @StateObject private var network = NetworkService()
+    @StateObject private var db = DatabaseService()
     
     var body: some Scene {
         WindowGroup {

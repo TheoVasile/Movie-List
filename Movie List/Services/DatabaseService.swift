@@ -27,7 +27,7 @@ class Movie: Identifiable {
 */
 
 
-class DataAccess: ObservableObject {
+class DatabaseService: ObservableObject {
     
     let db_movies = "movies"
     let db_lists = "lists"

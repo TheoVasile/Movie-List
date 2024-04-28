@@ -9,15 +9,15 @@ import SwiftUI
 
 struct Home: View {
     
-    @EnvironmentObject var network: Network
-    @EnvironmentObject var db: DataAccess
+    @EnvironmentObject var network: NetworkService
+    @EnvironmentObject var db: DatabaseService
     @ObservedObject var viewModel: HomeViewModel
     @State var showPopup: Bool = false
     @State var listName = ""
     
-    init() {
-        _viewModel = ObservedObject(wrappedValue: HomeViewModel())
-    }
+    //init() {
+    //    _viewModel = ObservedObject(wrappedValue: HomeViewModel())
+    //}
     
     var body: some View{
         ZStack{
@@ -59,7 +59,7 @@ private extension Home {
     var movieLists: some View {
         List {
             ForEach(viewModel.lists, id: \.self) { list in
-                NavigationLink(list, destination: ListView(listName: list))
+                NavigationLink(list, destination: ListView(viewModel: ListViewModel(listName: listName)))
             }
             .onDelete(perform: viewModel.deleteList)
             .padding(10)
@@ -94,45 +94,11 @@ private extension Home {
         }
 }
 
-class HomeViewModel: ObservableObject {
-    @Published var lists: [String] = []
-    var db: DataAccess? = nil
-    var network: Network? = nil
-    
-    init(){ }
-    
-    func setup(db: DataAccess, network: Network) {
-        self.db = db
-        self.network = network
-        self.loadLists()
-        print("setup")
-    }
-    
-    func loadLists() {
-        lists = db?.getLists() ?? []
-        print(lists)
-    }
-    
-    func addList(named name: String) {
-        if name.count > 0 {
-            lists.append(name)
-            if (db?.addList(list: name) ?? -1) < 0 {
-                print("failed to add list")
-            }
-        }
-    }
-    
-    func deleteList(at offsets: IndexSet) {
-        if (db?.deleteList(list: lists[offsets.first ?? 0]) ?? -1) < 0 {
-            print("Failed to delete list")
-        }
-    }
-}
 
 struct Home_Previews: PreviewProvider{
     static var previews: some View{
-        Home()
-            .environmentObject(Network())
-            .environmentObject(DataAccess())
+        Home(viewModel: HomeViewModel())
+            .environmentObject(NetworkService())
+            .environmentObject(DatabaseService())
     }
 }

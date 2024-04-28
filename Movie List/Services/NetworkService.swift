@@ -14,7 +14,7 @@ struct Search: Decodable {
     var results: [Movie]
 }
 
-class Network: ObservableObject {
+class NetworkService: ObservableObject {
     
     @Published var movies: [Movie] = []
     
