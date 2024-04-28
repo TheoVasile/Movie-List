@@ -107,9 +107,9 @@ private extension ListView {
     
     func movieCard(movie: Movie) -> some View {
         HStack{
-            Text("\(String(movie.rank)).")
-            Text(movie.name)
-            Text("(\(String(movie.year)))")
+            Text("\(String(movie.rank ?? -1)).")
+            Text(movie.title)
+            Text("(\(String(movie.year ?? -1)))")
         }
     }
     
@@ -121,7 +121,7 @@ private extension ListView {
             }
             .onMove(perform: viewModel.move)
             .onDelete { indexSet in
-                viewModel.deleteMovie(name: movieArray[indexSet.first ?? 0].name, year: nil)
+                viewModel.deleteMovie(name: movieArray[indexSet.first ?? 0].title, year: nil)
             }
         }
     }
@@ -141,10 +141,11 @@ class ListViewModel: ObservableObject {
     var db: DataAccess?=nil
     var network: Network?=nil
     var listName: String
-    var movieArray: [Movie]=[]
+    @Published var movieArray: [Movie]=[]
     
     init(listName: String) {
         self.listName = listName
+        network?.$movies.assign(to: &$movieArray)
     }
     
     func setup(db: DataAccess, network: Network) {
@@ -155,7 +156,7 @@ class ListViewModel: ObservableObject {
     func getMovieNames(movieArray: Array<Movie>) -> [String]{
         var movieNames: [String] = []
         for movie in movieArray {
-            movieNames.append(movie.name)
+            movieNames.append(movie.title)
         }
         return movieNames
     }
@@ -188,7 +189,7 @@ class ListViewModel: ObservableObject {
         
         let movie1 = movieArray[fromIndex]
         
-        self.setRank(name: movie1.name, year: movie1.year, rank: Int64(toIndex + 1))
+        self.setRank(name: movie1.title, year: movie1.year ?? 0, rank: Int64(toIndex + 1))
         
         self.updateMovieList()
     }
@@ -214,7 +215,7 @@ class ListViewModel: ObservableObject {
         movieArray = db?.getMovieList(list: listName) ?? []
     }
     
-    func recommendMovie() -> String{
+    func recommendMovie() -> String {
         /**
          Return the name of a movie in the given list. More likely to return highly rated movies.
          If there are no movies, return an empty string
@@ -227,7 +228,7 @@ class ListViewModel: ObservableObject {
         print("SELECTED RANK: \(selectedRank)")
         let selectedMovie = db?.getMovieFromRank(list: listName, rank: Int64(selectedRank)) ?? nil
         
-        return selectedMovie?.name ?? ""
+        return selectedMovie?.title ?? ""
     }
 }
 

@@ -23,8 +23,8 @@ struct CompareMovieView: View {
     }
     
     func selectMovies(){
-        self.movie1 = movieList.randomElement()?.name ?? "Movie 1"
-        self.movie2 = movieList.randomElement()?.name ?? "Movie 2"
+        self.movie1 = movieList.randomElement()?.title ?? "Movie 1"
+        self.movie2 = movieList.randomElement()?.title ?? "Movie 2"
     }
     
     var body: some View{
@@ -69,6 +69,8 @@ struct CompareMovieView: View {
 struct CompareMovieView_Previews: PreviewProvider{
     static var previews: some View{
         CompareMovieView(listName: "Test List")
+            .environmentObject(DataAccess())
+            .environmentObject(Network())
     }
 }
 

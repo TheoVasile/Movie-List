@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 import SQLite
 
-
+/*
 class Movie: Identifiable {
     var id: UUID?
     
@@ -24,6 +24,7 @@ class Movie: Identifiable {
         self.rank = rank
     }
 }
+*/
 
 
 class DataAccess: ObservableObject {
@@ -255,7 +256,7 @@ class DataAccess: ObservableObject {
             let rowIterator = try db.prepareRowIterator(moviesInList)
             for movie in try Array(rowIterator) {
                 if movie[id] == id_ {
-                    let currMovie: Movie = Movie(name:movie[movieName], year: movie[movieYear], rank: movie[movieRank])
+                    let currMovie: Movie = Movie(title:movie[movieName], year: movie[movieYear], rank: movie[movieRank])
                     moviesFromList.append(currMovie)
                 }
             }
@@ -279,7 +280,7 @@ class DataAccess: ObservableObject {
             let selectedMovie = movies.filter(id == id_ && movieRank == rank)
             let movie = try Array(db.prepareRowIterator(selectedMovie))[0]
             
-            return Movie(name: movie[movieName], year: movie[movieYear], rank: rank)
+            return Movie(title: movie[movieName], year: movie[movieYear], rank: rank)
             
         } catch {
             print("ERROR: \(error)")
