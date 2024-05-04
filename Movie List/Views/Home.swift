@@ -68,8 +68,7 @@ private extension Home {
     
     func addNewList() {
         if listName.count > 0 {
-            //viewModel.addList(named: listName)
-            let _ = CDMovieList(name: listName, creation_date: Date.now, overview: "", context: context)
+            CDMovieList(name: listName, overview: "", context: context)
             withAnimation { showPopup.toggle() }
         }
     }
@@ -77,7 +76,6 @@ private extension Home {
     func deleteList(at offsets: IndexSet) {
         withAnimation {
             offsets.forEach { index in
-                // Assuming you have a managed object context and a way to delete from Core Data
                 let deleteItem = movieLists[index]
                 CDMovieList.delete(movieList: deleteItem)
             }

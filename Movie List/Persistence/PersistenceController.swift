@@ -46,7 +46,7 @@ struct PersistenceController {
         
         let movie = CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context)
         
-        let movieList = CDMovieList(name: "Christmas Movies", creation_date: "2024-04-20", overview: "", context: context)
+        let movieList = CDMovieList(name: "Christmas Movies", overview: "", context: context)
         
         return controller
     }()

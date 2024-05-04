@@ -10,21 +10,15 @@ import CoreData
 
 
 extension CDMovieList {
-    convenience init(name: String, creation_date: Date, overview: String, context: NSManagedObjectContext) {
+    convenience init(name: String, overview: String, context: NSManagedObjectContext) {
         self.init(context: context)
         self.id = UUID()
         self.name = name
         
-        self.creation_date = creation_date
+        self.creation_date = Date.now
+        self.date_modified = Date.now
         
         self.overview = overview
-    }
-    convenience init(name: String, creation_date: String, overview: String, context: NSManagedObjectContext) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: creation_date)!
-        
-        self.init(name: name, creation_date: date, overview: overview, context: context)
     }
     
     static func delete(movieList: CDMovieList) {
@@ -36,7 +30,7 @@ extension CDMovieList {
     static func fetch(_ predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
         let request = CDMovieList.fetchRequest()
         request.fetchLimit = 20
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.name, ascending: true)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.date_modified, ascending: true)]
         request.predicate = predicate
         
         return request
@@ -44,7 +38,7 @@ extension CDMovieList {
     
     static var example: CDMovieList {
         let context =  PersistenceController.preview.container.viewContext
-        let movieList = CDMovieList(name: "Christmas Movies", creation_date: "2024-04-20", overview: "", context: context)
+        let movieList = CDMovieList(name: "Christmas Movies", overview: "", context: context)
         
         return movieList
     }

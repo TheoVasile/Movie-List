@@ -20,6 +20,7 @@
     </entity>
     <entity name="CDMovieList" representedClassName="CDMovieList" syncable="YES" codeGenerationType="class">
         <attribute name="creation_date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date_modified" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="overview" optional="YES" attributeType="String"/>
