@@ -9,9 +9,9 @@ import SwiftUI
 
 struct Home: View {
     
+    @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
+    @Environment(\.managedObjectContext) var context
     @EnvironmentObject var network: NetworkService
-    @EnvironmentObject var db: DatabaseService
-    @ObservedObject var viewModel: HomeViewModel
     @State var showPopup: Bool = false
     @State var listName = ""
     
@@ -41,7 +41,7 @@ struct Home: View {
         }
         .onAppear {
                     print("APPEARED")
-                    viewModel.setup(db: db, network: network)
+                    //viewModel.setup(db: db, network: network)
                 }
     }
 }
@@ -49,31 +49,38 @@ struct Home: View {
 private extension Home {
     var movieListsView: some View {
         Group {
-            if viewModel.lists.isEmpty {
+            if movieLists.isEmpty {
                 Text("No Lists, Add one Now!")
             } else {
-                movieLists
+                List {
+                    ForEach(movieLists, id: \.self) { movieList in
+                        NavigationLink(movieList.name ?? "No Name", destination: Text("Test"))
+                    }
+                    .onDelete(perform: deleteList)
+                    .padding(10)
+                }
             }
         }
     }
-    var movieLists: some View {
-        List {
-            ForEach(viewModel.lists, id: \.self) { list in
-                NavigationLink(list, destination: ListView(viewModel: ListViewModel(listName: listName)))
-            }
-            .onDelete(perform: viewModel.deleteList)
-            .padding(10)
-        }
-    }
-    
     func closePopup() {
         withAnimation{ showPopup.toggle() }
     }
     
     func addNewList() {
         if listName.count > 0 {
-            viewModel.addList(named: listName)
+            //viewModel.addList(named: listName)
+            let _ = CDMovieList(name: listName, creation_date: Date.now, overview: "", context: context)
             withAnimation { showPopup.toggle() }
+        }
+    }
+    
+    func deleteList(at offsets: IndexSet) {
+        withAnimation {
+            offsets.forEach { index in
+                // Assuming you have a managed object context and a way to delete from Core Data
+                let deleteItem = movieLists[index]
+                CDMovieList.delete(movieList: deleteItem)
+            }
         }
     }
     
@@ -97,9 +104,8 @@ private extension Home {
 
 struct Home_Previews: PreviewProvider{
     static var previews: some View{
-        Home(viewModel: HomeViewModel())
+        Home()
             .environmentObject(NetworkService())
-            .environmentObject(DatabaseService())
             .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }

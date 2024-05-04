@@ -14,7 +14,7 @@ struct ContentView: View {
     @State var showingPopup = false
     
     var body: some View {
-        Home(viewModel: HomeViewModel())
+        Home()
             .environmentObject(network)
             .environmentObject(db)
     }

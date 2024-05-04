@@ -9,10 +9,6 @@ import Foundation
 import CoreData
 
 extension CDMovie {
-    var user_rating: Float {
-        get { user_rating_ ?? 2.5 }
-        set { user_rating_ = newValue }
-    }
     
     convenience init(id: Int64, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Float, context: NSManagedObjectContext) {
         self.init(context: context)
@@ -21,8 +17,8 @@ extension CDMovie {
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: release_date)
-        self.release_date = date
+        let formattedDate = dateFormatter.date(from: release_date)
+        self.release_date = formattedDate
         
         self.overview = overview
         self.original_language = original_language

@@ -13,10 +13,16 @@ struct MovieRow: View {
     
     var body: some View {
         HStack{
-            Text("\(String(movie.rank ?? -1)).")
+            Text("\(String(movie.rank)).")
             Text(movie.title ?? "No title")
-            Text("(\(String(movie.release_date?.description ?? "Date not found")))")
+            Text(yearString(from: movie.release_date!))
         }
+    }
+    
+    func yearString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy"
+        return formatter.string(from: date)
     }
 }
 

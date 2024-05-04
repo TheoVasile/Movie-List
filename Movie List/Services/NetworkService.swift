@@ -38,7 +38,7 @@ class NetworkService: ObservableObject {
         ]
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, _) = try await URLSession.shared.data(for: request)
             
             //print(String(decoding: data, as: UTF8.self))
             let decodedMovies = try JSONDecoder().decode(Search.self, from: data)

@@ -12,9 +12,9 @@
         <attribute name="popularity" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="poster_path" attributeType="String"/>
         <attribute name="rank" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="release_date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="release_date" attributeType="Date" defaultDateTimeInterval="736530900" usesScalarValueType="NO"/>
         <attribute name="title" attributeType="String"/>
-        <attribute name="user_rating_" optional="YES" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="user_rating" attributeType="Float" defaultValueString="-1" usesScalarValueType="YES"/>
         <relationship name="genres" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDGenre" inverseName="movies" inverseEntity="CDGenre"/>
         <relationship name="list" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDMovieList" inverseName="movies" inverseEntity="CDMovieList"/>
     </entity>

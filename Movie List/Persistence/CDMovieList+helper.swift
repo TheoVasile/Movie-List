@@ -10,17 +10,21 @@ import CoreData
 
 
 extension CDMovieList {
-    convenience init(name: String, creation_date: String, overview: String, context: NSManagedObjectContext) {
+    convenience init(name: String, creation_date: Date, overview: String, context: NSManagedObjectContext) {
         self.init(context: context)
         self.id = UUID()
         self.name = name
         
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: creation_date)
-        self.creation_date = date
+        self.creation_date = creation_date
         
         self.overview = overview
+    }
+    convenience init(name: String, creation_date: String, overview: String, context: NSManagedObjectContext) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let date = dateFormatter.date(from: creation_date)!
+        
+        self.init(name: name, creation_date: date, overview: overview, context: context)
     }
     
     static func delete(movieList: CDMovieList) {
@@ -32,7 +36,7 @@ extension CDMovieList {
     static func fetch(_ predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
         let request = CDMovieList.fetchRequest()
         request.fetchLimit = 20
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovie.popularity, ascending: true), NSSortDescriptor(keyPath: \CDMovie.release_date, ascending: true), NSSortDescriptor(keyPath: \CDMovie.title, ascending: true)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.name, ascending: true)]
         request.predicate = predicate
         
         return request

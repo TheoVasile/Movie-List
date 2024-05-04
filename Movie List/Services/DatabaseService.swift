@@ -231,7 +231,7 @@ class DatabaseService: ObservableObject {
             
             let moviesInList = moviesTable.filter(id == id_)
             
-            var rowIterator = try db.prepareRowIterator(moviesInList)
+            let rowIterator = try db.prepareRowIterator(moviesInList)
             let movieCount = try Array(rowIterator).count
             
             return movieCount

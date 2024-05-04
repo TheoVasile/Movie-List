@@ -10,17 +10,16 @@ import SwiftUI
 
 @main
 struct Movie_ListApp: App {
-    @StateObject private var coreDataStack = CoreDataStack.shared
     @StateObject private var network = NetworkService()
     @StateObject private var db = DatabaseService()
-    //let persistenceController = PersistenceController.shared
+    let persistenceController = PersistenceController.shared
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(network)
                 .environmentObject(db)
-                .environment(\.managedObjectContext, coreDataStack.persistentContainer.viewContext)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
 }
