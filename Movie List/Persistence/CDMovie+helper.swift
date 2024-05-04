@@ -19,15 +19,29 @@ extension CDMovie {
         self.id = id
         self.title = title
         
-        let stringDate = "2022-12-22"
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let date = dateFormatter.date(from: stringDate)
+        let date = dateFormatter.date(from: release_date)
         self.release_date = date
         
         self.overview = overview
         self.original_language = original_language
         self.popularity = popularity
+    }
+    
+    static func delete(movie: CDMovie) {
+        guard let context = movie.managedObjectContext else { return }
+        
+        context.delete(movie)
+    }
+    
+    static func fetch(_ predicate: NSPredicate = .all) -> NSFetchRequest<CDMovie> {
+        let request = CDMovie.fetchRequest()
+        request.fetchLimit = 20
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovie.popularity, ascending: true), NSSortDescriptor(keyPath: \CDMovie.release_date, ascending: true), NSSortDescriptor(keyPath: \CDMovie.title, ascending: true)]
+        request.predicate = predicate
+        
+        return request
     }
     
     static var example: CDMovie {

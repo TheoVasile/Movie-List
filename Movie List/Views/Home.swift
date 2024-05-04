@@ -100,5 +100,6 @@ struct Home_Previews: PreviewProvider{
         Home(viewModel: HomeViewModel())
             .environmentObject(NetworkService())
             .environmentObject(DatabaseService())
+            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }
