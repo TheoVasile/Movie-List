@@ -19,7 +19,7 @@ struct ListView: View {
     @State var movieYear: String = ""
     @State var searchText: String = ""
     
-    @State var recommendedMovie = ""
+    @State var recommendedMovie: CDMovie? = nil
     
     @State var otherSearchResults: [String] = []
     @Environment(\.managedObjectContext) var context
@@ -37,7 +37,12 @@ struct ListView: View {
             NavigationView{
                 VStack{
                     List {
-                        dailyMovie
+                        if recommendedMovie != nil {
+                            dailyMovie
+                        }
+                        if movies.count == 0 {
+                            Text("No Movies Added")
+                        }
                         ForEach(movies){movie in
                             MovieRow(movie: movie)
                         }
@@ -66,15 +71,15 @@ struct ListView: View {
 private extension ListView {
     var dailyMovie: some View {
         Group {
-            if movieList.movies.count > 0 {
-                Section("Movie of the Day: \(recommendedMovie)"){
-                    Image("Babylon")
-                        .resizable()
-                        .frame(width: 200, height: 295)
-                        .cornerRadius(25)
-                }
-            } else {
-                Text("No Movies Added")
+            Section("Movie of the Day: \(recommendedMovie?.title)"){
+                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie?.poster_path)")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            ProgressView()
+                        }
+                        .frame(width: 300, height: 200)
             }
         }
     }
