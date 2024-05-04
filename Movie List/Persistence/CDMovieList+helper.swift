@@ -33,7 +33,7 @@ extension CDMovieList {
         context.delete(movieList)
     }
     
-    static func fetch(_ predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
+    static func fetch(predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
         let request = CDMovieList.fetchRequest()
         request.fetchLimit = 20
         request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.date_modified, ascending: true)]

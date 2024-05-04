@@ -121,7 +121,34 @@ private extension ListView {
     }
     
     func search(searchText: String) {
-        
+        if searchText.count > 0 {
+            Task {
+                await network.searchMovies(name: searchText)
+            }
+        }
+    }
+    
+    func recommendMovie() -> CDMovie? {
+        let numMovies = Double(movies.count)
+        if numMovies < 1 {
+            return nil
+        }
+
+        let selectedRank = round((1 - Double.random(in: 0..<numMovies)) / numMovies.squareRoot() * (numMovies - 1) + 1)
+        print("SELECTED RANK: \(selectedRank)")
+
+        let predicates = [NSPredicate(format: "list == %@", movieList.name! as CVarArg),
+                          NSPredicate(format: "rank == %d", Int(selectedRank))]
+        let request = CDMovie.fetch(NSCompoundPredicate(andPredicateWithSubpredicates: predicates))
+        request.fetchLimit = 1  // We only want one movie
+
+        do {
+            let results = try context.fetch(request)
+            return results.first  // Returns the first movie found, or nil if no movie matches
+        } catch {
+            print("Failed to fetch movie: \(error)")
+            return nil
+        }
     }
     
     func movieCard(movie: Movie) -> some View {
