@@ -10,8 +10,10 @@ import SwiftUI
 
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
-    @EnvironmentObject var db: DatabaseService
-    @ObservedObject var viewModel: ListViewModel
+    //@EnvironmentObject var db: DatabaseService
+    //@ObservedObject var viewModel: ListViewModel
+    var movieList: CDMovieList
+    @FetchRequest(fetchRequest: CDMovie.fetch(), animation: .bouncy) var movies: FetchedResults<CDMovie>
     @State var showPopup: Bool = false
     @State var movieName: String = ""
     @State var movieYear: String = ""
@@ -20,21 +22,34 @@ struct ListView: View {
     @State var recommendedMovie = ""
     
     @State var otherSearchResults: [String] = []
+    @Environment(\.managedObjectContext) var context
     
-    //init(listViewModel: ListViewModel){
-    //    _viewModel = ObservedObject(wrappedValue: ListViewModel(listName: listName))
-    //}
+    
+    init(movieList: CDMovieList){
+        self.movieList = movieList
+        let request = CDMovie.fetch()
+        request.predicate = NSPredicate(format: "list == %@", movieList as CVarArg)
+        self._movies = FetchRequest(fetchRequest: request)
+    }
     
     var body: some View{
         ZStack{
             NavigationView{
                 VStack{
-                    movieList(movieArray: viewModel.movieArray)
+                    List {
+                        dailyMovie
+                        ForEach(movies){movie in
+                            MovieRow(movie: movie)
+                        }
+                        //.onDelete { indexSet in
+                        //    movieList?.movies.remove(movieList?.movies[indexSet.first ?? 0])
+                        //}
+                    }
                 }
                 .searchable(text: $searchText) {
                     searchResultsList
                 }
-                .navigationTitle(viewModel.listName)
+                .navigationTitle(movieList.name!)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){ optionsMenu }
@@ -43,7 +58,7 @@ struct ListView: View {
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
         }
         .onAppear {
-                    viewModel.setup(db: db, network: network)
+                    //viewModel.setup(db: db, network: network)
                 }
     }
 }
@@ -51,7 +66,7 @@ struct ListView: View {
 private extension ListView {
     var dailyMovie: some View {
         Group {
-            if viewModel.hasItems() {
+            if movieList.movies.count > 0 {
                 Section("Movie of the Day: \(recommendedMovie)"){
                     Image("Babylon")
                         .resizable()
@@ -68,19 +83,19 @@ private extension ListView {
     var optionsMenu: some View {
         Menu("Options") {
             Button("Add Movie"){ showPopup.toggle() }
-            NavigationLink("Compare", destination: CompareMovieView(listName: viewModel.listName))
-                .environmentObject(db)
+            NavigationLink("Compare", destination: CompareMovieView(listName: movieList.name!))
             Button("Recommend Movie"){
-                recommendedMovie = viewModel.recommendMovie()
+                //recommendedMovie = viewModel.recommendMovie()
                 print("RECOMMENDATION: \(recommendedMovie)")
             }
         }
     }
     
     var searchResultsList: some View {
-        ForEach(viewModel.searchResults(searchText: searchText), id: \.self) { result in
-            Text("\(result)").searchCompletion(result)
-        }
+        //ForEach(viewModel.searchResults(searchText: searchText), id: \.self) { result in
+        //    Text("\(result)").searchCompletion(result)
+        //}
+        Text("PlaceHolder")
     }
     
     var popup: some View {
@@ -98,11 +113,15 @@ private extension ListView {
                         Button("Close"){ withAnimation{ showPopup.toggle() } }
                     }
                     ToolbarItem(placement: .bottomBar) {
-                        Button("Search"){ viewModel.search(searchText: searchText) }
+                        Button("Search"){ search(searchText: searchText) }
                     }
                 }
             
         }
+    }
+    
+    func search(searchText: String) {
+        
     }
     
     func movieCard(movie: Movie) -> some View {
@@ -110,19 +129,6 @@ private extension ListView {
             Text("\(String(movie.rank ?? -1)).")
             Text(movie.title)
             Text("(\(String(movie.year ?? -1)))")
-        }
-    }
-    
-    func movieList(movieArray: [Movie]) -> some View {
-        List {
-            dailyMovie
-            ForEach(movieArray){movie in
-                movieCard(movie: movie)
-            }
-            .onMove(perform: viewModel.move)
-            .onDelete { indexSet in
-                viewModel.deleteMovie(name: movieArray[indexSet.first ?? 0].title, year: nil)
-            }
         }
     }
     
@@ -139,9 +145,8 @@ private extension ListView {
 
 
 struct List_Previews: PreviewProvider{
-    static var previews: some View{
-        ListView(viewModel: ListViewModel(listName: "Test List"))
-            .environmentObject(DatabaseService())
+    static var previews: some View {
+        ListView(movieList: CDMovieList.example)
             .environmentObject(NetworkService())
     }
 }

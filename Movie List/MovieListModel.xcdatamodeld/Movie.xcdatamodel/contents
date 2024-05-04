@@ -16,7 +16,7 @@
         <attribute name="title" attributeType="String"/>
         <attribute name="user_rating" attributeType="Float" defaultValueString="-1" usesScalarValueType="YES"/>
         <relationship name="genres" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDGenre" inverseName="movies" inverseEntity="CDGenre"/>
-        <relationship name="list" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDMovieList" inverseName="movies" inverseEntity="CDMovieList"/>
+        <relationship name="list" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDMovieList" inverseName="movies_" inverseEntity="CDMovieList"/>
     </entity>
     <entity name="CDMovieList" representedClassName="CDMovieList" syncable="YES" codeGenerationType="class">
         <attribute name="creation_date" attributeType="Date" usesScalarValueType="NO"/>
@@ -24,6 +24,6 @@
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="overview" optional="YES" attributeType="String"/>
-        <relationship name="movies" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDMovie" inverseName="list" inverseEntity="CDMovie"/>
+        <relationship name="movies_" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CDMovie" inverseName="list" inverseEntity="CDMovie"/>
     </entity>
 </model>
