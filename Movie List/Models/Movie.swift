@@ -8,10 +8,11 @@
 import Foundation
 
 struct Movie: Identifiable, Decodable {
-    var id: Int64?
-    var poster_path: String?
+    var id: Int64
     var title: String
-    var year: Int64?
-    var overview: String?
-    var rank: Int64?
+    var release_date: String
+    var overview: String
+    var poster_path: String?
+    var original_language: String
+    var popularity: Double
 }

@@ -8,6 +8,7 @@
 import Foundation
 
 class ListViewModel: ObservableObject {
+    /*
     var db: DatabaseService?=nil
     var network: NetworkService?=nil
     var listName: String
@@ -100,4 +101,5 @@ class ListViewModel: ObservableObject {
         
         return selectedMovie?.title ?? ""
     }
+     */
 }

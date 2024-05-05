@@ -8,21 +8,28 @@
 import Foundation
 import CoreData
 
+enum cdmovieError : Error {
+    case nilValueFound(String);
+}
+
 extension CDMovie {
     
-    convenience init(id: Int64, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Float, context: NSManagedObjectContext) {
+    convenience init(id: Int64, title: String, release_date: Date, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) {
         self.init(context: context)
         self.id = id
         self.title = title
-        
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let formattedDate = dateFormatter.date(from: release_date)
-        self.release_date = formattedDate
-        
+        self.release_date = release_date
         self.overview = overview
         self.original_language = original_language
         self.popularity = popularity
+    }
+    
+    convenience init(id: Int64, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) throws {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        guard let formattedDate: Date = dateFormatter.date(from: release_date) else { throw cdmovieError.nilValueFound("Improper date submitted for movie") }
+        
+        self.init(id: id, title: title, release_date: formattedDate, overview: overview, rank: rank, poster_path: poster_path, original_language: original_language, popularity: popularity, context: context)
     }
     
     static func delete(movie: CDMovie) {
@@ -41,8 +48,10 @@ extension CDMovie {
     }
     
     static var example: CDMovie {
-        let context = PersistenceController.preview.container.viewContext
-        let movie = CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context)
-        return movie
+        get {
+            let context = PersistenceController.preview.container.viewContext
+            let movie = try! CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context)
+            return movie
+        }
     }
 }

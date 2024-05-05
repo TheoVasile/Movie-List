@@ -36,16 +36,22 @@ class NetworkService: ObservableObject {
           "accept": "application/json",
           "Authorization": "Bearer \(api_key)"
         ]
+        
+        print("initialized request")
 
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
             
-            //print(String(decoding: data, as: UTF8.self))
+            print("acquired data")
+            
+            print(String(decoding: data, as: UTF8.self))
+            
             let decodedMovies = try JSONDecoder().decode(Search.self, from: data)
-            print("succeeded")
+            print(decodedMovies)
             
             await MainActor.run() {
                 self.movies = decodedMovies.results
+                print(self.movies)
             }
         } catch {
             print("request failed \(error)")

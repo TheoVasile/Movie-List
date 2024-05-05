@@ -9,6 +9,7 @@ import Foundation
 
 
 class HomeViewModel: ObservableObject {
+    /*
     @Published var lists: [String] = []
     var db: DatabaseService? = nil
     var network: NetworkService? = nil
@@ -41,4 +42,5 @@ class HomeViewModel: ObservableObject {
             print("Failed to delete list")
         }
     }
+     */
 }

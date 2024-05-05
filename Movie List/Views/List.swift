@@ -37,11 +37,10 @@ struct ListView: View {
             NavigationView{
                 VStack{
                     List {
-                        if recommendedMovie != nil {
-                            dailyMovie
-                        }
                         if movies.count == 0 {
                             Text("No Movies Added")
+                        } else if recommendedMovie != nil {
+                            dailyMovie
                         }
                         ForEach(movies){movie in
                             MovieRow(movie: movie)
@@ -71,8 +70,8 @@ struct ListView: View {
 private extension ListView {
     var dailyMovie: some View {
         Group {
-            Section("Movie of the Day: \(recommendedMovie?.title)"){
-                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie?.poster_path)")) { image in
+            Section("Movie of the Day: \(recommendedMovie!.title)"){
+                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie!.poster_path)")) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -88,7 +87,7 @@ private extension ListView {
     var optionsMenu: some View {
         Menu("Options") {
             Button("Add Movie"){ showPopup.toggle() }
-            NavigationLink("Compare", destination: CompareMovieView(listName: movieList.name!))
+            NavigationLink("Compare", destination: CompareMovieView())
             Button("Recommend Movie"){
                 //recommendedMovie = viewModel.recommendMovie()
                 print("RECOMMENDATION: \(recommendedMovie)")
@@ -97,18 +96,22 @@ private extension ListView {
     }
     
     var searchResultsList: some View {
-        //ForEach(viewModel.searchResults(searchText: searchText), id: \.self) { result in
-        //    Text("\(result)").searchCompletion(result)
-        //}
-        Text("PlaceHolder")
+        ForEach(network.movies) { result in
+            Text("\(result.title)").searchCompletion(result.title)
+        }
+        //Text("PlaceHolder")
     }
     
     var popup: some View {
         VStack{
             VStack{ List{ Text("") } }
                 .searchable(text: $searchText) {
-                    ForEach(network.movies) { movie in
-                        Text("\(movie.title)").searchCompletion(movie.title)
+                    ForEach(network.movies) { networkMovie in
+                        Text("\(networkMovie.title)")
+                            .searchCompletion(networkMovie.title)
+                            .onTapGesture {
+                                createAndSaveMovie(from: networkMovie)
+                            }
                     }
                 }
                 .navigationTitle("Add New Movie")
@@ -122,6 +125,26 @@ private extension ListView {
                     }
                 }
             
+        }
+    }
+    
+    func createAndSaveMovie(from networkMovie: Movie) {
+        let newMovie = try! CDMovie(
+            id: networkMovie.id,
+            title: networkMovie.title,
+            release_date: networkMovie.release_date,
+            overview: networkMovie.overview,
+            rank: Int32(movies.count + 1),
+            poster_path: networkMovie.poster_path ?? "",
+            original_language: "en",
+            popularity: networkMovie.popularity,
+            context: context)
+        newMovie.list!.adding(movieList)
+
+        do {
+            try context.save()
+        } catch {
+            print("Error saving context: \(error)")
         }
     }
     
@@ -156,14 +179,6 @@ private extension ListView {
         }
     }
     
-    func movieCard(movie: Movie) -> some View {
-        HStack{
-            Text("\(String(movie.rank ?? -1)).")
-            Text(movie.title)
-            Text("(\(String(movie.year ?? -1)))")
-        }
-    }
-    
     func header(recommendedMovie: String) -> some View {
         VStack{
             Text("Movie of the Day: \(recommendedMovie)")
@@ -180,5 +195,6 @@ struct List_Previews: PreviewProvider{
     static var previews: some View {
         ListView(movieList: CDMovieList.example)
             .environmentObject(NetworkService())
+            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }

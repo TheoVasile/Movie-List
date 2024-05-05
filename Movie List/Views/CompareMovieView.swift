@@ -9,7 +9,10 @@ import Foundation
 import SwiftUI
 
 struct CompareMovieView: View {
-    
+    var body : some View {
+        Text("Placeholder")
+    }
+    /*
     @EnvironmentObject var db: DatabaseService
     @State var movieList: Array<Movie>
     var listName: String
@@ -64,12 +67,12 @@ struct CompareMovieView: View {
         .navigationTitle("Compare Movies")
         .navigationBarTitleDisplayMode(.inline)
     }
+     */
 }
 
 struct CompareMovieView_Previews: PreviewProvider{
     static var previews: some View{
-        CompareMovieView(listName: "Test List")
-            .environmentObject(DatabaseService())
+        CompareMovieView()
             .environmentObject(NetworkService())
     }
 }

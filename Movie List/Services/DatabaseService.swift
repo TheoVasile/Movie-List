@@ -28,6 +28,7 @@ class Movie: Identifiable {
 
 
 class DatabaseService: ObservableObject {
+    /*
     
     let db_movies = "movies"
     let db_lists = "lists"
@@ -403,4 +404,5 @@ class DatabaseService: ObservableObject {
             t.column(id)
         })
     }
+     */
 }
