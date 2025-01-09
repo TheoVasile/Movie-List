@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22757" systemVersion="23E224" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22757" systemVersion="23F79" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="CDGenre" representedClassName="CDGenre" syncable="YES" codeGenerationType="class">
         <attribute name="id" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="name" attributeType="String"/>
@@ -10,7 +10,7 @@
         <attribute name="original_language" attributeType="String"/>
         <attribute name="overview" attributeType="String"/>
         <attribute name="popularity" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
-        <attribute name="poster_path" attributeType="String"/>
+        <attribute name="poster_path" optional="YES" attributeType="String"/>
         <attribute name="rank" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="release_date" attributeType="Date" defaultDateTimeInterval="736530900" usesScalarValueType="NO"/>
         <attribute name="title" attributeType="String"/>

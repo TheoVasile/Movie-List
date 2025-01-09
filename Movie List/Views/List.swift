@@ -13,7 +13,8 @@ struct ListView: View {
     //@EnvironmentObject var db: DatabaseService
     //@ObservedObject var viewModel: ListViewModel
     var movieList: CDMovieList
-    @FetchRequest(fetchRequest: CDMovie.fetch(), animation: .bouncy) var movies: FetchedResults<CDMovie>
+    //@FetchRequest(fetchRequest: CDMovie.fetch(), animation: .bouncy) var movies: FetchedResults<CDMovie>
+    @State var movies: Set<CDMovie>
     @State var showPopup: Bool = false
     @State var movieName: String = ""
     @State var movieYear: String = ""
@@ -26,10 +27,12 @@ struct ListView: View {
     
     
     init(movieList: CDMovieList){
+        print("initializing")
         self.movieList = movieList
-        let request = CDMovie.fetch()
-        request.predicate = NSPredicate(format: "list == %@", movieList as CVarArg)
-        self._movies = FetchRequest(fetchRequest: request)
+        //let request = CDMovie.fetch()
+        //request.predicate = NSPredicate(format: "list == %@", movieList as CVarArg)
+        //self._movies = FetchRequest(fetchRequest: request)
+        self.movies = movieList.movies
     }
     
     var body: some View{
@@ -42,7 +45,7 @@ struct ListView: View {
                         } else if recommendedMovie != nil {
                             dailyMovie
                         }
-                        ForEach(movies){movie in
+                        ForEach(Array(movies)){movie in
                             MovieRow(movie: movie)
                         }
                         //.onDelete { indexSet in
@@ -53,7 +56,7 @@ struct ListView: View {
                 .searchable(text: $searchText) {
                     searchResultsList
                 }
-                .navigationTitle(movieList.name!)
+                .navigationTitle(movieList.name ?? "no movie name")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){ optionsMenu }
@@ -70,8 +73,8 @@ struct ListView: View {
 private extension ListView {
     var dailyMovie: some View {
         Group {
-            Section("Movie of the Day: \(recommendedMovie!.title)"){
-                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie!.poster_path)")) { image in
+            Section("Movie of the Day: \(String(describing: recommendedMovie?.title))"){
+                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie?.poster_path ?? "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg")")) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
@@ -110,7 +113,9 @@ private extension ListView {
                         Text("\(networkMovie.title)")
                             .searchCompletion(networkMovie.title)
                             .onTapGesture {
+                                print("adding movie")
                                 createAndSaveMovie(from: networkMovie)
+                                showPopup.toggle()
                             }
                     }
                 }
@@ -129,20 +134,26 @@ private extension ListView {
     }
     
     func createAndSaveMovie(from networkMovie: Movie) {
+        print(movies.count)
         let newMovie = try! CDMovie(
             id: networkMovie.id,
             title: networkMovie.title,
             release_date: networkMovie.release_date,
             overview: networkMovie.overview,
             rank: Int32(movies.count + 1),
-            poster_path: networkMovie.poster_path ?? "",
-            original_language: "en",
+            poster_path: networkMovie.poster_path ?? "/zDifiMtI6MTIbGnjEMwzwOcoXZu.jpg",
+            original_language: networkMovie.original_language,
             popularity: networkMovie.popularity,
             context: context)
-        newMovie.list!.adding(movieList)
+        // newMovie.list!.adding(movieList)
+        movieList.addToMovies_(newMovie)
+        movies = movieList.movies
+        // newMovie.addToList(movieList)
 
         do {
+            print("saving context")
             try context.save()
+            print(movies)
         } catch {
             print("Error saving context: \(error)")
         }
@@ -165,7 +176,7 @@ private extension ListView {
         let selectedRank = round((1 - Double.random(in: 0..<numMovies)) / numMovies.squareRoot() * (numMovies - 1) + 1)
         print("SELECTED RANK: \(selectedRank)")
 
-        let predicates = [NSPredicate(format: "list == %@", movieList.name! as CVarArg),
+        let predicates = [NSPredicate(format: "list == %@", movieList.name ?? "no name" as CVarArg),
                           NSPredicate(format: "rank == %d", Int(selectedRank))]
         let request = CDMovie.fetch(NSCompoundPredicate(andPredicateWithSubpredicates: predicates))
         request.fetchLimit = 1  // We only want one movie

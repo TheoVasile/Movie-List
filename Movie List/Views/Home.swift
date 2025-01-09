@@ -50,11 +50,17 @@ private extension Home {
     var movieListsView: some View {
         Group {
             if movieLists.isEmpty {
-                Text("No Lists, Add one Now!")
+                List{
+                    Text("No Lists, Add one Now!")
+                }
             } else {
                 List {
                     ForEach(movieLists, id: \.self) { movieList in
-                        NavigationLink(movieList.name ?? "No Name", destination: Text("Test"))
+                        NavigationLink(movieList.name ?? "No Name", destination:
+                                        ListView(movieList: movieList)
+                            .environmentObject(NetworkService())
+                            .environmentObject(DatabaseService())
+                        )
                     }
                     .onDelete(perform: deleteList)
                     .padding(10)

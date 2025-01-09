@@ -44,14 +44,13 @@ class NetworkService: ObservableObject {
             
             print("acquired data")
             
-            print(String(decoding: data, as: UTF8.self))
-            
             let decodedMovies = try JSONDecoder().decode(Search.self, from: data)
-            print(decodedMovies)
+            print(decodedMovies.results.sorted(by: { $0.popularity > $1.popularity }))
             
             await MainActor.run() {
-                self.movies = decodedMovies.results
-                print(self.movies)
+                self.movies = decodedMovies.results.sorted(by: { $0.popularity > $1.popularity })
+                //print("--------------------------------------")
+                //print(self.movies)
             }
         } catch {
             print("request failed \(error)")
