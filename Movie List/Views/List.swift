@@ -134,7 +134,7 @@ private extension ListView {
     }
     
     func createAndSaveMovie(from networkMovie: Movie) {
-        print(movies.count)
+        print("COUNTS", movies.count)
         let newMovie = try! CDMovie(
             id: networkMovie.id,
             title: networkMovie.title,
@@ -145,6 +145,7 @@ private extension ListView {
             original_language: networkMovie.original_language,
             popularity: networkMovie.popularity,
             context: context)
+        print("RANK", newMovie.rank)
         // newMovie.list!.adding(movieList)
         movieList.addToMovies_(newMovie)
         movies = movieList.movies

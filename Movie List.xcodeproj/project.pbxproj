@@ -19,7 +19,6 @@
 		FA10A9F1296A755900FDF445 /* Movie_ListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9F0296A755900FDF445 /* Movie_ListTests.swift */; };
 		FA10A9FB296A755900FDF445 /* Movie_ListUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9FA296A755900FDF445 /* Movie_ListUITests.swift */; };
 		FA10A9FD296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9FC296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift */; };
-		FA1D17712BDB794E00CEFEF0 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = FA1D17702BDB794E00CEFEF0 /* SQLite */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
 		FA6F64C929F88B6E00B418DB /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6F64C829F88B6E00B418DB /* NetworkService.swift */; };
@@ -30,6 +29,7 @@
 		FAE62ED22970D545000654E1 /* CompareMovieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ED12970D545000654E1 /* CompareMovieView.swift */; };
 		FAE62ED42970D5C5000654E1 /* AddMovieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ED32970D5C5000654E1 /* AddMovieView.swift */; };
 		FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62F392970E552000654E1 /* DatabaseService.swift */; };
+		FAE9F51D2D30966100471C80 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = FAE9F51C2D30966100471C80 /* SQLite */; };
 		FAFF24F62BE687A000C4F78D /* MovieRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFF24F52BE687A000C4F78D /* MovieRow.swift */; };
 /* End PBXBuildFile section */
 
@@ -79,7 +79,6 @@
 		FA10A9F6296A755900FDF445 /* Movie ListUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Movie ListUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA10A9FA296A755900FDF445 /* Movie_ListUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie_ListUITests.swift; sourceTree = "<group>"; };
 		FA10A9FC296A755900FDF445 /* Movie_ListUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie_ListUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		FA1D176F2BDB78AE00CEFEF0 /* SQLite.swift-master */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "SQLite.swift-master"; path = "../../../Downloads/SQLite.swift-master"; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
 		FA6F64C829F88B6E00B418DB /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
@@ -98,7 +97,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FA1D17712BDB794E00CEFEF0 /* SQLite in Frameworks */,
+				FAE9F51D2D30966100471C80 /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,7 +242,6 @@
 		FAE62F352970E37D000654E1 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				FA1D176F2BDB78AE00CEFEF0 /* SQLite.swift-master */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -266,7 +264,7 @@
 			);
 			name = "Movie List";
 			packageProductDependencies = (
-				FA1D17702BDB794E00CEFEF0 /* SQLite */,
+				FAE9F51C2D30966100471C80 /* SQLite */,
 			);
 			productName = "Movie List";
 			productReference = FA10A9DC296A755800FDF445 /* Movie List.app */;
@@ -340,6 +338,9 @@
 				Base,
 			);
 			mainGroup = FA10A9D3296A755800FDF445;
+			packageReferences = (
+				FAE9F51B2D30964300471C80 /* XCRemoteSwiftPackageReference "SQLite" */,
+			);
 			productRefGroup = FA10A9DD296A755800FDF445 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -727,9 +728,21 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		FAE9F51B2D30964300471C80 /* XCRemoteSwiftPackageReference "SQLite" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
-		FA1D17702BDB794E00CEFEF0 /* SQLite */ = {
+		FAE9F51C2D30966100471C80 /* SQLite */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = FAE9F51B2D30964300471C80 /* XCRemoteSwiftPackageReference "SQLite" */;
 			productName = SQLite;
 		};
 /* End XCSwiftPackageProductDependency section */

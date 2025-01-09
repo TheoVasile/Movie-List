@@ -42,10 +42,7 @@ class NetworkService: ObservableObject {
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
             
-            print("acquired data")
-            
             let decodedMovies = try JSONDecoder().decode(Search.self, from: data)
-            print(decodedMovies.results.sorted(by: { $0.popularity > $1.popularity }))
             
             await MainActor.run() {
                 self.movies = decodedMovies.results.sorted(by: { $0.popularity > $1.popularity })

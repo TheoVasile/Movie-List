@@ -18,6 +18,7 @@ extension CDMovie {
         self.init(context: context)
         self.id = id
         self.title = title
+        self.rank = rank
         self.release_date = release_date
         self.overview = overview
         self.original_language = original_language
