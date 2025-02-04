@@ -9,8 +9,30 @@ import Foundation
 import SwiftUI
 
 struct CompareMovieView: View {
+    @EnvironmentObject var network: NetworkService
+    
+    @State var movies: [CDMovie] = []
+    @State var top: CDMovie? = nil
+    @State var bottom: CDMovie? = nil
+    @State var movieList: CDMovieList
+    var i: Int = 0
+    
     var body : some View {
-        Text("Placeholder")
+        VStack{
+            if movies.count >= 2 {
+                MovieCard(movie: top)
+                MovieCard(movie: bottom)
+            } else{
+                Text("Need at least 2 movies to compare")
+            }
+        }
+        .onAppear {
+            movies = Array(movieList.movies).shuffled()
+            if movies.count >= 2 {
+                top = movies[0]
+                bottom = movies[1]
+            }
+        }
     }
     /*
     @EnvironmentObject var db: DatabaseService
@@ -72,7 +94,7 @@ struct CompareMovieView: View {
 
 struct CompareMovieView_Previews: PreviewProvider{
     static var previews: some View{
-        CompareMovieView()
+        CompareMovieView(movieList: CDMovieList.example)
             .environmentObject(NetworkService())
     }
 }

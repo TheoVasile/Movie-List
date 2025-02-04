@@ -90,7 +90,8 @@ private extension ListView {
     var optionsMenu: some View {
         Menu("Options") {
             Button("Add Movie"){ showPopup.toggle() }
-            NavigationLink("Compare", destination: CompareMovieView())
+            NavigationLink("Compare", destination: CompareMovieView(movieList: movieList)
+                .environmentObject(network))
             Button("Recommend Movie"){
                 //recommendedMovie = viewModel.recommendMovie()
                 print("RECOMMENDATION: \(recommendedMovie)")
@@ -129,7 +130,6 @@ private extension ListView {
                         Button("Search"){ search(searchText: searchText) }
                     }
                 }
-            
         }
     }
     

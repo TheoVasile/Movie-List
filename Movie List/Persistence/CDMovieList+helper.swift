@@ -46,13 +46,19 @@ extension CDMovieList {
         let context =  PersistenceController.preview.container.viewContext
         let movieList = CDMovieList(name: "Christmas Movies", overview: "", context: context)
         
-        guard let movie = try? CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context) else {
+        guard let movie1 = try? CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context) else {
+                fatalError("Failed to initialize the movie entity properly.")
+        }
+        guard let movie2 = try? CDMovie(id: 615777, title: "Inglorious Basterds", release_date: "2009-12-22", overview: "In Nazi-occupied France during World War II, a plan to assassinate Nazi leaders by a group of Jewish U.S. soldiers coincides with a theatre owner's vengeful plans for the same.", rank: 2, poster_path: "", original_language: "en", popularity: 283.072, context: context) else {
                 fatalError("Failed to initialize the movie entity properly.")
         }
         
         // movieList.movies.insert(movie)
-        movieList.addToMovies_(movie)
-        movie.addToList(movieList)
+        movieList.addToMovies_(movie1)
+        movie1.addToList(movieList)
+        
+        movieList.addToMovies_(movie2)
+        movie2.addToList(movieList)
         
         
         return movieList
