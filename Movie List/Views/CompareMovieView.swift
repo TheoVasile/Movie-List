@@ -21,7 +21,7 @@ struct CompareMovieView: View {
             Spacer()
             Text("Select which movie you prefer")
                 .fontWeight(.bold)
-                .padding(.top, 100)
+                .padding(.top, 150)
                 .padding(.bottom, 50)
             HStack{
                 if selection.count == 2 {

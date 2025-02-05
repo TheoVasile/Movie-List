@@ -37,7 +37,7 @@ struct ListView: View {
     
     var body: some View{
         ZStack{
-            NavigationView{
+            NavigationStack{
                 VStack{
                     List {
                         if movies.count == 0 {

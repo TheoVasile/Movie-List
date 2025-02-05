@@ -36,7 +36,7 @@ struct MovieCard: View {
         .frame(maxWidth: .infinity) // Make width relative to screen size
         .cornerRadius(20) // Rounded corners
         .shadow(radius: 5) // Shadow effect
-        .padding(20) // Add padding
+        .padding(10) // Add padding
     }
 }
 
