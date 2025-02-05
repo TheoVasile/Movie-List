@@ -23,6 +23,7 @@ extension CDMovie {
         self.overview = overview
         self.original_language = original_language
         self.popularity = popularity
+        self.poster_path = poster_path
     }
     
     convenience init(id: Int64, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) throws {
@@ -31,6 +32,12 @@ extension CDMovie {
         guard let formattedDate: Date = dateFormatter.date(from: release_date) else { throw cdmovieError.nilValueFound("Improper date submitted for movie") }
         
         self.init(id: id, title: title, release_date: formattedDate, overview: overview, rank: rank, poster_path: poster_path, original_language: original_language, popularity: popularity, context: context)
+    }
+    
+    func get_date() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd" // Ensures only the date is shown
+        return release_date.map { dateFormatter.string(from: $0) } ?? "None"
     }
     
     static func delete(movie: CDMovie) {

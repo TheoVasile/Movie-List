@@ -12,90 +12,57 @@ struct CompareMovieView: View {
     @EnvironmentObject var network: NetworkService
     
     @State var movies: [CDMovie] = []
-    @State var top: CDMovie? = nil
-    @State var bottom: CDMovie? = nil
-    @State var movieList: CDMovieList
-    var i: Int = 0
+    @State private var selection: [CDMovie] = []
+    @Binding var movieList: CDMovieList
+    @State var i: Int = 2
     
     var body : some View {
         VStack{
-            if movies.count >= 2 {
-                MovieCard(movie: top)
-                MovieCard(movie: bottom)
-            } else{
-                Text("Need at least 2 movies to compare")
+            Spacer()
+            Text("Select which movie you prefer")
+                .fontWeight(.bold)
+                .padding(.top, 100)
+                .padding(.bottom, 50)
+            HStack{
+                if selection.count == 2 {
+                    MovieCard(movie: selection[0])
+                        .onTapGesture {makeHigher(index: 0)}
+                    MovieCard(movie: selection[1])
+                        .onTapGesture{makeHigher(index: 1)}
+                } else{
+                    Text("Need at least 2 movies to compare")
+                }
             }
-        }
-        .onAppear {
-            movies = Array(movieList.movies).shuffled()
-            if movies.count >= 2 {
-                top = movies[0]
-                bottom = movies[1]
-            }
-        }
-    }
-    /*
-    @EnvironmentObject var db: DatabaseService
-    @State var movieList: Array<Movie>
-    var listName: String
-    
-    @State var movie1: String = "Movie 1"
-    @State var movie2: String = "Movie 2"
-    
-    init(listName: String){
-        self.listName = listName
-        _movieList = State(initialValue: [])
-    }
-    
-    func selectMovies(){
-        self.movie1 = movieList.randomElement()?.title ?? "Movie 1"
-        self.movie2 = movieList.randomElement()?.title ?? "Movie 2"
-    }
-    
-    var body: some View{
-        NavigationView{
-            VStack{
-                Text("Select Which Movie You Think is Better")
-                HStack{
-                    Button{
-                        selectMovies()
-                    } label: {
-                        ZStack{
-                            RoundedRectangle(cornerRadius: 25)
-                                .fill(.white)
-                                .frame(width:150, height:150)
-                                .shadow(radius: 5)
-                            Text(movie1)
-                        }
-                    }
-                    Button{
-                        selectMovies()
-                    } label: {
-                        ZStack{
-                            RoundedRectangle(cornerRadius: 25)
-                                .fill(.white)
-                                .frame(width:150, height:150)
-                                .shadow(radius: 5)
-                            Text(movie2)
-                        }
-                    }
+            .padding(.bottom, 100)
+            .onAppear {
+                movies = Array(movieList.movies).shuffled()
+                if movies.count >= 2 {
+                    selection.append(movies[0])
+                    selection.append(movies[1])
                 }
             }
         }
-        .onAppear{
-            movieList = db.getMovieList(list: listName) ?? []
-            selectMovies()
-        }
-        .navigationTitle("Compare Movies")
-        .navigationBarTitleDisplayMode(.inline)
     }
-     */
+    
+    private func makeHigher(index: Int) {
+        if selection[index].rank < selection[1-index].rank {
+            (selection[index].rank, selection[1-index].rank) = (selection[1-index].rank, selection[index].rank)
+        }
+        for j in 0..<2 {
+            if i >= movies.count{
+                i = 0
+            }
+            print(i, movies.count)
+            selection[j] = movies[i]
+            i += 1
+        }
+    }
 }
 
 struct CompareMovieView_Previews: PreviewProvider{
-    static var previews: some View{
-        CompareMovieView(movieList: CDMovieList.example)
-            .environmentObject(NetworkService())
+    static var previews: some View {
+        CompareMovieView(movieList: .constant(CDMovieList.example))
+            .environmentObject(NetworkService()) // Keep if needed
     }
 }
 

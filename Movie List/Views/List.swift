@@ -12,9 +12,9 @@ struct ListView: View {
     @EnvironmentObject var network: NetworkService
     //@EnvironmentObject var db: DatabaseService
     //@ObservedObject var viewModel: ListViewModel
-    var movieList: CDMovieList
+    @State var movieList: CDMovieList
     //@FetchRequest(fetchRequest: CDMovie.fetch(), animation: .bouncy) var movies: FetchedResults<CDMovie>
-    @State var movies: Set<CDMovie>
+    @State var movies: [CDMovie] = []
     @State var showPopup: Bool = false
     @State var movieName: String = ""
     @State var movieYear: String = ""
@@ -25,7 +25,7 @@ struct ListView: View {
     @State var otherSearchResults: [String] = []
     @Environment(\.managedObjectContext) var context
     
-    
+    /*
     init(movieList: CDMovieList){
         print("initializing")
         self.movieList = movieList
@@ -33,7 +33,7 @@ struct ListView: View {
         //request.predicate = NSPredicate(format: "list == %@", movieList as CVarArg)
         //self._movies = FetchRequest(fetchRequest: request)
         self.movies = movieList.movies
-    }
+    }*/
     
     var body: some View{
         ZStack{
@@ -45,11 +45,11 @@ struct ListView: View {
                         } else if recommendedMovie != nil {
                             dailyMovie
                         }
-                        ForEach(Array(movies)){movie in
+                        ForEach(movies, id: \.id){movie in
                             MovieRow(movie: movie)
                         }
                         //.onDelete { indexSet in
-                        //    movieList?.movies.remove(movieList?.movies[indexSet.first ?? 0])
+                        //    movieList.movies.remove(movieList.movies[indexSet.first ?? 0])
                         //}
                     }
                 }
@@ -65,8 +65,10 @@ struct ListView: View {
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
         }
         .onAppear {
-                    //viewModel.setup(db: db, network: network)
-                }
+            movies = Array(movieList.movies)
+            print(movies)
+            //viewModel.setup(db: db, network: network)
+        }
     }
 }
 
@@ -90,7 +92,7 @@ private extension ListView {
     var optionsMenu: some View {
         Menu("Options") {
             Button("Add Movie"){ showPopup.toggle() }
-            NavigationLink("Compare", destination: CompareMovieView(movieList: movieList)
+            NavigationLink("Compare", destination: CompareMovieView(movieList: $movieList)
                 .environmentObject(network))
             Button("Recommend Movie"){
                 //recommendedMovie = viewModel.recommendMovie()
@@ -148,7 +150,7 @@ private extension ListView {
         print("RANK", newMovie.rank)
         // newMovie.list!.adding(movieList)
         movieList.addToMovies_(newMovie)
-        movies = movieList.movies
+        movies = Array(movieList.movies)
         // newMovie.addToList(movieList)
 
         do {
