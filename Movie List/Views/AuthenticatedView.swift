@@ -16,25 +16,26 @@ extension AuthenticatedView where Unauthenticated == EmptyView {
 }
 
 struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Unauthenticated: View {
-  @StateObject private var viewModel = AuthenticationViewModel()
-  @State private var presentingLoginScreen = false
-  @State private var presentingProfileScreen = false
+    @StateObject private var viewModel = AuthenticationViewModel()
+    @State private var presentingLoginScreen = false
+    @State private var presentingProfileScreen = false
+    @State private var isVisible = true
 
-  var unauthenticated: Unauthenticated?
-  @ViewBuilder var content: () -> Content
+    var unauthenticated: Unauthenticated?
+    @ViewBuilder var content: () -> Content
 
-  public init(unauthenticated: Unauthenticated?, @ViewBuilder content: @escaping () -> Content) {
+    public init(unauthenticated: Unauthenticated?, @ViewBuilder content: @escaping () -> Content) {
     self.unauthenticated = unauthenticated
     self.content = content
-  }
+    }
 
-  public init(@ViewBuilder unauthenticated: @escaping () -> Unauthenticated, @ViewBuilder content: @escaping () -> Content) {
+    public init(@ViewBuilder unauthenticated: @escaping () -> Unauthenticated, @ViewBuilder content: @escaping () -> Content) {
     self.unauthenticated = unauthenticated()
     self.content = content
-  }
+    }
 
 
-  var body: some View {
+    var body: some View {
     switch viewModel.authenticationState {
     case .unauthenticated, .authenticating:
       VStack {
@@ -54,21 +55,33 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
           .environmentObject(viewModel)
       }
     case .authenticated:
-      VStack {
-        content()
-        Text("You're logged in as \(viewModel.displayName).")
-        Button("Tap here to view your profile") {
-          presentingProfileScreen.toggle()
+        VStack {
+            content()
+            if isVisible {
+                VStack{
+                    Text("You're logged in as \(viewModel.displayName).")
+                    Button("Tap here to view your profile") {
+                        presentingProfileScreen.toggle()
+                    }
+                }
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation(.easeOut(duration: 1.5)) {
+                            isVisible = false
+                        }
+                    }
+                }
+            }
         }
-      }
-      .sheet(isPresented: $presentingProfileScreen) {
-        NavigationStack {
-          UserProfileView()
-            .environmentObject(viewModel)
+        .sheet(isPresented: $presentingProfileScreen) {
+            NavigationStack {
+                UserProfileView()
+                    .environmentObject(viewModel)
+                }
+            }
         }
-      }
     }
-  }
 }
 
 struct AuthenticatedView_Previews: PreviewProvider {
