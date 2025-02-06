@@ -21,7 +21,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
-            AccountView()
+            UserProfileView()
                 .environmentObject(network)
                 .tabItem {
                     Label("Account", systemImage: "person.fill")

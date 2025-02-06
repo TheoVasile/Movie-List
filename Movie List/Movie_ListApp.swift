@@ -34,10 +34,25 @@ struct Movie_ListApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(network)
-                .environmentObject(db)
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            AuthenticatedView {
+                Image(systemName: "number.circle.fill")
+                    .resizable()
+                    .frame(width: 100 , height: 100)
+                    .foregroundColor(Color(.systemPink))
+                    .aspectRatio(contentMode: .fit)
+                    .clipShape(Circle())
+                    .clipped()
+                    .padding(4)
+                    .overlay(Circle().stroke(Color.black, lineWidth: 2))
+                  Text("Welcome to CineList!")
+                    .font(.title)
+                  Text("You need to be logged in to use this app.")
+            } content: {
+                ContentView()
+                    .environmentObject(network)
+                    .environmentObject(db)
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            }
         }
     }
 }
