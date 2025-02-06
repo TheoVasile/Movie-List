@@ -1,5 +1,5 @@
 //
-//  AccountView.swift
+//  SignUpView.swift
 //  Movie List
 //
 //  Created by Theo Vasile on 2025-02-06.
@@ -8,14 +8,14 @@
 import Foundation
 import SwiftUI
 
-struct AccountView: View {
+struct SignUpView: View {
     var body: some View {
-        SignInView()
+        Text("Sign Up")
     }
 }
 
-struct AccountView_Previews: PreviewProvider {
+struct SignUpView_Previews: PreviewProvider {
     static var previews: some View {
-        AccountView()
+        SignUpView()
     }
 }
