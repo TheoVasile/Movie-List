@@ -78,9 +78,7 @@ struct ListView: View {
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
         }
         .onAppear {
-            movies = Array(movieList.movies)
-            movies = movies.sorted(by: { $0.rank < $1.rank })
-            print(movies)
+            movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
             //viewModel.setup(db: db, network: network)
         }
     }

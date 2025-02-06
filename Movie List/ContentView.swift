@@ -14,9 +14,18 @@ struct ContentView: View {
     @State var showingPopup = false
     
     var body: some View {
-        Home()
-            .environmentObject(network)
-            .environmentObject(db)
+        TabView {
+            Home()
+                .environmentObject(network)
+                .environmentObject(db)
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+            AccountView()
+                .tabItem {
+                    Label("Account", systemImage: "person.fill")
+                }
+        }
     }
 }
 

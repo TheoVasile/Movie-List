@@ -30,6 +30,7 @@
 		FAE62ED22970D545000654E1 /* CompareMovieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ED12970D545000654E1 /* CompareMovieView.swift */; };
 		FAE62ED42970D5C5000654E1 /* AddMovieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62ED32970D5C5000654E1 /* AddMovieView.swift */; };
 		FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE62F392970E552000654E1 /* DatabaseService.swift */; };
+		FAE949E92D547D0300592081 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE949E82D547D0300592081 /* AccountView.swift */; };
 		FAE9F51D2D30966100471C80 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = FAE9F51C2D30966100471C80 /* SQLite */; };
 		FAFF24F62BE687A000C4F78D /* MovieRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFF24F52BE687A000C4F78D /* MovieRow.swift */; };
 /* End PBXBuildFile section */
@@ -91,6 +92,7 @@
 		FAE62ED12970D545000654E1 /* CompareMovieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareMovieView.swift; sourceTree = "<group>"; };
 		FAE62ED32970D5C5000654E1 /* AddMovieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMovieView.swift; sourceTree = "<group>"; };
 		FAE62F392970E552000654E1 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		FAE949E82D547D0300592081 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		FAFF24F52BE687A000C4F78D /* MovieRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -222,6 +224,7 @@
 				FAE62ED32970D5C5000654E1 /* AddMovieView.swift */,
 				FAFF24F52BE687A000C4F78D /* MovieRow.swift */,
 				FAD23A742D52011600EACB94 /* MovieCard.swift */,
+				FAE949E82D547D0300592081 /* AccountView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -390,6 +393,7 @@
 				FAD23A752D52011600EACB94 /* MovieCard.swift in Sources */,
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
+				FAE949E92D547D0300592081 /* AccountView.swift in Sources */,
 				FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */,
 				FAFF24F62BE687A000C4F78D /* MovieRow.swift in Sources */,
 				FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */,
