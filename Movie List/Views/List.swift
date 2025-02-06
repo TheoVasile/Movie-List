@@ -35,6 +35,15 @@ struct ListView: View {
         self.movies = movieList.movies
     }*/
     
+    private func deleteMovie(offsets: IndexSet) {
+        for index in offsets {
+            let poppedMovie: CDMovie = movies[index]
+            movieList.movies.remove(poppedMovie)
+        }
+        movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
+        
+    }
+    
     var body: some View{
         ZStack{
             NavigationStack{
@@ -48,9 +57,9 @@ struct ListView: View {
                         ForEach(movies, id: \.id){movie in
                             MovieRow(movie: movie)
                         }
-                        //.onDelete { indexSet in
-                        //    movieList.movies.remove(movieList.movies[indexSet.first ?? 0])
-                        //}
+                        .onDelete { indexSet in
+                            deleteMovie(offsets: indexSet)
+                        }
                     }
                 }
                 .searchable(text: $searchText) {
@@ -66,6 +75,7 @@ struct ListView: View {
         }
         .onAppear {
             movies = Array(movieList.movies)
+            movies = movies.sorted(by: { $0.rank < $1.rank })
             print(movies)
             //viewModel.setup(db: db, network: network)
         }
@@ -135,7 +145,7 @@ private extension ListView {
         }
     }
     
-    func createAndSaveMovie(from networkMovie: Movie) {
+    private func createAndSaveMovie(from networkMovie: Movie) {
         print("COUNTS", movies.count)
         let newMovie = try! CDMovie(
             id: networkMovie.id,
