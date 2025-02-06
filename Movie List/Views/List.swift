@@ -41,6 +41,10 @@ struct ListView: View {
             movieList.movies.remove(poppedMovie)
         }
         movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
+        for i in 0...(movies.count-1) {
+            movies[i].rank = Int32(i+1)
+        }
+        movieList.movies = Set(movies)
         
     }
     
