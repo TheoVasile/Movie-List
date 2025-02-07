@@ -57,6 +57,7 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
     case .authenticated:
         VStack {
             content()
+                .environmentObject(viewModel)
             if isVisible {
                 VStack{
                     Text("You're logged in as \(viewModel.displayName).")
