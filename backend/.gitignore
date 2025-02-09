@@ -1,0 +1,16 @@
+# Ignore Node modules
+node_modules/
+
+# Ignore environment variables
+.env
+
+# Ignore Firebase credentials (DO NOT COMMIT THIS FILE!)
+config/firebase-service-account.json
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore system files (macOS, VS Code, etc.)
+.DS_Store
+.vscode/
