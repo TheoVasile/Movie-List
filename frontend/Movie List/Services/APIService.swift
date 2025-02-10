@@ -24,9 +24,118 @@ struct ListResponse: Codable {
     let date_modified: String
 }
 
+struct MovieRequest: Codable {
+    let tmdb_id: Int64
+    let title: String
+    let release_date: String
+    let overview: String
+    let poster_path: String
+    let original_language: String
+    let popularity: Double
+}
+
+struct MovieResponse: Codable {
+    let id: Int64
+    let tmdb_id: String
+    let title: String
+    let release_date: String
+    let overview: String
+    let poster_path: String
+    let original_language: String
+    let popularity: Double
+    let created_at: String
+}
+
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
+    
+    func addMovieToList(list_id: Int64, movie_id: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/addToList") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+                "list_id": list_id,
+                "movie_id": movie_id
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "Invalid response", code: 0, userInfo: nil)))
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                completion(.success(()))
+            }
+        }
+
+        task.resume()
+    }
+    
+    func createMovie(tmdb_id: Int64, title: String, release_date: String, overview: String, poster_path: String, original_language: String, popularity: Double, completion: @escaping (Result<MovieResponse, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/create") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = MovieRequest(tmdb_id: tmdb_id, title: title, release_date: release_date, overview: overview, poster_path: poster_path, original_language: original_language, popularity: popularity)
+
+        do {
+            request.httpBody = try JSONEncoder().encode(body)
+        } catch {
+            print("❌ Encoding error:", error)
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
+                }
+                return
+            }
+
+            do {
+                let movieResponse = try JSONDecoder().decode(MovieResponse.self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(movieResponse))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+        
+    }
     
     func deleteList(listID: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/delete/\(listID)") else { return }

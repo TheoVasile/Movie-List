@@ -2,10 +2,23 @@ const pool = require("../config/db");
 
 async function createMovie(tmdb_id, title, release_date, overview, poster_path, original_language, popularity) {
     const result = await pool.query(
-        "INSERT INTO movies (tmdb_id, title, release_date, overview, poster_path, original_language, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        "INSERT INTO movies (tmdb_id, title, release_date, overview, poster_path, original_language, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (tmdb_id) DO NOTHING RETURNING *",
         [tmdb_id, title, release_date, overview, poster_path, original_language, popularity]
     );
     return result.rows[0];
+}
+
+async function addMovieToList(list_id, movie_id) {
+    try {
+    const result = await pool.query(
+        "INSERT INTO list_movies (list_id, movie_id) VALUES ($1, $2)",
+        [list_id, movie_id]
+    );
+    return result.rows[0];
+    } catch (error) {
+        console.error("Error adding movie to list:", error);
+        throw error;
+    }
 }
 
 async function getMovieByTmdbId(tmdb_id) {
@@ -16,4 +29,4 @@ async function getMovieByTmdbId(tmdb_id) {
     return result.rows[0];
 }
 
-module.exports = { createMovie, getMovieByTmdbId };
+module.exports = { createMovie, addMovieToList, getMovieByTmdbId };

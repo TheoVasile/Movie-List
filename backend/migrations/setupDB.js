@@ -24,7 +24,7 @@ const createTables = async () => {
                 id SERIAL PRIMARY KEY,
                 tmdb_id VARCHAR(20) UNIQUE,
                 title VARCHAR(255) NOT NULL,
-                release_date INT,
+                release_date VARCHAR(20),
                 overview TEXT,
                 poster_path VARCHAR(255),
                 original_language VARCHAR(10),

@@ -31,6 +31,13 @@ extension CDMovieList {
         guard let context = movieList.managedObjectContext else { return }
         
         context.delete(movieList)
+        
+        do {
+            try context.save() // Save changes to persist the deletion
+            print("✅ Movie list deleted successfully.")
+        } catch {
+            print("❌ Error deleting movie list:", error.localizedDescription)
+        }
     }
     
     static func fetch(predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
