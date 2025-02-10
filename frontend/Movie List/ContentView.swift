@@ -17,6 +17,7 @@ struct ContentView: View {
     var body: some View {
         TabView {
             Home()
+                .environmentObject(viewModel)
                 .environmentObject(network)
                 .environmentObject(db)
                 .tabItem {

@@ -1,9 +1,8 @@
 // Connect to PostgreSQL
-const getPool = require("../config/db");
+const pool = require("../config/db");
 
 // Define table creation queries
 const createTables = async () => {
-    const pool = getPool();
     //const client = await pool.connect( (err, connection) => {
     //    if (err) throw err;
     //    console.log('Database is connected successfully !');
@@ -15,7 +14,7 @@ const createTables = async () => {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
-                firebase_uid VARCHAR(128) UNIQUE NOT NULL, 
+                firebase_uid VARCHAR(255) UNIQUE NOT NULL, 
                 username VARCHAR(50) UNIQUE NOT NULL,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -35,7 +34,7 @@ const createTables = async () => {
 
             CREATE TABLE IF NOT EXISTS lists (
                 id SERIAL PRIMARY KEY,
-                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
                 name VARCHAR(100) NOT NULL,
                 overview TEXT,
                 is_ranked BOOLEAN DEFAULT FALSE,
@@ -57,7 +56,6 @@ const createTables = async () => {
         console.error("❌ Error creating tables:", error);
     } finally {
         //await client.release();
-        await pool.end();
     }
 };
 

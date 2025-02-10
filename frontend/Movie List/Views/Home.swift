@@ -11,6 +11,7 @@ struct Home: View {
     
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @Environment(\.managedObjectContext) var context
+    @EnvironmentObject var viewModel: AuthenticationViewModel
     @EnvironmentObject var network: NetworkService
     @State var showPopup: Bool = false
     @State var listName = ""
@@ -39,10 +40,6 @@ struct Home: View {
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ newListPopup }
         }
-        .onAppear {
-                    print("APPEARED")
-                    //viewModel.setup(db: db, network: network)
-                }
     }
 }
 
@@ -74,7 +71,36 @@ private extension Home {
     
     func addNewList() {
         if listName.count > 0 {
-            CDMovieList(name: listName, overview: "", context: context)
+            let newList = CDMovieList(name: listName, overview: "", context: context)
+            
+            APIService.shared.createList(
+                    userID: viewModel.user!.uid,
+                    name: listName,
+                    overview: "",
+                    isRanked: true
+                ) { result in
+                    switch result {
+                    case .success(let serverList):
+                        print("✅ List synced to backend:", serverList)
+
+                        // Optionally, update Core Data with the server ID
+                        DispatchQueue.main.async {
+                            newList.id = UUID(uuidString: String(serverList.id)) // Replace with backend ID
+                            try? context.save()
+                        }
+
+                    case .failure(let error):
+                        print(viewModel.user?.uid ?? "no uid")
+                        print("❌ Backend request failed, deleting from Core Data:", error.localizedDescription)
+
+                        // Step 3: If request fails, delete the local entry
+                        DispatchQueue.main.async {
+                            context.delete(newList)
+                            try? context.save()
+                        }
+                    }
+                }
+            
             withAnimation { showPopup.toggle() }
         }
     }
@@ -109,6 +135,7 @@ private extension Home {
 struct Home_Previews: PreviewProvider{
     static var previews: some View{
         Home()
+            .environmentObject(AuthenticationViewModel())
             .environmentObject(NetworkService())
             .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }

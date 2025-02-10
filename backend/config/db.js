@@ -1,9 +1,8 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-let pool;
-
 function getPool() {
+    let pool;
     if (!pool) {
         pool = new Pool({
             connectionString: process.env.DATABASE_URL,
@@ -25,4 +24,6 @@ function getPool() {
     return pool;
 }
 
-module.exports = getPool;
+const pool = getPool();
+
+module.exports = pool;
