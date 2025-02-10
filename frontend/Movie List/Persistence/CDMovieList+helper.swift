@@ -16,9 +16,9 @@ extension CDMovieList {
         set { movies_ = newValue as NSSet }
     }
     
-    convenience init(name: String, overview: String, context: NSManagedObjectContext) {
+    convenience init(id: Int64, name: String, overview: String, context: NSManagedObjectContext) {
         self.init(context: context)
-        self.id = UUID()
+        self.id = id
         self.name = name
         
         self.creation_date = Date.now
@@ -44,7 +44,7 @@ extension CDMovieList {
     
     static var example: CDMovieList {
         let context =  PersistenceController.preview.container.viewContext
-        let movieList = CDMovieList(name: "Christmas Movies", overview: "", context: context)
+        let movieList = CDMovieList(id: Int64(1), name: "Christmas Movies", overview: "", context: context)
         
         guard let movie1 = try? CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context) else {
                 fatalError("Failed to initialize the movie entity properly.")

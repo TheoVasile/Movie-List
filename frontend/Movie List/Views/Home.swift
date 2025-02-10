@@ -71,7 +71,7 @@ private extension Home {
     
     func addNewList() {
         if listName.count > 0 {
-            let newList = CDMovieList(name: listName, overview: "", context: context)
+            let newList = CDMovieList(id: Int64(1), name: listName, overview: "", context: context)
             
             APIService.shared.createList(
                     userID: viewModel.user!.uid,
@@ -85,7 +85,7 @@ private extension Home {
 
                         // Optionally, update Core Data with the server ID
                         DispatchQueue.main.async {
-                            newList.id = UUID(uuidString: String(serverList.id)) // Replace with backend ID
+                            newList.id = serverList.id // Replace with backend ID
                             try? context.save()
                         }
 
@@ -109,7 +109,16 @@ private extension Home {
         withAnimation {
             offsets.forEach { index in
                 let deleteItem = movieLists[index]
-                CDMovieList.delete(movieList: deleteItem)
+                APIService.shared.deleteList(listID: deleteItem.id) { result in
+                        switch result {
+                        case .success(let serverList):
+                            print("✅ List synced to backend:", serverList)
+                            CDMovieList.delete(movieList: deleteItem)
+
+                        case .failure(let error):
+                            print("❌ Backend request failed", error.localizedDescription)
+                        }
+                    }
             }
         }
     }

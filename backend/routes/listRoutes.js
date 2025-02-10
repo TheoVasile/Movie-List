@@ -1,5 +1,5 @@
 const express = require("express");
-const { createList } = require("../models/listModel");
+const { createList, deleteList } = require("../models/listModel");
 
 const router = express.Router();
 
@@ -14,6 +14,17 @@ router.post("/create", async (req, res) => {
         res.status(201).json(newList);
     } catch (error) {
         console.error("Error creating list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/delete/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedList = await deleteList(id);
+        res.status(200).json(deletedList);
+    } catch (error) {
+        console.error("Error deleting list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
