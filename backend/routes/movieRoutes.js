@@ -1,6 +1,6 @@
 const express = require("express");
 const axios = require("axios");
-const { createMovie, addMovieToList } = require("../models/movieModel");
+const { createMovie, addMovieToList, removeMovieFromList } = require("../models/movieModel");
 
 const router = express.Router();
 
@@ -48,6 +48,17 @@ router.post("/create", async (req, res) => {
         res.status(201).json(newMovie);
     } catch (error) {
         console.error("Error creating movie:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/removeFromList/:list_id/:movie_id", async (req, res) => {
+    try {
+        const { list_id, movie_id } = req.params;
+        const removedMovie = await removeMovieFromList(list_id, movie_id);
+        res.status(200).json(removedMovie);
+    } catch (error) {
+        console.error("Error removing movie from list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

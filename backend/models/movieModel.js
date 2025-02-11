@@ -19,6 +19,19 @@ async function createMovie(tmdb_id, title, release_date, overview, poster_path, 
     return existingMovie.rows[0];
 }
 
+async function removeMovieFromList(list_id, movie_id) {
+    try {
+        const result = await pool.query(
+            "DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2",
+            [list_id, movie_id]
+        );
+        return result.rows[0];
+    } catch (error) {
+        console.error("Error removing movie from list:", error);
+        throw error;
+    }
+}
+
 async function addMovieToList(list_id, movie_id) {
     try {
         const result = await pool.query(
@@ -40,4 +53,4 @@ async function getMovieByTmdbId(tmdb_id) {
     return result.rows[0];
 }
 
-module.exports = { createMovie, addMovieToList, getMovieByTmdbId };
+module.exports = { createMovie, addMovieToList, getMovieByTmdbId, removeMovieFromList };
