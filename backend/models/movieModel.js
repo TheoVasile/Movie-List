@@ -22,9 +22,14 @@ async function createMovie(tmdb_id, title, release_date, overview, poster_path, 
 async function removeMovieFromList(list_id, movie_id) {
     try {
         const result = await pool.query(
-            "DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2",
+            "DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2 RETURNING *",
             [list_id, movie_id]
         );
+    
+        if (result.rowCount === 0) {
+            return { message: "No matching movie found, but operation successful." };
+        }
+    
         return result.rows[0];
     } catch (error) {
         console.error("Error removing movie from list:", error);

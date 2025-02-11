@@ -39,13 +39,39 @@ struct ListView: View {
     private func deleteMovie(offsets: IndexSet) {
         for index in offsets {
             let poppedMovie: CDMovie = movies[index]
-            movieList.movies.remove(poppedMovie)
+            APIService.shared.removeMovieFromList(list_id: movieList.id, movie_id: poppedMovie.id) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                        case .success:
+                            print("deleting \(poppedMovie.title)")
+                            if let managedObjectContext = poppedMovie.managedObjectContext {
+                                managedObjectContext.delete(poppedMovie)
+                                
+                                do {
+                                    try managedObjectContext.save()
+                                    print("Successfully deleted from Core Data")
+                                } catch {
+                                    print("Core Data context not saved:", error)
+                                }
+                            } else {
+                                print("Error: Movie is not in Core Data context")
+                            }
+                            
+                            // Update the UI list
+                            self.movies.remove(at: index)
+                        case .failure(let error):
+                            print("error deleting", error)
+                        }
+                }
+            }
         }
-        movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
-        for i in 0...(movies.count-1) {
-            movies[i].rank = Int32(i+1)
+        if movieList.movies.count > 0 {
+            movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
+            for i in 0...(movies.count-1) {
+                movies[i].rank = Int32(i+1)
+            }
+            movieList.movies = Set(movies)
         }
-        movieList.movies = Set(movies)
         
     }
     

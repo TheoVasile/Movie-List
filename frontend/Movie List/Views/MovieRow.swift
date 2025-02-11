@@ -15,7 +15,7 @@ struct MovieRow: View {
         HStack{
             Text("\(String(movie.rank)).")
             Text(movie.title ?? "No title")
-            Text(yearString(from: movie.release_date!))
+            Text(yearString(from: movie.release_date ?? Date()))
         }
     }
     
