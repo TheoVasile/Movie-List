@@ -54,7 +54,7 @@ class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
     
-    func searchMovies(name: String, completion: @escaping (Result<[MovieResponse], Error>) -> Void) {
+    func searchMovies(name: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/search?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
             return
@@ -80,11 +80,12 @@ class APIService {
             }
             
             do {
-                let decodedResponse = try JSONDecoder().decode(MovieSearchResponse.self, from: data)
+                let decodedResponse = try JSONDecoder().decode([Movie].self, from: data)
                 DispatchQueue.main.async {
-                    completion(.success(decodedResponse.results))
+                    completion(.success(decodedResponse))
                 }
             } catch {
+                print(error.localizedDescription)
                 DispatchQueue.main.async {
                     completion(.failure(error))
                 }

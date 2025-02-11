@@ -19,6 +19,7 @@ struct ListView: View {
     @State var movieName: String = ""
     @State var movieYear: String = ""
     @State var searchText: String = ""
+    @State var searchResults: [Movie] = []
     
     @State var recommendedMovie: CDMovie? = nil
     
@@ -114,7 +115,7 @@ private extension ListView {
     }
     
     var searchResultsList: some View {
-        ForEach(network.movies) { result in
+        ForEach(searchResults, id: \.title) { result in
             Text("\(result.title)").searchCompletion(result.title)
         }
         //Text("PlaceHolder")
@@ -124,12 +125,12 @@ private extension ListView {
         VStack{
             VStack{ List{ Text("") } }
                 .searchable(text: $searchText) {
-                    ForEach(network.movies) { networkMovie in
-                        Text("\(networkMovie.title)")
-                            .searchCompletion(networkMovie.title)
+                    ForEach(searchResults, id: \.title) { apiMovie in
+                        Text("\(apiMovie.title)")
+                            .searchCompletion(apiMovie.title)
                             .onTapGesture {
                                 print("adding movie")
-                                createAndSaveMovie(from: networkMovie)
+                                createAndSaveMovie(from: apiMovie)
                                 showPopup.toggle()
                             }
                     }
@@ -177,7 +178,14 @@ private extension ListView {
     func search(searchText: String) {
         if searchText.count > 0 {
             Task {
-                await network.searchMovies(name: searchText)
+                APIService.shared.searchMovies(name: searchText) { result in
+                    switch result {
+                    case .success(let movies):
+                        self.searchResults = movies
+                    case .failure(let error):
+                        print(error.localizedDescription)
+                    }
+                }
             }
         }
     }

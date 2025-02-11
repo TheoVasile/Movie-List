@@ -11,9 +11,12 @@ import SwiftUI
 struct SearchBar: View {
     @Binding var text: String
     var placeholder: String = "Search..."
+    func onSearch(){
+        print("search")
+    }
 
     var body: some View {
-        HStack {
+        VStack {
             TextField(placeholder, text: $text)
                 .padding(8)
                 .padding(.horizontal, 24)
@@ -35,6 +38,9 @@ struct SearchBar: View {
                         }
                     }
                 )
+            Button(action: onSearch) {
+                Text("search")
+            }
         }
         .padding(.horizontal)
     }
