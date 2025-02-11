@@ -46,10 +46,51 @@ struct MovieResponse: Codable {
     let created_at: String
 }
 
+struct MovieSearchResponse: Codable {
+    let results: [MovieResponse]
+}
+
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
     
+    func searchMovies(name: String, completion: @escaping (Result<[MovieResponse], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/search?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
+                }
+                return
+            }
+            
+            do {
+                let decodedResponse = try JSONDecoder().decode(MovieSearchResponse.self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(decodedResponse.results))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
     func addMovieToList(list_id: Int64, movie_id: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/addToList") else { return }
         
