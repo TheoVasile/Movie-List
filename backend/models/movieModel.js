@@ -37,11 +37,11 @@ async function removeMovieFromList(list_id, movie_id) {
     }
 }
 
-async function addMovieToList(list_id, movie_id) {
+async function addMovieToList(list_id, movie_id, rank) {
     try {
         const result = await pool.query(
-            "INSERT INTO list_movies (list_id, movie_id) VALUES ($1, $2)",
-            [list_id, movie_id]
+            "INSERT INTO list_movies (list_id, movie_id, rank) VALUES ($1, $2, $3)",
+            [list_id, movie_id, rank]
         );
         return result.rows[0];
     } catch (error) {

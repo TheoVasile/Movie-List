@@ -65,8 +65,8 @@ router.delete("/removeFromList/:list_id/:movie_id", async (req, res) => {
 
 router.post("/addToList", async (req, res) => {
     try {
-        const { list_id, movie_id } = req.body;
-        const newMovie = await addMovieToList(list_id, movie_id);
+        const { list_id, movie_id, rank } = req.body;
+        const newMovie = await addMovieToList(list_id, movie_id, rank);
         res.status(201).json(newMovie);
     } catch (error) {
         console.error("Error adding movie to list:", error);

@@ -146,7 +146,7 @@ class APIService {
             }
         }.resume()
     }
-    func addMovieToList(list_id: Int64, movie_id: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
+    func addMovieToList(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/addToList") else { return }
         
         var request = URLRequest(url: url)
@@ -155,7 +155,8 @@ class APIService {
         
         let body: [String: Any] = [
                 "list_id": list_id,
-                "movie_id": movie_id
+                "movie_id": movie_id,
+                "rank": rank
         ]
         
         do {

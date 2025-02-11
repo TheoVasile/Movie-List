@@ -216,7 +216,7 @@ private extension ListView {
         APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
             switch result {
                 case .success(let movieResponse):
-                APIService.shared.addMovieToList(list_id: movieList.id, movie_id: movieResponse.id) { result in
+                APIService.shared.addMovieToList(list_id: movieList.id, movie_id: movieResponse.id, rank: movies.count + 1) { result in
                     switch result {
                     case .success:
                         print("succesfully added movie to list")
