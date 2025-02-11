@@ -46,10 +46,6 @@ struct MovieResponse: Codable {
     let created_at: String
 }
 
-struct MovieSearchResponse: Codable {
-    let results: [MovieResponse]
-}
-
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"

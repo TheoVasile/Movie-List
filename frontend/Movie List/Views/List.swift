@@ -115,7 +115,7 @@ private extension ListView {
     }
     
     var searchResultsList: some View {
-        ForEach(searchResults, id: \.title) { result in
+        ForEach(Array(searchResults.enumerated()), id: \.offset) { index, result in
             Text("\(result.title)").searchCompletion(result.title)
         }
         //Text("PlaceHolder")
@@ -123,10 +123,11 @@ private extension ListView {
     
     var popup: some View {
         VStack{
+            /*
             VStack{ List{ Text("") } }
                 .searchable(text: $searchText) {
-                    ForEach(searchResults, id: \.title) { apiMovie in
-                        Text("\(apiMovie.title)")
+                    ForEach(Array(searchResults.enumerated()), id: \.offset) { index, apiMovie in
+                        Text("\(apiMovie.title), \(index)")
                             .searchCompletion(apiMovie.title)
                             .onTapGesture {
                                 print("adding movie")
@@ -134,7 +135,32 @@ private extension ListView {
                                 showPopup.toggle()
                             }
                     }
+                }*/
+            VStack{
+                TextField("Search...", text: $searchText)
+                    .padding(8)
+                    .padding(.horizontal, 24)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    .overlay(
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.gray)
+                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 8)
+                        }
+                    )
+                List {
+                    ForEach(searchResults, id: \.id) { apiMovie in
+                        Text("\(apiMovie.title)")
+                            .onTapGesture {
+                                print("adding movie")
+                                createAndSaveMovie(from: apiMovie)
+                                showPopup.toggle()
+                            }
+                    }
                 }
+            }
                 .navigationTitle("Add New Movie")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -182,6 +208,7 @@ private extension ListView {
                     switch result {
                     case .success(let movies):
                         self.searchResults = movies
+                        print(searchResults)
                     case .failure(let error):
                         print(error.localizedDescription)
                     }
