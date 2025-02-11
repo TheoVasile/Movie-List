@@ -1,6 +1,6 @@
 const express = require("express");
 const axios = require("axios");
-const { createMovie } = require("../models/movieModel");
+const { createMovie, addMovieToList } = require("../models/movieModel");
 
 const router = express.Router();
 

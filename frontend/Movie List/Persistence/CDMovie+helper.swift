@@ -14,9 +14,10 @@ enum cdmovieError : Error {
 
 extension CDMovie {
     
-    convenience init(id: Int64, title: String, release_date: Date, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) {
+    convenience init(id: Int64, tmdb_id: Int32, title: String, release_date: Date, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) {
         self.init(context: context)
         self.id = id
+        self.tmdb_id = tmdb_id
         self.title = title
         self.rank = rank
         self.release_date = release_date
@@ -26,12 +27,12 @@ extension CDMovie {
         self.poster_path = poster_path
     }
     
-    convenience init(id: Int64, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) throws {
+    convenience init(id: Int64, tmdb_id: Int32, title: String, release_date: String, overview: String, rank: Int32, poster_path: String, original_language: String, popularity: Double, context: NSManagedObjectContext) throws {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         guard let formattedDate: Date = dateFormatter.date(from: release_date) else { throw cdmovieError.nilValueFound("Improper date submitted for movie") }
         
-        self.init(id: id, title: title, release_date: formattedDate, overview: overview, rank: rank, poster_path: poster_path, original_language: original_language, popularity: popularity, context: context)
+        self.init(id: id, tmdb_id: tmdb_id, title: title, release_date: formattedDate, overview: overview, rank: rank, poster_path: poster_path, original_language: original_language, popularity: popularity, context: context)
     }
     
     func get_date() -> String {
@@ -58,7 +59,7 @@ extension CDMovie {
     static var example: CDMovie {
         get {
             let context = PersistenceController.preview.container.viewContext
-            let movie = try! CDMovie(id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context)
+            let movie = try! CDMovie(id: 1, tmdb_id: 615777, title: "Babylon", release_date: "2022-12-22", overview: "A tale of outsized ambition and outrageous excess, tracing the rise and fall of multiple characters in an era of unbridled decadence and depravity during Hollywood's transition from silent films to sound films in the late 1920s.", rank: 1, poster_path: "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg", original_language: "en", popularity: 283.072, context: context)
             return movie
         }
     }
