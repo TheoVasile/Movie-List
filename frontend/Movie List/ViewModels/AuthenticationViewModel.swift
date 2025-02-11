@@ -165,6 +165,15 @@ extension AuthenticationViewModel {
 
         let result = try await Auth.auth().signIn(with: credential)
         let firebaseUser = result.user
+          
+          APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
+              switch result {
+              case .success( _):
+                  print("created user")
+              case .failure(let error):
+                  print(error.localizedDescription)
+              }
+          }
         print("User \(firebaseUser.uid) signed in with email \(firebaseUser.email ?? "unknown")")
         return true
       }

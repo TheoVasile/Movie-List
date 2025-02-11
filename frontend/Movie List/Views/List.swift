@@ -187,17 +187,6 @@ private extension ListView {
     
     private func createAndSaveMovie(from networkMovie: Movie) {
         print("COUNTS", movies.count)
-        /*let newMovie = try! CDMovie(
-            id: networkMovie.id,
-            title: networkMovie.title,
-            release_date: networkMovie.release_date,
-            overview: networkMovie.overview,
-            rank: Int32(movies.count + 1),
-            poster_path: networkMovie.poster_path ?? "/zDifiMtI6MTIbGnjEMwzwOcoXZu.jpg",
-            original_language: networkMovie.original_language,
-            popularity: networkMovie.popularity,
-            context: context)*/
-        //print("RANK", newMovie.rank)
         APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
             switch result {
                 case .success(let movieResponse):

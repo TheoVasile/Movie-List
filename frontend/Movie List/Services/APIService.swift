@@ -46,9 +46,67 @@ struct MovieResponse: Codable {
     let created_at: String
 }
 
+struct UserResponse: Codable {
+    let id: Int64
+    let firebase_id: String
+    let email: String
+    let name: String
+}
+
+struct UserRequest: Codable {
+    let firebase_id: String
+    let email: String
+    let name: String
+}
+
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
+    
+    func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/create") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = UserRequest(firebase_id: firebase_id, email: email, name: name)
+
+        do {
+            request.httpBody = try JSONEncoder().encode(body)
+        } catch {
+            print("❌ Encoding error:", error)
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
+                }
+                return
+            }
+
+            do {
+                let userResponse = try JSONDecoder().decode(UserResponse.self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(userResponse))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+        
+    }
     
     func searchMovies(name: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/search?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") else {
