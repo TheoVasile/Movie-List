@@ -76,7 +76,16 @@ struct ListView: View {
                     ToolbarItem(placement: .navigationBarTrailing){ optionsMenu }
                 }
             }
-            .popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
+            .overlay {
+                if showPopup {
+                    Color.primary
+                        .opacity(0.15)
+                        .ignoresSafeArea()
+                    popup
+                        .padding()
+                }
+            }
+            //.popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
         }
         .onAppear {
             movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
@@ -123,20 +132,13 @@ private extension ListView {
     
     var popup: some View {
         VStack{
-            /*
-            VStack{ List{ Text("") } }
-                .searchable(text: $searchText) {
-                    ForEach(Array(searchResults.enumerated()), id: \.offset) { index, apiMovie in
-                        Text("\(apiMovie.title), \(index)")
-                            .searchCompletion(apiMovie.title)
-                            .onTapGesture {
-                                print("adding movie")
-                                createAndSaveMovie(from: apiMovie)
-                                showPopup.toggle()
-                            }
-                    }
-                }*/
-            VStack{
+            HStack{
+                Button(action: {
+                    withAnimation { showPopup.toggle() }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .medium)) // Adjust size & weight
+                }
                 TextField("Search...", text: $searchText)
                     .padding(8)
                     .padding(.horizontal, 24)
@@ -150,28 +152,37 @@ private extension ListView {
                                 .padding(.leading, 8)
                         }
                     )
-                List {
-                    ForEach(searchResults, id: \.id) { apiMovie in
-                        Text("\(apiMovie.title)")
-                            .onTapGesture {
-                                print("adding movie")
-                                createAndSaveMovie(from: apiMovie)
-                                showPopup.toggle()
-                            }
+                    .submitLabel(.search) // 🔥 This makes the keyboard show a "Search" button
+                    .onSubmit {
+                        search(searchText: searchText) // Call your search function when the user taps "Search"
                     }
-                }
             }
+            GeometryReader { geometry in
+                VStack{
+                    List {
+                        ForEach(searchResults, id: \.id) { apiMovie in
+                            Text("\(apiMovie.title), \(apiMovie.release_date)")
+                                .onTapGesture {
+                                    print("adding movie")
+                                    createAndSaveMovie(from: apiMovie)
+                                    showPopup.toggle()
+                                }
+                            }
+                        }
+                        .listStyle(.plain)
+                        .cornerRadius(10)
+                    }
+                    .frame(maxHeight: min(CGFloat(searchResults.count * 50), geometry.size.height))
+                }
                 .navigationTitle("Add New Movie")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Close"){ withAnimation{ showPopup.toggle() } }
-                    }
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("Search"){ search(searchText: searchText) }
-                    }
                 }
+            }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
     
     private func createAndSaveMovie(from networkMovie: Movie) {
