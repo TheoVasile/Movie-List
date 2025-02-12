@@ -55,8 +55,46 @@ class ListViewModel: ObservableObject {
     }
     
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
-        if let index = movies.firstIndex(where: { $0.id == updatedMovie.id }) {
-            movies[index] = updatedMovie
+        APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
+            switch result {
+                case .success:
+                    print("updated db rankings")
+                    // ✅ Ensure Core Data context exists
+                    guard let context = updatedMovie.managedObjectContext else {
+                        print("❌ Error: No Core Data context found")
+                        return
+                    }
+
+                    let oldRank = Int(updatedMovie.rank)
+                    updatedMovie.rank = Int32(newRank)  // ✅ Update selected movie's rank
+
+                    // ✅ Convert NSSet to sorted array
+                    var movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+
+                    // ✅ Remove the movie from the list
+                    movies.removeAll { $0.id == updatedMovie.id }
+
+                    // ✅ Insert the movie at the new rank
+                    movies.insert(updatedMovie, at: newRank - 1)
+
+                    // ✅ Reassign correct rankings for all movies
+                    for (index, movie) in movies.enumerated() {
+                        movie.rank = Int32(index + 1)
+                    }
+
+                    // ✅ Update movieList's relationship
+                    self.movieList.movies = Set(movies)
+
+                    // ✅ Save changes to Core Data
+                    do {
+                        try context.save()
+                        print("✅ Core Data rankings updated successfully")
+                    } catch {
+                        print("❌ Error saving Core Data:", error.localizedDescription)
+                    }
+                case .failure(let error):
+                    print("error updating movie rank:", error)
+                }
         }
     }
     

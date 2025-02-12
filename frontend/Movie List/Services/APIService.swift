@@ -189,6 +189,44 @@ class APIService {
         task.resume()
     }
     
+    func updateMovieRanking(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/updateRank") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Any] = [
+                "list_id": list_id,
+                "movie_id": movie_id,
+                "rank": rank
+            ]
+
+            do {
+                request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            } catch {
+                completion(.failure(error))
+                return
+            }
+
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                    let statusError = NSError(domain: "", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil)
+                    completion(.failure(statusError))
+                    return
+                }
+
+                completion(.success(()))
+            }
+
+            task.resume()
+    }
+    
     func removeMovieFromList(list_id: Int64, movie_id: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/removeFromList/\(list_id)/\(movie_id)") else { return }
         
