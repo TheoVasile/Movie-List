@@ -29,6 +29,13 @@ struct ListView: View {
                 .toolbar { ToolbarOptions }
             }
             .overlay { if viewModel.showPopup { PopupOverlay } }
+            if viewModel.showCompareMovieView {
+                if let selectedMovie = viewModel.selectedMovie {
+                    CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie)) { updatedMovie, rank in
+                        viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
+                    }
+                }
+            }
         }
     }
 }
@@ -43,7 +50,7 @@ private extension ListView {
                 DailyMovieView(movie: viewModel.recommendedMovie!)
             }
             ForEach(viewModel.movies, id: \.id) { movie in
-                MovieRow(movie: movie)
+                MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie)
             }
             .onDelete(perform: viewModel.deleteMovie)
         }

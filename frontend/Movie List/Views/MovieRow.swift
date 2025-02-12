@@ -10,6 +10,8 @@ import SwiftUI
 
 struct MovieRow: View {
     @ObservedObject var movie: CDMovie
+    @Binding var showCompareMovieView: Bool
+    @Binding var selectedMovie: CDMovie?
     
     var body: some View {
         ZStack{
@@ -35,7 +37,11 @@ struct MovieRow: View {
                     .padding()
                 Menu {
                         Button("Set Rank") { print("Edit tapped") }
-                        Button("Compare") { print("Compare Tapped") }
+                    Button("Compare") {
+                        print("Compare Tapped")
+                        showCompareMovieView = true
+                        selectedMovie = movie
+                    }
                         Button("Delete", role: .destructive) { print("Delete tapped") }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -57,5 +63,5 @@ struct MovieRow: View {
 }
 
 #Preview {
-    MovieRow(movie: CDMovie.example)
+    MovieRow(movie: CDMovie.example, showCompareMovieView: .constant(false), selectedMovie: .constant(nil))
 }

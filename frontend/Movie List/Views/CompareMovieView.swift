@@ -16,9 +16,9 @@ struct CompareMovieView: View {
     @State var left: Int = 0
     @State var right: Int = 0
     @State var middle: Int = 0
-    var onRankingUpdate: (CDMovie) -> Void
+    var onRankingUpdate: (CDMovie, Int) -> Void
     
-    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, onRankingUpdate: @escaping (CDMovie) -> Void) {
+    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
             self._movies = movies
             self._movie = movie
             self.onRankingUpdate = onRankingUpdate
@@ -72,14 +72,14 @@ struct CompareMovieView: View {
         middle = (left+right)/2
         if left >= right {
             movie.rank = Int32(left+1)
-            onRankingUpdate(movie)
+            onRankingUpdate(movie, Int(left+1))
         }
     }
 }
 
 struct CompareMovieView_Previews: PreviewProvider{
     static var previews: some View {
-        CompareMovieView(movies: .constant(Array(CDMovieList.example.movies)), movie: .constant(Array(CDMovieList.example.movies)[0])) { updatedMovie in
+        CompareMovieView(movies: .constant(Array(CDMovieList.example.movies)), movie: .constant(Array(CDMovieList.example.movies)[0])) { updatedMovie, rank in
             print(updatedMovie)
             
         }

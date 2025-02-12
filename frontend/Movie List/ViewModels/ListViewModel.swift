@@ -16,6 +16,8 @@ class ListViewModel: ObservableObject {
     @Published var recommendedMovie: CDMovie? = nil
     @Published var showPopup: Bool = false
     @Published var searchText: String = ""
+    @Published var showCompareMovieView = false
+    @Published var selectedMovie: CDMovie? = nil
     
     var movieList: CDMovieList
     private let context: NSManagedObjectContext
