@@ -92,6 +92,7 @@ struct ListView: View {
                             deleteMovie(offsets: indexSet)
                         }
                     }
+                    .listStyle(.plain)
                 }
                 .searchable(text: $searchText) {
                     searchResultsList
