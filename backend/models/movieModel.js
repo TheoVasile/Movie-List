@@ -50,6 +50,59 @@ async function addMovieToList(list_id, movie_id, rank) {
     }
 }
 
+async function updateMovieRank(list_id, movie_id, new_rank) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN"); // Start transaction
+
+        // Get the current rank of the movie
+        const { rows } = await client.query(
+            "SELECT rank FROM list_movies WHERE list_id = $1 AND movie_id = $2",
+            [list_id, movie_id]
+        );
+
+        if (rows.length === 0) {
+            throw new Error("Movie not found in the list");
+        }
+
+        const old_rank = rows[0].rank;
+        if (old_rank === new_rank) {
+            await client.query("COMMIT"); // No updates needed, but commit transaction
+            return rows[0]; // ✅ Return the existing row as-is
+        }
+        // Shift affected movies up or down
+        await client.query(
+            `UPDATE list_movies
+             SET rank = CASE
+                 WHEN CAST($1 AS INTEGER) < CAST($2 AS INTEGER) THEN rank - 1
+                 WHEN CAST($1 AS INTEGER) > CAST($2 AS INTEGER) THEN rank + 1
+                 ELSE rank
+             END
+             WHERE list_id = CAST($3 AS INTEGER)
+             AND rank BETWEEN LEAST(CAST($1 AS INTEGER), CAST($2 AS INTEGER))
+                         AND GREATEST(CAST($1 AS INTEGER), CAST($2 AS INTEGER))
+             AND movie_id != CAST($4 AS INTEGER)`,
+            [old_rank, new_rank, list_id, movie_id]
+        );
+
+        // Update the movie's rank
+        const result = await client.query(
+            "UPDATE list_movies SET rank = $1 WHERE list_id = $2 AND movie_id = $3 RETURNING *",
+            [new_rank, list_id, movie_id]
+        );
+        await client.query("COMMIT"); // Commit transaction
+        return result.rows[0];
+
+    } catch (error) {
+        await client.query("ROLLBACK"); // Rollback in case of error
+        console.error("Error updating movie rank:", error);
+        throw error;
+    } finally {
+        client.release(); // Release DB connection
+    }
+}
+
+
 async function getMovieByTmdbId(tmdb_id) {
     const result = await pool.query(
         "SELECT * FROM movies WHERE tmdb_id = $1",
@@ -58,4 +111,4 @@ async function getMovieByTmdbId(tmdb_id) {
     return result.rows[0];
 }
 
-module.exports = { createMovie, addMovieToList, getMovieByTmdbId, removeMovieFromList };
+module.exports = { createMovie, addMovieToList, getMovieByTmdbId, removeMovieFromList, updateMovieRank };

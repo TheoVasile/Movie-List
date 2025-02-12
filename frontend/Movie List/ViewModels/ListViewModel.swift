@@ -54,6 +54,12 @@ class ListViewModel: ObservableObject {
         }
     }
     
+    func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
+        if let index = movies.firstIndex(where: { $0.id == updatedMovie.id }) {
+            movies[index] = updatedMovie
+        }
+    }
+    
     func searchMovies() {
         if searchText.isEmpty { return }
         APIService.shared.searchMovies(name: searchText) { result in

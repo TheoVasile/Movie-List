@@ -25,42 +25,48 @@ struct CompareMovieView: View {
         }
     
     var body : some View {
-        VStack{
-            Spacer()
-            Text("Select which movie you prefer")
-                .fontWeight(.bold)
-                .padding(.top, 150)
-                .padding(.bottom, 50)
-            HStack{
-                if movies.count > 1 {
-                    MovieCard(movie: $movie)
-                        .onTapGesture {
-                            right = middle - 1
-                            if right == movie.rank - 1 {
-                                right -= 1
-                            }
-                            updateMiddle()
-                        }
-                    if middle < movies.count {
-                        MovieCard(movie: $movies[middle])
+        ZStack{
+            Color(.white)
+            VStack{
+                Spacer()
+                Text("Select which movie you prefer")
+                    .fontWeight(.bold)
+                    .padding(.top, 150)
+                    .padding(.bottom, 50)
+                HStack{
+                    if movies.count > 1 {
+                        MovieCard(movie: $movie)
                             .onTapGesture {
-                                left = middle + 1
-                                if left == movie.rank - 1 {
-                                    left += 1
+                                right = middle - 1
+                                if right == movie.rank - 1 {
+                                    right -= 1
                                 }
                                 updateMiddle()
                             }
+                        if middle < movies.count {
+                            MovieCard(movie: $movies[middle])
+                                .onTapGesture {
+                                    left = middle + 1
+                                    if left == movie.rank - 1 {
+                                        left += 1
+                                    }
+                                    updateMiddle()
+                                }
+                        }
+                    } else{
+                        Text("Need at least 2 movies to compare")
                     }
-                } else{
-                    Text("Need at least 2 movies to compare")
                 }
+                .padding(.bottom, 100)
             }
-            .padding(.bottom, 100)
+            .onAppear {
+                right = movies.count - 1
+                updateMiddle()
+            }
         }
-        .onAppear {
-            right = movies.count - 1
-            updateMiddle()
-        }
+        .cornerRadius(20)
+        .padding()
+        .background(Color.black.opacity(0.15))
     }
     private func updateMiddle() {
         middle = (left+right)/2

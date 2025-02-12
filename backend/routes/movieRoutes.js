@@ -1,6 +1,6 @@
 const express = require("express");
 const axios = require("axios");
-const { createMovie, addMovieToList, removeMovieFromList } = require("../models/movieModel");
+const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
 const router = express.Router();
 
@@ -52,6 +52,16 @@ router.post("/create", async (req, res) => {
     }
 });
 
+router.put("/updateRank", async (req, res) => {
+    try {
+        const { list_id, movie_id, rank } = req.body;
+        const updatedMovie = await updateMovieRank(list_id, movie_id, rank);
+        res.status(200).json(updatedMovie);
+    } catch (error) {
+        console.error("Error updating movie rank:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 router.delete("/removeFromList/:list_id/:movie_id", async (req, res) => {
     try {
         const { list_id, movie_id } = req.params;
