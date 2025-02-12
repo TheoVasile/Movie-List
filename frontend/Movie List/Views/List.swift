@@ -7,305 +7,87 @@
 
 import Foundation
 import SwiftUI
+import CoreData
 
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
-    //@EnvironmentObject var db: DatabaseService
-    //@ObservedObject var viewModel: ListViewModel
-    @State var movieList: CDMovieList
-    //@FetchRequest(fetchRequest: CDMovie.fetch(), animation: .bouncy) var movies: FetchedResults<CDMovie>
-    @State var movies: [CDMovie] = []
-    @State var showPopup: Bool = false
-    @State var movieName: String = ""
-    @State var movieYear: String = ""
-    @State var searchText: String = ""
-    @State var searchResults: [Movie] = []
-    
-    @State var recommendedMovie: CDMovie? = nil
-    
-    @State var otherSearchResults: [String] = []
-    @Environment(\.managedObjectContext) var context
-    
-    /*
-    init(movieList: CDMovieList){
-        print("initializing")
-        self.movieList = movieList
-        //let request = CDMovie.fetch()
-        //request.predicate = NSPredicate(format: "list == %@", movieList as CVarArg)
-        //self._movies = FetchRequest(fetchRequest: request)
-        self.movies = movieList.movies
-    }*/
-    
-    private func deleteMovie(offsets: IndexSet) {
-        for index in offsets {
-            let poppedMovie: CDMovie = movies[index]
-            APIService.shared.removeMovieFromList(list_id: movieList.id, movie_id: poppedMovie.id) { result in
-                DispatchQueue.main.async {
-                    switch result {
-                        case .success:
-                            print("deleting \(poppedMovie.title)")
-                            if let managedObjectContext = poppedMovie.managedObjectContext {
-                                managedObjectContext.delete(poppedMovie)
-                                
-                                do {
-                                    try managedObjectContext.save()
-                                    print("Successfully deleted from Core Data")
-                                } catch {
-                                    print("Core Data context not saved:", error)
-                                }
-                            } else {
-                                print("Error: Movie is not in Core Data context")
-                            }
-                            
-                            // Update the UI list
-                            self.movies.remove(at: index)
-                        case .failure(let error):
-                            print("error deleting", error)
-                        }
-                }
-            }
-        }
-        if movieList.movies.count > 0 {
-            movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
-            for i in 0...(movies.count-1) {
-                movies[i].rank = Int32(i+1)
-            }
-            movieList.movies = Set(movies)
-        }
-        
+    @StateObject var viewModel: ListViewModel
+
+    init(movieList: CDMovieList, context: NSManagedObjectContext) {
+        _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
     }
-    
-    var body: some View{
-        ZStack{
-            NavigationStack{
-                VStack{
-                    List {
-                        if movies.count == 0 {
-                            Text("No Movies Added")
-                        } else if recommendedMovie != nil {
-                            dailyMovie
-                        }
-                        ForEach(movies, id: \.id){movie in
-                            MovieRow(movie: movie)
-                        }
-                        .onDelete { indexSet in
-                            deleteMovie(offsets: indexSet)
-                        }
-                    }
-                    .listStyle(.plain)
+
+    var body: some View {
+        ZStack {
+            NavigationStack {
+                VStack {
+                    MovieListSection
                 }
-                .searchable(text: $searchText) {
-                    searchResultsList
-                }
-                .navigationTitle(movieList.name ?? "no movie name")
+                .searchable(text: $viewModel.searchText) { SearchResultsList }
+                .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar{
-                    ToolbarItem(placement: .navigationBarTrailing){ optionsMenu }
-                }
+                .toolbar { ToolbarOptions }
             }
-            .overlay {
-                if showPopup {
-                    Color.primary
-                        .opacity(0.15)
-                        .ignoresSafeArea()
-                    popup
-                        .padding()
-                }
-            }
-            //.popupNavigationView(horizontalPadding: 20, show: $showPopup){ popup }
-        }
-        .onAppear {
-            movies = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
-            //viewModel.setup(db: db, network: network)
+            .overlay { if viewModel.showPopup { PopupOverlay } }
         }
     }
 }
 
+// MARK: - UI Components
 private extension ListView {
-    var dailyMovie: some View {
-        Group {
-            Section("Movie of the Day: \(String(describing: recommendedMovie?.title))"){
-                AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600andh_900_bestv2/\(recommendedMovie?.poster_path ?? "/wjOHjWCUE0YzDiEzKv8AfqHj3ir.jpg")")) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                            ProgressView()
-                        }
-                        .frame(width: 300, height: 200)
+    var MovieListSection: some View {
+        List {
+            if viewModel.movies.isEmpty {
+                Text("No Movies Added")
+            } else if viewModel.recommendedMovie != nil {
+                DailyMovieView(movie: viewModel.recommendedMovie!)
             }
+            ForEach(viewModel.movies, id: \.id) { movie in
+                MovieRow(movie: movie)
+            }
+            .onDelete(perform: viewModel.deleteMovie)
+        }
+        .listStyle(.plain)
+    }
+    
+    var SearchResultsList: some View {
+        ForEach(viewModel.searchResults, id: \.id) { result in
+            Text(result.title).searchCompletion(result.title)
         }
     }
     
-    // Options to manipulate the list
-    var optionsMenu: some View {
+    var ToolbarOptions: some View {
         Menu("Options") {
-            Button("Add Movie"){ showPopup.toggle() }
-            NavigationLink("Compare", destination: CompareMovieView(movieList: $movieList)
-                .environmentObject(network))
-            Button("Recommend Movie"){
-                //recommendedMovie = viewModel.recommendMovie()
-                print("RECOMMENDATION: \(recommendedMovie)")
-            }
+            Button("Add Movie") { viewModel.showPopup.toggle() }
+            Button("Recommend Movie") { viewModel.recommendMovie() }
         }
     }
     
-    var searchResultsList: some View {
-        ForEach(Array(searchResults.enumerated()), id: \.offset) { index, result in
-            Text("\(result.title)").searchCompletion(result.title)
-        }
-        //Text("PlaceHolder")
+    var PopupOverlay: some View {
+        Color.primary.opacity(0.15).ignoresSafeArea()
     }
-    
-    var popup: some View {
-        VStack{
-            HStack{
-                Button(action: {
-                    withAnimation { showPopup.toggle() }
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium)) // Adjust size & weight
-                }
-                TextField("Search...", text: $searchText)
-                    .padding(8)
-                    .padding(.horizontal, 24)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .overlay(
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
-                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, 8)
-                        }
-                    )
-                    .submitLabel(.search) // 🔥 This makes the keyboard show a "Search" button
-                    .onSubmit {
-                        search(searchText: searchText) // Call your search function when the user taps "Search"
-                    }
-            }
-            GeometryReader { geometry in
-                VStack{
-                    List {
-                        ForEach(searchResults, id: \.id) { apiMovie in
-                            Text("\(apiMovie.title), \(apiMovie.release_date)")
-                                .onTapGesture {
-                                    print("adding movie")
-                                    createAndSaveMovie(from: apiMovie)
-                                    showPopup.toggle()
-                                }
-                            }
-                        }
-                        .listStyle(.plain)
-                        .cornerRadius(10)
-                    }
-                    .frame(maxHeight: min(CGFloat(searchResults.count * 50), geometry.size.height))
-                }
-                .navigationTitle("Add New Movie")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Close"){ withAnimation{ showPopup.toggle() } }
-                }
-            }
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-    
-    private func createAndSaveMovie(from networkMovie: Movie) {
-        print("COUNTS", movies.count)
-        APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
-            switch result {
-                case .success(let movieResponse):
-                APIService.shared.addMovieToList(list_id: movieList.id, movie_id: movieResponse.id, rank: movies.count + 1) { result in
-                    switch result {
-                    case .success:
-                        print("succesfully added movie to list")
-                        let newMovie = try! CDMovie(
-                            id: movieResponse.id,
-                            tmdb_id: Int32(movieResponse.tmdb_id)!,
-                            title: movieResponse.title,
-                            release_date: movieResponse.release_date,
-                            overview: movieResponse.overview,
-                            rank: Int32(movies.count + 1),
-                            poster_path: movieResponse.poster_path,
-                            original_language: movieResponse.original_language,
-                            popularity: movieResponse.popularity,
-                            context: context)
-                        movieList.addToMovies_(newMovie)
-                        movies = Array(movieList.movies)
-                        
-                        do {
-                            print("saving context")
-                            try context.save()
-                        } catch {
-                            print("Error saving context: \(error)")
-                        }
-                    case .failure(let error):
-                        print(error.localizedDescription)
-                    }
-                }
-            case .failure(let error):
-                print("❌ Backend request failed, deleting from Core Data:", error.localizedDescription)
-            }
-        }
-    }
-    
-    func search(searchText: String) {
-        if searchText.count > 0 {
-            Task {
-                APIService.shared.searchMovies(name: searchText) { result in
-                    switch result {
-                    case .success(let movies):
-                        self.searchResults = movies
-                        print(searchResults)
-                    case .failure(let error):
-                        print(error.localizedDescription)
-                    }
-                }
-            }
-        }
-    }
-    
-    func recommendMovie() -> CDMovie? {
-        let numMovies = Double(movies.count)
-        if numMovies < 1 {
-            return nil
-        }
+}
 
-        let selectedRank = round((1 - Double.random(in: 0..<numMovies)) / numMovies.squareRoot() * (numMovies - 1) + 1)
-        print("SELECTED RANK: \(selectedRank)")
-
-        let predicates = [NSPredicate(format: "list == %@", movieList.name ?? "no name" as CVarArg),
-                          NSPredicate(format: "rank == %d", Int(selectedRank))]
-        let request = CDMovie.fetch(NSCompoundPredicate(andPredicateWithSubpredicates: predicates))
-        request.fetchLimit = 1  // We only want one movie
-
-        do {
-            let results = try context.fetch(request)
-            return results.first  // Returns the first movie found, or nil if no movie matches
-        } catch {
-            print("Failed to fetch movie: \(error)")
-            return nil
-        }
-    }
+// MARK: - Daily Movie View
+struct DailyMovieView: View {
+    let movie: CDMovie
     
-    func header(recommendedMovie: String) -> some View {
-        VStack{
-            Text("Movie of the Day: \(recommendedMovie)")
-            Image("Babylon")
-                .resizable()
-                .frame(width: 200, height: 295)
-                .cornerRadius(25)
+    var body: some View {
+        Section("Movie of the Day: \(movie.title ?? "")") {
+            AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2/\(movie.poster_path ?? "")")) { image in
+                image.resizable().aspectRatio(contentMode: .fit)
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(width: 300, height: 200)
         }
     }
 }
 
 
-struct List_Previews: PreviewProvider{
+struct List_Previews: PreviewProvider {
     static var previews: some View {
-        ListView(movieList: CDMovieList.example)
+        ListView(movieList: CDMovieList.example, context: PersistenceController.preview.container.viewContext)
             .environmentObject(NetworkService())
-            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }

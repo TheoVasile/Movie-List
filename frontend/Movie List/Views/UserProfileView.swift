@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 
 struct UserProfileView: View {
+    @Environment(\.managedObjectContext) var context
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     var body: some View {
@@ -62,7 +63,7 @@ struct UserProfileView: View {
                         List {
                             ForEach(movieLists, id: \.self) { movieList in
                                 NavigationLink(movieList.name ?? "No Name", destination:
-                                                ListView(movieList: movieList)
+                                                ListView(movieList: movieList, context: context)
                                     .environmentObject(NetworkService())
                                     .environmentObject(DatabaseService())
                                 )

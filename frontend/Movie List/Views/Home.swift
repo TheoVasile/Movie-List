@@ -54,7 +54,7 @@ private extension Home {
                 List {
                     ForEach(movieLists, id: \.self) { movieList in
                         NavigationLink(movieList.name ?? "No Name", destination:
-                                        ListView(movieList: movieList)
+                                        ListView(movieList: movieList, context: context)
                             .environmentObject(NetworkService())
                             .environmentObject(DatabaseService())
                         )
