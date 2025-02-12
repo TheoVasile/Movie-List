@@ -33,6 +33,15 @@ struct MovieRow: View {
                 Spacer()
                 Text(yearString(from: movie.release_date ?? Date()))
                     .padding()
+                Menu {
+                        Button("Set Rank") { print("Edit tapped") }
+                        Button("Compare") { print("Compare Tapped") }
+                        Button("Delete", role: .destructive) { print("Delete tapped") }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .rotationEffect(.degrees(90)) // Makes it vertical like ⋮
+                            .padding()
+                    }
             }
         }
         .frame(height: 100)

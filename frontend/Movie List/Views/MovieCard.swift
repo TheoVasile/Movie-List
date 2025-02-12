@@ -9,17 +9,17 @@ import Foundation
 import SwiftUI
 
 struct MovieCard: View {
-    @State var movie: CDMovie?
+    @Binding var movie: CDMovie
     var body: some View {
         ZStack {
             Color.white
             VStack{
-                Text(movie?.title ?? "None")
+                Text(movie.title ?? "None")
                     .fontWeight(.bold)
                     .foregroundColor(.black) // Text color
-                Text(movie?.get_date() ?? "None")
+                Text(movie.get_date() ?? "None")
                     .foregroundColor(.gray)
-                if let poster_path = movie?.poster_path, !poster_path.isEmpty {
+                if let poster_path = movie.poster_path, !poster_path.isEmpty {
                     AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2"+poster_path)) { image in
                         image.resizable()
                             .scaledToFit()
@@ -40,6 +40,8 @@ struct MovieCard: View {
     }
 }
 
-#Preview{
-    MovieCard(movie: CDMovie.example)
+struct MovieCardPreviews: PreviewProvider {
+    static var previews: some View {
+        MovieCard(movie: .constant(CDMovie.example))
+    }
 }
