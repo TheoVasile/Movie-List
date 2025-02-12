@@ -32,6 +32,15 @@ struct ListView: View {
             if viewModel.showCompareMovieView {
                 if let selectedMovie = viewModel.selectedMovie {
                     CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie)) { updatedMovie, rank in
+                        viewModel.showCompareMovieView = false
+                        viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
+                    }
+                }
+            }
+            else if viewModel.showSetRank {
+                if let selectedMovie = viewModel.selectedMovie {
+                    SetRankView(movie: Binding.constant(selectedMovie)) {updatedMovie, rank in
+                        viewModel.showSetRank = false
                         viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                     }
                 }
@@ -50,7 +59,7 @@ private extension ListView {
                 DailyMovieView(movie: viewModel.recommendedMovie!)
             }
             ForEach(viewModel.movies, id: \.id) { movie in
-                MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie)
+                MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
             }
             .onDelete(perform: viewModel.deleteMovie)
         }

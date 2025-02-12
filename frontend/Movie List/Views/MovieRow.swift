@@ -12,6 +12,7 @@ struct MovieRow: View {
     @ObservedObject var movie: CDMovie
     @Binding var showCompareMovieView: Bool
     @Binding var selectedMovie: CDMovie?
+    @Binding var showSetRank: Bool
     
     var body: some View {
         ZStack{
@@ -36,7 +37,10 @@ struct MovieRow: View {
                 Text(yearString(from: movie.release_date ?? Date()))
                     .padding()
                 Menu {
-                        Button("Set Rank") { print("Edit tapped") }
+                        Button("Set Rank") {
+                            showSetRank = true
+                            selectedMovie = movie
+                        }
                     Button("Compare") {
                         print("Compare Tapped")
                         showCompareMovieView = true
@@ -63,5 +67,5 @@ struct MovieRow: View {
 }
 
 #Preview {
-    MovieRow(movie: CDMovie.example, showCompareMovieView: .constant(false), selectedMovie: .constant(nil))
+    MovieRow(movie: CDMovie.example, showCompareMovieView: .constant(false), selectedMovie: .constant(nil), showSetRank: .constant(false))
 }
