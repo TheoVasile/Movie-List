@@ -37,10 +37,10 @@ struct MovieRow: View {
                 Text(yearString(from: movie.release_date ?? Date()))
                     .padding()
                 Menu {
-                        Button("Set Rank") {
-                            showSetRank = true
-                            selectedMovie = movie
-                        }
+                    Button("Set Rank") {
+                        showSetRank = true
+                        selectedMovie = movie
+                    }
                     Button("Compare") {
                         print("Compare Tapped")
                         showCompareMovieView = true

@@ -13,6 +13,7 @@
 		FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0124A22BDECC4B00A1C13C /* CDMovieList+helper.swift */; };
 		FA0124A52BDEDBB700A1C13C /* NSPredicate+helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0124A42BDEDBB700A1C13C /* NSPredicate+helper.swift */; };
 		FA096BC12D5D5D5E004FDFE8 /* SetRankView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */; };
+		FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */; };
 		FA10A9E0296A755800FDF445 /* Movie_ListApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9DF296A755800FDF445 /* Movie_ListApp.swift */; };
 		FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9E1296A755800FDF445 /* ContentView.swift */; };
 		FA10A9E4296A755900FDF445 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA10A9E3296A755900FDF445 /* Assets.xcassets */; };
@@ -70,6 +71,7 @@
 		FA0124A22BDECC4B00A1C13C /* CDMovieList+helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CDMovieList+helper.swift"; sourceTree = "<group>"; };
 		FA0124A42BDEDBB700A1C13C /* NSPredicate+helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPredicate+helper.swift"; sourceTree = "<group>"; };
 		FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetRankView.swift; sourceTree = "<group>"; };
+		FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettingsView.swift; sourceTree = "<group>"; };
 		FA10A9DC296A755800FDF445 /* Movie List.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Movie List.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA10A9DF296A755800FDF445 /* Movie_ListApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Movie_ListApp.swift; sourceTree = "<group>"; };
 		FA10A9E1296A755800FDF445 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 				FAE94A152D55780000592081 /* AuthenticatedView.swift */,
 				FAE94A172D55789F00592081 /* UserProfileView.swift */,
 				FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */,
+				FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -331,6 +334,7 @@
 				FA0124A52BDEDBB700A1C13C /* NSPredicate+helper.swift in Sources */,
 				FAD23A752D52011600EACB94 /* MovieCard.swift in Sources */,
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
+				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
 				FAE94A082D554FBC00592081 /* GoogleSignInButton.swift in Sources */,
 				FAE94A182D55789F00592081 /* UserProfileView.swift in Sources */,
