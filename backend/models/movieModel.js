@@ -20,20 +20,42 @@ async function createMovie(tmdb_id, title, release_date, overview, poster_path, 
 }
 
 async function removeMovieFromList(list_id, movie_id) {
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            "DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2 RETURNING *",
+        await client.query("BEGIN"); // Start transaction
+
+        // ✅ Delete the movie and return the deleted row
+        const result = await client.query(
+            `DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2 RETURNING *`,
             [list_id, movie_id]
         );
-    
+
         if (result.rowCount === 0) {
+            await client.query("COMMIT"); // Commit even if nothing is deleted
             return { message: "No matching movie found, but operation successful." };
         }
-    
-        return result.rows[0];
+
+        // ✅ Reorder rankings after deletion
+        await client.query(
+            `UPDATE list_movies
+             SET rank = new_rank
+             FROM (
+                 SELECT movie_id, ROW_NUMBER() OVER (ORDER BY rank) AS new_rank
+                 FROM list_movies
+                 WHERE list_id = $1
+             ) AS ranked
+             WHERE list_movies.list_id = $1 AND list_movies.movie_id = ranked.movie_id`,
+            [list_id]
+        );
+
+        await client.query("COMMIT"); // Commit transaction
+        return result.rows[0]; // Return the deleted movie
     } catch (error) {
+        await client.query("ROLLBACK"); // Rollback on error
         console.error("Error removing movie from list:", error);
         throw error;
+    } finally {
+        client.release(); // Release the client
     }
 }
 

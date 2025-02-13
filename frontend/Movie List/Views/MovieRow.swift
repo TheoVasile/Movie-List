@@ -46,7 +46,6 @@ struct MovieRow: View {
                         showCompareMovieView = true
                         selectedMovie = movie
                     }
-                        Button("Delete", role: .destructive) { print("Delete tapped") }
                     } label: {
                         Image(systemName: "ellipsis")
                             .rotationEffect(.degrees(90)) // Makes it vertical like ⋮

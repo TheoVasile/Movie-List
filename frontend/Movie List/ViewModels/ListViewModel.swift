@@ -42,9 +42,15 @@ class ListViewModel: ObservableObject {
                     case .success:
                         if let managedObjectContext = poppedMovie.managedObjectContext {
                             managedObjectContext.delete(poppedMovie)
+                            self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                            self.movies.remove(at: index)
+                            for (i, m) in self.movies.enumerated() {
+                                m.rank = Int32(i+1)
+                            }
+                            self.movieList.movies = Set(self.movies)
                             do {
                                 try managedObjectContext.save()
-                                self.movies.remove(at: index) // Remove from UI
+                                try self.context.save()
                             } catch {
                                 print("Error saving Core Data:", error)
                             }
