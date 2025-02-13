@@ -108,12 +108,10 @@ class ListViewModel: ObservableObject {
                 case .success:
                     print("updated db rankings")
                     // ✅ Ensure Core Data context exists
-                    guard let context = updatedMovie.managedObjectContext else {
+                    /*guard let context = updatedMovie.managedObjectContext else {
                         print("❌ Error: No Core Data context found")
                         return
-                    }
-
-                    let oldRank = Int(updatedMovie.rank)
+                    }*/
                     updatedMovie.rank = Int32(newRank)  // ✅ Update selected movie's rank
 
                     // ✅ Convert NSSet to sorted array

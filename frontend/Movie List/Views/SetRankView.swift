@@ -9,19 +9,15 @@ import Foundation
 import SwiftUI
 
 struct SetRankView : View {
-    @State var rank: Int = 0
+    @State var rank: Int = 1
     @Binding var movie: CDMovie
+    var movieCount: Int
     var onRankingUpdate: (CDMovie, Int) -> Void
     
-    let formatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .none
-        return formatter
-    }()
-    
-    init(movie: Binding<CDMovie>, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
+    init(movie: Binding<CDMovie>, movieCount: Int, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
         _movie = movie
         self.onRankingUpdate = onRankingUpdate
+        self.movieCount = movieCount
     }
     
     var body: some View {
@@ -33,13 +29,17 @@ struct SetRankView : View {
                 VStack {
                     Text("Select Rank")
                         .padding()
-                    TextField("rank", value: $rank, formatter: formatter)
+                    TextField("rank", value: $rank, formatter: NumberFormatter())
+                        .keyboardType(.numberPad)
                         .frame(width: 100, height: 25)
                         .background(Color.black.opacity(0.1))
                         .cornerRadius(10)
                         .padding(.horizontal)
                         .padding(.bottom)
                         .disableAutocorrection(true)
+                        .onChange(of: rank) { newValue in
+                            rank = min(max(newValue, 1), movieCount)
+                                                }
                     Button("Set Rank") {
                         onRankingUpdate(movie, rank)
                     }
@@ -54,7 +54,7 @@ struct SetRankView : View {
 
 struct SetRankView_Previews: PreviewProvider {
     static var previews: some View {
-        SetRankView(movie: .constant(CDMovie.example)) { movie, rank in
+        SetRankView(movie: .constant(CDMovie.example), movieCount: 5) { movie, rank in
             print(rank)
         }
     }
