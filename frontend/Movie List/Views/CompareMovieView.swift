@@ -38,18 +38,12 @@ struct CompareMovieView: View {
                         MovieCard(movie: $movie)
                             .onTapGesture {
                                 right = middle - 1
-                                if right == movie.rank - 1 {
-                                    right -= 1
-                                }
                                 updateMiddle()
                             }
                         if middle < movies.count {
                             MovieCard(movie: $movies[middle])
                                 .onTapGesture {
                                     left = middle + 1
-                                    if left == movie.rank - 1 {
-                                        left += 1
-                                    }
                                     updateMiddle()
                                 }
                         }
@@ -70,7 +64,10 @@ struct CompareMovieView: View {
     }
     private func updateMiddle() {
         middle = (left+right)/2
-        if left >= right {
+        if middle == movie.rank - 1 {
+            middle += 1
+        }
+        if left >= right || middle >= movies.count {
             movie.rank = Int32(left+1)
             onRankingUpdate(movie, Int(left+1))
         }
