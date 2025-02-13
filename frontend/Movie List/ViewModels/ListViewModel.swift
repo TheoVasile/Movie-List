@@ -63,6 +63,45 @@ class ListViewModel: ObservableObject {
         }
     }
     
+    func createAndSaveMovie(from networkMovie: Movie) {
+            print("COUNTS", movies.count)
+            APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
+                switch result {
+                    case .success(let movieResponse):
+                    APIService.shared.addMovieToList(list_id: self.movieList.id, movie_id: movieResponse.id, rank: self.movies.count + 1) { result in
+                        switch result {
+                        case .success:
+                            print("succesfully added movie to list")
+                            let newMovie = try! CDMovie(
+                                id: movieResponse.id,
+                                tmdb_id: Int32(movieResponse.tmdb_id)!,
+                                title: movieResponse.title,
+                                release_date: movieResponse.release_date,
+                                overview: movieResponse.overview,
+                                rank: Int32(self.movies.count + 1),
+                                poster_path: movieResponse.poster_path,
+                                original_language: movieResponse.original_language,
+                                popularity: movieResponse.popularity,
+                                context: self.context)
+                            self.movieList.addToMovies_(newMovie)
+                            self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                            
+                            do {
+                                print("saving context")
+                                try self.context.save()
+                            } catch {
+                                print("Error saving context: \(error)")
+                            }
+                        case .failure(let error):
+                            print(error.localizedDescription)
+                        }
+                    }
+                case .failure(let error):
+                    print("❌ Backend request failed, deleting from Core Data:", error.localizedDescription)
+                }
+            }
+        }
+    
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
             switch result {
@@ -78,28 +117,30 @@ class ListViewModel: ObservableObject {
                     updatedMovie.rank = Int32(newRank)  // ✅ Update selected movie's rank
 
                     // ✅ Convert NSSet to sorted array
-                    var movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                    self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
 
                     // ✅ Remove the movie from the list
-                    movies.removeAll { $0.id == updatedMovie.id }
+                    self.movies.removeAll { $0.id == updatedMovie.id }
 
                     // ✅ Insert the movie at the new rank
-                    movies.insert(updatedMovie, at: newRank - 1)
+                    self.movies.insert(updatedMovie, at: newRank - 1)
 
                     // ✅ Reassign correct rankings for all movies
-                    for (index, movie) in movies.enumerated() {
+                    for (index, movie) in self.movies.enumerated() {
                         movie.rank = Int32(index + 1)
                     }
 
                     // ✅ Update movieList's relationship
-                    self.movieList.movies = Set(movies)
+                    self.movieList.movies = Set(self.movies)
 
                     // ✅ Save changes to Core Data
-                    do {
-                        try context.save()
-                        print("✅ Core Data rankings updated successfully")
-                    } catch {
-                        print("❌ Error saving Core Data:", error.localizedDescription)
+                    DispatchQueue.main.async {
+                        do {
+                            try self.context.save()
+                            print("✅ Core Data rankings updated successfully")
+                        } catch {
+                            print("❌ Error saving Core Data:", error)
+                        }
                     }
                 case .failure(let error):
                     print("error updating movie rank:", error)

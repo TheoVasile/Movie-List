@@ -28,8 +28,15 @@ struct ListView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarOptions }
             }
-            .overlay { if viewModel.showPopup { PopupOverlay } }
-            if viewModel.showCompareMovieView {
+            //.overlay { if viewModel.showPopup { PopupOverlay } }
+            if viewModel.showPopup {
+                Color.primary
+                    .opacity(0.15)
+                    .ignoresSafeArea()
+                popup
+                    .padding()
+            }
+            else if viewModel.showCompareMovieView {
                 if let selectedMovie = viewModel.selectedMovie {
                     CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie)) { updatedMovie, rank in
                         viewModel.showCompareMovieView = false
@@ -79,9 +86,60 @@ private extension ListView {
         }
     }
     
-    var PopupOverlay: some View {
-        Color.primary.opacity(0.15).ignoresSafeArea()
-    }
+    var popup: some View {
+            VStack{
+                HStack{
+                    Button(action: {
+                        withAnimation { viewModel.showPopup.toggle() }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .medium)) // Adjust size & weight
+                    }
+                    TextField("Search...", text: $viewModel.searchText)
+                        .padding(8)
+                        .padding(.horizontal, 24)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                        .overlay(
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.gray)
+                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                                    .padding(.leading, 8)
+                            }
+                        )
+                        .submitLabel(.search) // 🔥 This makes the keyboard show a "Search" button
+                        .onSubmit {
+                            viewModel.searchMovies() // Call your search function when the user taps "Search"
+                        }
+                }
+                GeometryReader { geometry in
+                    VStack{
+                        List {
+                            ForEach(viewModel.searchResults, id: \.id) { apiMovie in
+                                Text("\(apiMovie.title), \(apiMovie.release_date)")
+                                    .onTapGesture {
+                                        print("adding movie")
+                                        viewModel.createAndSaveMovie(from: apiMovie)
+                                        viewModel.showPopup.toggle()
+                                    }
+                                }
+                            }
+                            .listStyle(.plain)
+                            .cornerRadius(10)
+                        }
+                    .frame(maxHeight: min(CGFloat(viewModel.searchResults.count * 50), geometry.size.height))
+                    }
+                    .navigationTitle("Add New Movie")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Close"){ withAnimation{ viewModel.showPopup.toggle() } }
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
 }
 
 // MARK: - Daily Movie View
