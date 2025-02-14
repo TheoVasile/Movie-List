@@ -62,7 +62,10 @@ struct UserProfileView: View {
                     }
                 }
                 .sheet(isPresented: $showSettings, content: {
-                    UserSettingsView()
+                    ZStack{
+                        UserSettingsView()
+                            .environmentObject(viewModel)
+                    }
                 })
             }
         }

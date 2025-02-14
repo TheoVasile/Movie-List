@@ -9,29 +9,80 @@ import Foundation
 import SwiftUI
 
 struct UserSettingsView : View {
+    @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
+    @State var firstName: String = "Theo"
+    @State var lastName: String = "Vasile"
+    @State var pronouns: String = "He/Him"
     var body : some View {
         VStack {
-            Button("Sign Out") { print("sign out") }
-            Divider()
-            Text("First Name")
-            Divider()
-            Text("Last Name")
-            Divider()
-            Menu {
-                Text("They/Them")
-                Text("He/Him")
-                Text("He/Them")
-                Text("She/Her")
-                Text("She/Them")
-                Text("Xe/")
-                Text("Ze/")
-                Text("It/")
-            } label: {
-                Text("Pronouns")
+            HStack{
+                Text("First Name")
+                    .padding()
+                Spacer()
+                TextField("type here", text: $firstName)
+                    .padding()
+                    .frame(width: 200, height: 30)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
             }
+            .padding(.vertical)
+            Divider()
+            HStack{
+                Text("Last Name")
+                    .padding(.horizontal)
+                Spacer()
+                TextField("type here", text: $lastName)
+                    .padding()
+                    .frame(width: 200, height: 30)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+            }
+            .padding(.vertical)
+            Divider()
+            HStack{
+                Text("Pronouns")
+                    .padding(.horizontal)
+                Spacer()
+                Menu {
+                    Button("They/Them") {
+                        pronouns = "They/Them"
+                    }
+                    Button("He/Him") {
+                        pronouns = "He/Him"
+                    }
+                    Button("He/Them") {
+                        pronouns = "He/Them"
+                    }
+                    Button("She/Her") {
+                        pronouns = "She/Her"
+                    }
+                    Button("She/Them") {
+                        pronouns = "She/Them"
+                    }
+                    Button("Xe/Xem") {
+                        pronouns = "Xe/Xem"
+                    }
+                    Button("Ze/Hir") {
+                        pronouns = "Ze/Hir"
+                    }
+                    Button("It/Its") {
+                        pronouns = "It/Its"
+                    }
+                } label: {
+                    Text(pronouns)
+                        .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+            Divider()
+            Button("Sign Out") { authenticationViewModel.signOut() }
+                .padding(.vertical)
             Divider()
             Button("Deactivate Account") { print("deactivate") }
                 .foregroundStyle(.red)
+                .padding(.vertical)
             Spacer()
         }
     }
@@ -40,5 +91,6 @@ struct UserSettingsView : View {
 struct UserSettingsView_Previews : PreviewProvider {
     static var previews: some View {
         UserSettingsView()
+            .environmentObject(AuthenticationViewModel())
     }
 }
