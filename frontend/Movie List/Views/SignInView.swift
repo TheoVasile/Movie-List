@@ -11,16 +11,51 @@ import SwiftUI
 struct SignInView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @Environment(\.dismiss) var dismiss
+    @State var invalidCredentials: Bool = false
     
     private func signInWithGoogle() {
         Task {
-          if await viewModel.signInWithGoogle() == true {
+            if await viewModel.signInWithGoogle() == true {
             dismiss()
-          }
+            }
         }
-      }
+    }
+    private func signInWithEmail() {
+        Task {
+            if await viewModel.signInWithEmailPassword() == true {
+                dismiss()
+            } else {
+                invalidCredentials = true
+            }
+        }
+    }
     var body: some View {
         VStack {
+            Text("Email")
+            TextField("", text: $viewModel.email)
+                .padding()
+                .frame(width: 200, height: 30)
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(10)
+                .padding(.horizontal)
+                .padding(.bottom)
+            Text("Password")
+            TextField("", text: $viewModel.password)
+                .padding()
+                .frame(width: 200, height: 30)
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(10)
+                .padding(.horizontal)
+                .padding(.bottom)
+            Button("Sign in") {
+                signInWithEmail()
+            }.padding(.bottom)
+            if invalidCredentials {
+                Text("Incorrect username or password")
+                    .padding(.bottom)
+            }
+            Divider()
+                .padding(.bottom)
             Button(action: signInWithGoogle) {
                 Text("Sign in with Google")
                     .padding()
