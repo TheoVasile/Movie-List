@@ -16,6 +16,16 @@ struct ListView: View {
     init(movieList: CDMovieList, context: NSManagedObjectContext) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
     }
+    
+    var filteredMovies: [CDMovie] {
+        if viewModel.searchText.isEmpty {
+            return viewModel.movies
+        } else {
+            return viewModel.movies.filter { movie in
+                movie.title!.localizedCaseInsensitiveContains(viewModel.searchText)
+                        }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -65,7 +75,7 @@ private extension ListView {
             } else if viewModel.recommendedMovie != nil {
                 DailyMovieView(movie: viewModel.recommendedMovie!)
             }
-            ForEach(viewModel.movies, id: \.id) { movie in
+            ForEach(filteredMovies, id: \.id) { movie in
                 MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
             }
             .onDelete(perform: viewModel.deleteMovie)
