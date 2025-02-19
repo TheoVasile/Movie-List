@@ -30,38 +30,48 @@ struct SignInView: View {
         }
     }
     var body: some View {
-        VStack {
-            Text("Email")
-            TextField("", text: $viewModel.email)
-                .padding()
-                .frame(width: 200, height: 30)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
-                .padding(.horizontal)
-                .padding(.bottom)
-            Text("Password")
-            TextField("", text: $viewModel.password)
-                .padding()
-                .frame(width: 200, height: 30)
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(10)
-                .padding(.horizontal)
-                .padding(.bottom)
-            Button("Sign in") {
-                signInWithEmail()
-            }.padding(.bottom)
-            if invalidCredentials {
-                Text("Incorrect username or password")
-                    .padding(.bottom)
-            }
-            Divider()
-                .padding(.bottom)
-            Button(action: signInWithGoogle) {
-                Text("Sign in with Google")
+        NavigationStack{
+            VStack {
+                Text("Email")
+                TextField("", text: $viewModel.email)
                     .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
+                    .frame(width: 200, height: 30)
+                    .background(Color(UIColor.systemGray6))
                     .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                Text("Password")
+                TextField("", text: $viewModel.password)
+                    .padding()
+                    .frame(width: 200, height: 30)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                Button("Sign in") {
+                    signInWithEmail()
+                }.padding(.bottom)
+                HStack{
+                    Text("Don't have an account?")
+                        .foregroundColor(.gray)
+                    NavigationLink("Sign Up", destination: SignUpView()
+                        .environmentObject(viewModel))
+                        .foregroundColor(.blue)
+                        .bold()
+                }
+                if invalidCredentials {
+                    Text("Incorrect username or password")
+                        .padding(.bottom)
+                }
+                Divider()
+                    .padding(.bottom)
+                Button(action: signInWithGoogle) {
+                    Text("Sign in with Google")
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
             }
         }
     }

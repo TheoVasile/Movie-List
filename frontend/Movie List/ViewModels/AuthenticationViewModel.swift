@@ -98,19 +98,30 @@ extension AuthenticationViewModel {
     }
   }
 
-  func signUpWithEmailPassword() async -> Bool {
-    authenticationState = .authenticating
-    do  {
-      try await Auth.auth().createUser(withEmail: email, password: password)
-      return true
+    func signUpWithEmailPassword() async -> Bool {
+        authenticationState = .authenticating
+        do  {
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            let firebaseUser = result.user
+            
+            APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
+                switch result {
+                case .success( _):
+                    print("created user")
+                case .failure(let error):
+                    print(error.localizedDescription)
+                }
+            }
+            
+            return true
+        }
+        catch {
+            print(error)
+            errorMessage = error.localizedDescription
+            authenticationState = .unauthenticated
+            return false
+        }
     }
-    catch {
-      print(error)
-      errorMessage = error.localizedDescription
-      authenticationState = .unauthenticated
-      return false
-    }
-  }
 
   func signOut() {
     do {

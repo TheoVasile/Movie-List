@@ -13,6 +13,20 @@ struct SignUpView: View {
     @State private var password1: String = ""
     @State private var password2: String = ""
     @State private var name: String = ""
+    @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
+    @Environment(\.dismiss) var dismiss
+    @State var invalidCredentials: Bool = false
+    
+    private func signUpWithEmail() {
+        Task {
+            if await authenticationViewModel.signUpWithEmailPassword() == true {
+                dismiss()
+            } else {
+                invalidCredentials = true
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack{
@@ -24,15 +38,19 @@ struct SignUpView: View {
                     TextField("Name", text: $name)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding()
-                    TextField("Email", text: $email)
+                    TextField("Email", text: $authenticationViewModel.email)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding()
-                    SecureField("Password", text: $password1)
+                    SecureField("Password", text: $authenticationViewModel.password)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding()
-                    SecureField("Re-enter Password", text: $password2)
+                    SecureField("Re-enter Password", text: $authenticationViewModel.confirmPassword)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding()
+                    Button("Create Account") {
+                        signUpWithEmail()
+                    }
+                    /*
                     NavigationLink(destination: AccountView()) {
                         Text("Create Account")
                             .foregroundColor(.white)
@@ -40,15 +58,14 @@ struct SignUpView: View {
                     }
                     .background(.blue)
                     .cornerRadius(20)
-                    .padding()
+                    .padding()*/
                     HStack {
                         Text("Already have an account?")
                             .foregroundColor(.gray)
-                        NavigationLink(destination: SignInView()) {
-                            Text("Sign In")
-                                .foregroundColor(.blue)
-                                .bold()
-                        }
+                        NavigationLink("Sign in", destination: SignInView()
+                            .environmentObject(authenticationViewModel))
+                            .foregroundColor(.blue)
+                            .bold()
                     }
                     Spacer()
                 }
@@ -64,5 +81,6 @@ struct SignUpView: View {
 struct SignUpView_Previews: PreviewProvider {
     static var previews: some View {
         SignUpView()
+            .environmentObject(AuthenticationViewModel())
     }
 }
