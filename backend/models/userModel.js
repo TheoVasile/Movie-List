@@ -8,6 +8,22 @@ async function getUserByFirebaseUID(firebase_uid) {
     return result.rows[0];
 }
 
+async function deleteUser(firebase_uid) {
+    const client = await pool.connect();
+    try {
+        const result = await pool.query(
+            "DELETE FROM users WHERE firebase_uid = $1",
+            [firebase_uid]
+        );
+        return result.rows[0];
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 async function createUser(firebase_uid, email, username) {
     // Check if user already exists
     const existingUser = await pool.query(
@@ -28,4 +44,4 @@ async function createUser(firebase_uid, email, username) {
     return result.rows[0];
 }
 
-module.exports = { getUserByFirebaseUID, createUser };
+module.exports = { getUserByFirebaseUID, createUser, deleteUser };

@@ -108,6 +108,29 @@ class APIService {
         
     }
     
+    func deleteUser(firebase_id: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/delete/\(firebase_id)") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                completion(.success(()))
+            } else {
+                completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
+            }
+
+        }.resume()
+    }
+    
     func searchMovies(name: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/search?name=\(name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))

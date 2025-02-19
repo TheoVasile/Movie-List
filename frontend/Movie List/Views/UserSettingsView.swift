@@ -80,7 +80,18 @@ struct UserSettingsView : View {
             Button("Sign Out") { authenticationViewModel.signOut() }
                 .padding(.vertical)
             Divider()
-            Button("Deactivate Account") { print("deactivate") }
+            Button("Deactivate Account") {
+                APIService.shared.deleteUser(firebase_id: authenticationViewModel.user!.uid) { result in
+                    switch result {
+                    case .success:
+                        Task {
+                            await authenticationViewModel.deleteAccount()
+                        }
+                    case .failure(let error):
+                        print(error)
+                    }
+                }
+            }
                 .foregroundStyle(.red)
                 .padding(.vertical)
             Spacer()
