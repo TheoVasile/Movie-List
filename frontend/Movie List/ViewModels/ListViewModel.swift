@@ -15,6 +15,7 @@ class ListViewModel: ObservableObject {
     @Published var searchResults: [Movie] = []
     @Published var recommendedMovie: CDMovie? = nil
     @Published var showPopup: Bool = false
+    @Published var newMovieSearchText: String = ""
     @Published var searchText: String = ""
     @Published var showCompareMovieView = false
     @Published var showSetRank = false
@@ -147,8 +148,8 @@ class ListViewModel: ObservableObject {
     }
     
     func searchMovies() {
-        if searchText.isEmpty { return }
-        APIService.shared.searchMovies(name: searchText) { result in
+        if newMovieSearchText.isEmpty { return }
+        APIService.shared.searchMovies(name: newMovieSearchText) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let movies):

@@ -23,7 +23,7 @@ struct ListView: View {
                 VStack {
                     MovieListSection
                 }
-                .searchable(text: $viewModel.searchText) { SearchResultsList }
+                .searchable(text: $viewModel.searchText)
                 .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarOptions }
@@ -95,7 +95,7 @@ private extension ListView {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 20, weight: .medium)) // Adjust size & weight
                     }
-                    TextField("Search...", text: $viewModel.searchText)
+                    TextField("Search...", text: $viewModel.newMovieSearchText)
                         .padding(8)
                         .padding(.horizontal, 24)
                         .background(Color(.systemGray6))
