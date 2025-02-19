@@ -115,5 +115,6 @@ struct UserProfileView_Previews: PreviewProvider {
     static var previews: some View {
         UserProfileView()
             .environmentObject(AuthenticationViewModel())
+            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }

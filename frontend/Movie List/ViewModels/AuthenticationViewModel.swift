@@ -10,6 +10,7 @@ import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
 import GoogleSignInSwift
+import CoreData
 
 enum AuthenticationState {
   case unauthenticated
@@ -123,8 +124,9 @@ extension AuthenticationViewModel {
         }
     }
 
-  func signOut() {
+    func signOut() {
     do {
+        PersistenceController.shared.deleteAllCoreDataObjects()
       try Auth.auth().signOut()
     }
     catch {

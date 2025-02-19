@@ -20,12 +20,14 @@ struct ContentView: View {
                 .environmentObject(viewModel)
                 .environmentObject(network)
                 .environmentObject(db)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
                 }
             UserProfileView()
                 .environmentObject(viewModel)
                 .environmentObject(network)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
                     Label("Account", systemImage: "person.fill")
                 }

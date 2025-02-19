@@ -10,6 +10,7 @@ import SwiftUI
 
 struct UserSettingsView : View {
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
+    @Environment(\.managedObjectContext) var context
     @State var firstName: String = "Theo"
     @State var lastName: String = "Vasile"
     @State var pronouns: String = "He/Him"
@@ -103,5 +104,6 @@ struct UserSettingsView_Previews : PreviewProvider {
     static var previews: some View {
         UserSettingsView()
             .environmentObject(AuthenticationViewModel())
+            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 }

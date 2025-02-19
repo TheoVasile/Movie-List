@@ -28,6 +28,31 @@ struct PersistenceController {
         }
     }
     
+    func deleteAllCoreDataObjects() {
+        let context = container.viewContext
+        let persistentStoreCoordinator = context.persistentStoreCoordinator
+        
+        guard let storeCoordinator = persistentStoreCoordinator else { return }
+        
+        for store in storeCoordinator.persistentStores {
+            do {
+                let entityNames = storeCoordinator.managedObjectModel.entities.compactMap { $0.name }
+                
+                for entityName in entityNames {
+                    let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+                    let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
+                    
+                    try context.execute(deleteRequest)
+                }
+                
+                try context.save()
+                print("✅ All Core Data objects deleted successfully.")
+            } catch {
+                print("❌ Error deleting Core Data objects: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     func saveContext() {
         let context = container.viewContext
         if context.hasChanges {
