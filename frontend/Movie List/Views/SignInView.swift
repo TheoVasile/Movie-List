@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import GoogleSignInSwift
 
 struct SignInView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
@@ -66,13 +67,8 @@ struct SignInView: View {
                     }
                     Divider()
                         .padding(.bottom)
-                    Button(action: signInWithGoogle) {
-                        Text("Sign in with Google")
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
+                    GoogleSignInButton(action: signInWithGoogle)
+                        .frame(width:200)
                     Spacer()
                 }
                 .background(.white)

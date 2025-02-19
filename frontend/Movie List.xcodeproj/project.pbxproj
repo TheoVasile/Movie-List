@@ -42,7 +42,6 @@
 		FAE94A022D554E3700592081 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = FAE94A012D554E3700592081 /* FirebaseAppCheck */; };
 		FAE94A042D554E3700592081 /* FirebaseAppDistribution-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = FAE94A032D554E3700592081 /* FirebaseAppDistribution-Beta */; };
 		FAE94A062D554EBB00592081 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = FAE94A052D554EBB00592081 /* FirebaseAuth */; };
-		FAE94A082D554FBC00592081 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE94A072D554FBC00592081 /* GoogleSignInButton.swift */; };
 		FAE94A0C2D5561F900592081 /* AuthenticationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE94A0B2D5561F900592081 /* AuthenticationViewModel.swift */; };
 		FAE94A102D55639A00592081 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = FAE94A0F2D55639A00592081 /* FirebaseCore */; };
 		FAE94A162D55780000592081 /* AuthenticatedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAE94A152D55780000592081 /* AuthenticatedView.swift */; };
@@ -94,7 +93,6 @@
 		FAE949EC2D54828200592081 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		FAE949F02D55414F00592081 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		FAE949FC2D554A9200592081 /* Movie-List-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Movie-List-Info.plist"; sourceTree = SOURCE_ROOT; };
-		FAE94A072D554FBC00592081 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
 		FAE94A0B2D5561F900592081 /* AuthenticationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationViewModel.swift; sourceTree = "<group>"; };
 		FAE94A152D55780000592081 /* AuthenticatedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticatedView.swift; sourceTree = "<group>"; };
 		FAE94A172D55789F00592081 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -210,7 +208,6 @@
 				FAE949E82D547D0300592081 /* AccountView.swift */,
 				FAE949EA2D5480A200592081 /* SignUpView.swift */,
 				FAE949EC2D54828200592081 /* SignInView.swift */,
-				FAE94A072D554FBC00592081 /* GoogleSignInButton.swift */,
 				FAE94A152D55780000592081 /* AuthenticatedView.swift */,
 				FAE94A172D55789F00592081 /* UserProfileView.swift */,
 				FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */,
@@ -336,7 +333,6 @@
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
 				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
-				FAE94A082D554FBC00592081 /* GoogleSignInButton.swift in Sources */,
 				FAE94A182D55789F00592081 /* UserProfileView.swift in Sources */,
 				FAE94A162D55780000592081 /* AuthenticatedView.swift in Sources */,
 				FA096BC12D5D5D5E004FDFE8 /* SetRankView.swift in Sources */,
