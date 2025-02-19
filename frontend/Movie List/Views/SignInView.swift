@@ -31,49 +31,56 @@ struct SignInView: View {
     }
     var body: some View {
         NavigationStack{
-            VStack {
-                Text("Email")
-                TextField("", text: $viewModel.email)
-                    .padding()
-                    .frame(width: 200, height: 30)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    .padding(.bottom)
-                Text("Password")
-                TextField("", text: $viewModel.password)
-                    .padding()
-                    .frame(width: 200, height: 30)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    .padding(.bottom)
-                Button("Sign in") {
-                    signInWithEmail()
-                }.padding(.bottom)
-                HStack{
-                    Text("Don't have an account?")
-                        .foregroundColor(.gray)
-                    NavigationLink("Sign Up", destination: SignUpView()
-                        .environmentObject(viewModel))
+            ZStack{
+                Color(UIColor.systemGray6)
+                    .edgesIgnoringSafeArea(.all)
+                VStack {
+                    Spacer()
+                    Text("Sign into your account")
+                        .padding()
+                    TextField("Email", text: $viewModel.email)
+                        .padding()
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                    TextField("Password", text: $viewModel.password)
+                        .padding()
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                    Button("Sign in") {
+                        signInWithEmail()
+                    }.padding(.bottom)
+                    HStack{
+                        Text("Don't have an account?")
+                            .foregroundColor(.gray)
+                        NavigationLink("Sign Up", destination: SignUpView()
+                            .environmentObject(viewModel))
                         .foregroundColor(.blue)
                         .bold()
-                }
-                if invalidCredentials {
-                    Text("Incorrect username or password")
+                    }
+                    .padding()
+                    if invalidCredentials {
+                        Text("Incorrect username or password")
+                            .padding(.bottom)
+                    }
+                    Divider()
                         .padding(.bottom)
+                    Button(action: signInWithGoogle) {
+                        Text("Sign in with Google")
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    Spacer()
                 }
-                Divider()
-                    .padding(.bottom)
-                Button(action: signInWithGoogle) {
-                    Text("Sign in with Google")
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
+                .background(.white)
+                .cornerRadius(20)
+                .padding(20)
             }
         }
+        .navigationBarBackButtonHidden(true)
     }
 }
     

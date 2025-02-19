@@ -67,6 +67,7 @@ struct SignUpView: View {
                             .foregroundColor(.blue)
                             .bold()
                     }
+                    .padding()
                     Spacer()
                 }
                 .background(.white)

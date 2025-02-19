@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreData
 
 struct ListRequest: Codable {
     let user_id: String
