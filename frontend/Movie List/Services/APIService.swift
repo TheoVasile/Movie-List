@@ -56,7 +56,7 @@ struct UserResponse: Codable {
 struct UserRequest: Codable {
     let firebase_id: String
     let email: String
-    let name: String
+    let username: String
 }
 
 class APIService {
@@ -64,13 +64,13 @@ class APIService {
     let baseURL = "http://localhost:3000"
     
     func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/users/create") else { return }
+        guard let url = URL(string: "\(baseURL)/auth/create") else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body = UserRequest(firebase_id: firebase_id, email: email, name: name)
+        let body = UserRequest(firebase_id: firebase_id, email: email, username: name)
 
         do {
             request.httpBody = try JSONEncoder().encode(body)
