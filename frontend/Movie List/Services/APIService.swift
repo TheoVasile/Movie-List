@@ -64,6 +64,39 @@ class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
     
+    func fetchData(firebase_id: String, context: NSManagedObjectContext, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/fetch?id=\(firebase_id)") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
+                }
+                return
+            }
+            
+            do {
+                
+            } catch {
+                print(error.localizedDescription)
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
     func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/create") else { return }
         

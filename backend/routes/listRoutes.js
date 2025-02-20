@@ -1,5 +1,5 @@
 const express = require("express");
-const { createList, deleteList } = require("../models/listModel");
+const { createList, deleteList, fetchLists } = require("../models/listModel");
 
 const router = express.Router();
 
@@ -14,6 +14,17 @@ router.post("/create", async (req, res) => {
         res.status(201).json(newList);
     } catch (error) {
         console.error("Error creating list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.get("/fetch", async (req, res) => {
+    try {
+        const { user_id } = req.query;
+        const lists = await fetchLists(user_id);
+        res.status(200).json(lists);
+    } catch (error) {
+        console.error("Error fetching lists:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

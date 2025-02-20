@@ -8,6 +8,33 @@ async function createList(user_id, name, overview, is_ranked) {
     return result.rows[0];
 }
 
+async function fetchLists(user_id) {
+    const result = await pool.query(
+        "SELECT * FROM lists WHERE user_id = $1",
+        [user_id]
+    );
+    const lists = result.rows;
+
+    for (const list of lists) {
+        list.movies = [];
+        const movies = await pool.query(
+            "SELECT * FROM list_movies WHERE list_id = $1",
+            [list.id]
+        );
+        for (const movie of movies.rows) {
+            const movieDetails = await pool.query(
+                "SELECT * FROM movies WHERE id = $1",
+                [movie.movie_id]
+            );
+            const movieDetailsResult = movieDetails.rows[0];
+            movieDetailsResult.rank = movie.rank;
+            list.movies.push(movieDetailsResult);
+        }
+    }
+
+    return lists;
+}
+
 async function deleteList(list_id) {
     try {
         await pool.query("BEGIN");
@@ -24,4 +51,4 @@ async function deleteList(list_id) {
     }
 }
 
-module.exports = { createList, deleteList };
+module.exports = { createList, deleteList, fetchLists };
