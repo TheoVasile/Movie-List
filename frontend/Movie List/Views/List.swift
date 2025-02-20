@@ -56,7 +56,7 @@ struct ListView: View {
             }
             else if viewModel.showSetRank {
                 if let selectedMovie = viewModel.selectedMovie {
-                    SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count) {updatedMovie, rank in
+                    SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count, showSetRank: $viewModel.showSetRank) {updatedMovie, rank in
                         viewModel.showSetRank = false
                         viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                     }
