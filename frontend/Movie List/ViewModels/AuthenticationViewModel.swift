@@ -88,8 +88,9 @@ extension AuthenticationViewModel {
   func signInWithEmailPassword() async -> Bool {
     authenticationState = .authenticating
     do {
-      try await Auth.auth().signIn(withEmail: self.email, password: self.password)
-      return true
+        let firebaseUser = try await Auth.auth().signIn(withEmail: self.email, password: self.password)
+        PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.user.uid)
+        return true
     }
     catch  {
       print(error)
@@ -188,6 +189,7 @@ extension AuthenticationViewModel {
             }
         }
         print("User \(firebaseUser.uid) signed in with email \(firebaseUser.email ?? "unknown")")
+          PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.uid)
         return true
       }
       catch {

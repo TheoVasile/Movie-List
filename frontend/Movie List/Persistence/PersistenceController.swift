@@ -28,6 +28,36 @@ struct PersistenceController {
         }
     }
     
+    func fetchAllCoreDataObjects(firebase_id: String) {
+        let context = container.viewContext
+        
+        APIService.shared.fetchData(firebase_id: firebase_id) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success (let listResponses):
+                    for listResponse in listResponses {
+                        let curList = CDMovieList(id: listResponse.id, name: listResponse.name, overview: listResponse.overview, context: context)
+                        for movieResponse in listResponse.movies {
+                            do {
+                                let curMovie = try CDMovie(id: movieResponse.id, tmdb_id: Int32(movieResponse.tmdb_id)!, title: movieResponse.title, release_date: movieResponse.release_date, overview: movieResponse.overview, rank: Int32(movieResponse.rank), poster_path: movieResponse.poster_path, original_language: movieResponse.original_language, popularity: movieResponse.popularity, context: context)
+                                curList.addToMovies_(curMovie)
+                            } catch {
+                                print("Failed to create CD Movie", error)
+                            }
+                        }
+                    }
+                    do {
+                        try context.save()
+                    } catch {
+                        print("Failed to save context", error)
+                    }
+                case .failure(let error):
+                    print("Error deleting:", error)
+                }
+            }
+        }
+    }
+    
     func deleteAllCoreDataObjects() {
         let context = container.viewContext
         let persistentStoreCoordinator = context.persistentStoreCoordinator

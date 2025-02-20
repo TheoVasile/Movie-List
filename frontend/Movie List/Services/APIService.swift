@@ -60,12 +60,35 @@ struct UserRequest: Codable {
     let username: String
 }
 
+struct MovieDetailsResponse: Codable {
+    let id: Int64
+    let tmdb_id: String
+    let title: String
+    let overview: String
+    let poster_path: String
+    let original_language: String
+    let popularity: Double
+    let created_at: String
+    let release_date: String
+    let rank: Int
+}
+
+struct ListDetailsResponse: Codable {
+    let id: Int64
+    let user_id: String
+    let name: String
+    let overview: String
+    let creation_date: String
+    let date_modified: String
+    let movies: [MovieDetailsResponse]
+}
+
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
     
-    func fetchData(firebase_id: String, context: NSManagedObjectContext, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/lists/fetch?id=\(firebase_id)") else { return }
+    func fetchData(firebase_id: String, completion: @escaping (Result<[ListDetailsResponse], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/fetch?user_id=\(firebase_id)") else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -87,7 +110,10 @@ class APIService {
             }
             
             do {
-                
+                let decodedResponse = try JSONDecoder().decode([ListDetailsResponse].self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(decodedResponse))
+                }
             } catch {
                 print(error.localizedDescription)
                 DispatchQueue.main.async {
