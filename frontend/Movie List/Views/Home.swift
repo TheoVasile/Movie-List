@@ -15,6 +15,7 @@ struct Home: View {
     @EnvironmentObject var network: NetworkService
     @State var showPopup: Bool = false
     @State var listName = ""
+    @State var showFileSelector: Bool = false
     
     //init() {
     //    _viewModel = ObservedObject(wrappedValue: HomeViewModel())
@@ -30,12 +31,22 @@ struct Home: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar{
                     ToolbarItem(placement: .navigationBarTrailing){
-                        Button{
-                            withAnimation{ showPopup.toggle() }
+                        Menu {
+                            Button("Add") {
+                                withAnimation{ showPopup.toggle() }
+                            }
+                            Button("Import") {
+                                showFileSelector = true
+                            }
                         } label: {
                             Image(systemName: "plus")
                         }
                     }
+                }
+            }
+            .overlay {
+                if showFileSelector {
+                    ExcelFilePickerView(showFileSelector: $showFileSelector)
                 }
             }
             .popupNavigationView(horizontalPadding: 20, show: $showPopup){ newListPopup }

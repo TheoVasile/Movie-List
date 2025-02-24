@@ -18,6 +18,9 @@
 		FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9E1296A755800FDF445 /* ContentView.swift */; };
 		FA10A9E4296A755900FDF445 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA10A9E3296A755900FDF445 /* Assets.xcassets */; };
 		FA10A9E7296A755900FDF445 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA10A9E6296A755900FDF445 /* Preview Assets.xcassets */; };
+		FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */; };
+		FA1613702D6C3A1400CD99D0 /* CoreXLSX in Frameworks */ = {isa = PBXBuildFile; productRef = FA16136F2D6C3A1400CD99D0 /* CoreXLSX */; };
+		FA1613722D6C3C5B00CD99D0 /* Movies.xlsx in Resources */ = {isa = PBXBuildFile; fileRef = FA1613712D6C3C5B00CD99D0 /* Movies.xlsx */; };
 		FA2609A22D599679000A692D /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2609A12D599679000A692D /* APIService.swift */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
@@ -76,6 +79,8 @@
 		FA10A9E1296A755800FDF445 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FA10A9E3296A755900FDF445 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FA10A9E6296A755900FDF445 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelFilePickerView.swift; sourceTree = "<group>"; };
+		FA1613712D6C3C5B00CD99D0 /* Movies.xlsx */ = {isa = PBXFileReference; lastKnownFileType = file; path = Movies.xlsx; sourceTree = "<group>"; };
 		FA2609A12D599679000A692D /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
@@ -112,6 +117,7 @@
 				FAE94A022D554E3700592081 /* FirebaseAppCheck in Frameworks */,
 				FAE94A102D55639A00592081 /* FirebaseCore in Frameworks */,
 				FAE949F92D5549C900592081 /* GoogleSignIn in Frameworks */,
+				FA1613702D6C3A1400CD99D0 /* CoreXLSX in Frameworks */,
 				FAE949FB2D5549C900592081 /* GoogleSignInSwift in Frameworks */,
 				FAE94A042D554E3700592081 /* FirebaseAppDistribution-Beta in Frameworks */,
 			);
@@ -140,6 +146,7 @@
 		FA10A9DE296A755800FDF445 /* Movie List */ = {
 			isa = PBXGroup;
 			children = (
+				FA1613712D6C3C5B00CD99D0 /* Movies.xlsx */,
 				FAE949FC2D554A9200592081 /* Movie-List-Info.plist */,
 				FAE949F02D55414F00592081 /* GoogleService-Info.plist */,
 				FA01249A2BDE150800A1C13C /* MovieListModel.xcdatamodeld */,
@@ -212,6 +219,7 @@
 				FAE94A172D55789F00592081 /* UserProfileView.swift */,
 				FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */,
 				FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */,
+				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -267,6 +275,7 @@
 				FAE94A032D554E3700592081 /* FirebaseAppDistribution-Beta */,
 				FAE94A052D554EBB00592081 /* FirebaseAuth */,
 				FAE94A0F2D55639A00592081 /* FirebaseCore */,
+				FA16136F2D6C3A1400CD99D0 /* CoreXLSX */,
 			);
 			productName = "Movie List";
 			productReference = FA10A9DC296A755800FDF445 /* Movie List.app */;
@@ -300,6 +309,7 @@
 				FAE9F51B2D30964300471C80 /* XCRemoteSwiftPackageReference "SQLite" */,
 				FAE949F42D5542AD00592081 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				FAE949F72D5549C900592081 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				FA16136E2D6C3A1400CD99D0 /* XCRemoteSwiftPackageReference "CoreXLSX" */,
 			);
 			productRefGroup = FA10A9DD296A755800FDF445 /* Products */;
 			projectDirPath = "";
@@ -318,6 +328,7 @@
 				FA10A9E7296A755900FDF445 /* Preview Assets.xcassets in Resources */,
 				FA10A9E4296A755900FDF445 /* Assets.xcassets in Resources */,
 				FAE949F12D55414F00592081 /* GoogleService-Info.plist in Resources */,
+				FA1613722D6C3C5B00CD99D0 /* Movies.xlsx in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -332,6 +343,7 @@
 				FAD23A752D52011600EACB94 /* MovieCard.swift in Sources */,
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
 				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
+				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
 				FAE94A182D55789F00592081 /* UserProfileView.swift in Sources */,
 				FAE94A162D55780000592081 /* AuthenticatedView.swift in Sources */,
@@ -566,6 +578,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		FA16136E2D6C3A1400CD99D0 /* XCRemoteSwiftPackageReference "CoreXLSX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CoreOffice/CoreXLSX.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.14.2;
+			};
+		};
 		FAE949F42D5542AD00592081 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -593,6 +613,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		FA16136F2D6C3A1400CD99D0 /* CoreXLSX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA16136E2D6C3A1400CD99D0 /* XCRemoteSwiftPackageReference "CoreXLSX" */;
+			productName = CoreXLSX;
+		};
 		FAE949F52D5542AD00592081 /* FirebaseAnalytics */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FAE949F42D5542AD00592081 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

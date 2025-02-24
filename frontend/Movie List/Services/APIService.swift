@@ -237,9 +237,9 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body: [String: Any] = [
-                "list_id": list_id,
-                "movie_id": movie_id,
-                "rank": rank
+            "list_id": list_id,
+            "movie_id": movie_id,
+            "rank": rank
         ]
         
         do {
