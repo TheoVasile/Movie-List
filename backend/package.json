@@ -10,11 +10,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.3",
     "axios": "^1.7.9",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase-admin": "^13.1.0",
+    "firebase-admin": "^13.10.0",
     "pg": "^8.13.1"
+  },
+  "allowScripts": {
+    "protobufjs@7.6.6": true
   }
 }

@@ -135,7 +135,7 @@ class APIService {
         do {
             request.httpBody = try JSONEncoder().encode(body)
         } catch {
-            print("❌ Encoding error:", error)
+            print("Encoding error:", error)
             return
         }
         

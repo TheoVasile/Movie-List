@@ -19,7 +19,7 @@ function getPool() {
             console.error('Unexpected error on idle client', err);
         });
 
-        console.log("✅ New database connection pool created");
+        console.log("New database connection pool created");
     }
     return pool;
 }

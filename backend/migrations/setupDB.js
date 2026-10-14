@@ -10,7 +10,7 @@ const createTables = async () => {
     //  }); 
     console.log("Connected to database");
     try {
-        console.log("🚀 Creating database tables...");
+        console.log("Creating database tables");
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -51,9 +51,9 @@ const createTables = async () => {
             );
         `);
 
-        console.log("✅ Tables created successfully!");
+        console.log("Tables created successfully");
     } catch (error) {
-        console.error("❌ Error creating tables:", error);
+        console.error("Error creating tables:", error);
     } finally {
         //await client.release();
     }
