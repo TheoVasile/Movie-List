@@ -88,6 +88,61 @@ router.get("/search", async (req, res) => {
     }
 });
 
+// Keeps only films a swipe card can show and the app can save, in the shape the app's Movie model decodes
+function toDiscoverMovie(movie) {
+    if (movie.adult || !movie.poster_path || !/^\d{4}-\d{2}-\d{2}$/.test(movie.release_date ?? "")) {
+        return null;
+    }
+    return {
+        id: movie.id,
+        title: movie.title,
+        release_date: movie.release_date,
+        overview: movie.overview ?? "",
+        poster_path: movie.poster_path,
+        original_language: movie.original_language ?? "",
+        popularity: movie.popularity ?? 0,
+        vote_average: movie.vote_average ?? 0,
+    };
+}
+
+// Films for the Discover tab: TMDb recommendations for the user's top-ranked films (seeds),
+// interleaved so no single seed dominates, followed by this week's trending films.
+// The app filters out films already in a list, so this doesn't need the user's lists
+router.get("/discover", async (req, res) => {
+    try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const seeds = String(req.query.seeds ?? "")
+            .split(",")
+            .map((id) => parseInt(id, 10))
+            .filter((id) => id > 0)
+            .slice(0, 5);
+        const params = { api_key: process.env.API_KEY, language: "en-US", page };
+
+        // allSettled so one seed TMDb doesn't know about can't fail the whole request
+        const [trending, ...recommendations] = await Promise.allSettled([
+            axios.get("https://api.themoviedb.org/3/trending/movie/week", { params }),
+            ...seeds.map((id) => axios.get(`https://api.themoviedb.org/3/movie/${id}/recommendations`, { params })),
+        ]);
+        const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value.data.results : []);
+
+        const recommendationLists = recommendations.map(resultsOf);
+        const interleaved = [];
+        for (let i = 0; i < Math.max(0, ...recommendationLists.map((list) => list.length)); i++) {
+            recommendationLists.forEach((list) => list[i] && interleaved.push(list[i]));
+        }
+
+        const seen = new Set(seeds);
+        const movies = [...interleaved, ...resultsOf(trending)]
+            .map(toDiscoverMovie)
+            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id));
+
+        res.json(movies);
+    } catch (error) {
+        console.error("Error fetching discover movies:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 router.post("/create", async (req, res) => {
     try {
         const { tmdb_id, title, release_date, overview, poster_path, original_language, popularity } = req.body;

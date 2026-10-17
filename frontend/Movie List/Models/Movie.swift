@@ -15,4 +15,6 @@ struct Movie: Identifiable, Decodable {
     var poster_path: String?
     var original_language: String
     var popularity: Double
+    // Only sent by the discover endpoint
+    var vote_average: Double?
 }

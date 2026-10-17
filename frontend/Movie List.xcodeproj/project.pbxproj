@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA7E5A012F0000000000000F /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000E /* DiscoverViewModel.swift */; };
+		FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000C /* DiscoverView.swift */; };
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
@@ -72,6 +74,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA7E5A012F0000000000000E /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
+		FA7E5A012F0000000000000C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
@@ -187,6 +191,7 @@
 			children = (
 				FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */,
 				FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */,
+				FA7E5A012F0000000000000E /* DiscoverViewModel.swift */,
 				FAE94A0B2D5561F900592081 /* AuthenticationViewModel.swift */,
 			);
 			path = ViewModels;
@@ -224,6 +229,7 @@
 				FAFF24F52BE687A000C4F78D /* MovieRow.swift */,
 				FAD23A742D52011600EACB94 /* MovieCard.swift */,
 				FA7E5A012F00000000000003 /* MovieDetailView.swift */,
+				FA7E5A012F0000000000000C /* DiscoverView.swift */,
 				FAE949E82D547D0300592081 /* AccountView.swift */,
 				FAE949EA2D5480A200592081 /* SignUpView.swift */,
 				FAE949EC2D54828200592081 /* SignInView.swift */,
@@ -383,6 +389,8 @@
 				FAE62ECE2970BBE9000654E1 /* Extensions.swift in Sources */,
 				FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */,
 				FA7E5A012F00000000000002 /* Theme.swift in Sources */,
+				FA7E5A012F0000000000000F /* DiscoverViewModel.swift in Sources */,
+				FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */,
 				FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */,
 				FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */,
 				FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */,

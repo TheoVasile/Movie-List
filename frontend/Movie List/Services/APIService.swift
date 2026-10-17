@@ -283,6 +283,40 @@ class APIService {
             }
         }.resume()
     }
+    /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) plus trending films
+    func discoverMovies(seeds: [Int64], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/movies/discover")
+        components?.queryItems = [
+            URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
+            URLQueryItem(name: "page", value: String(page)),
+        ]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data, error == nil,
+                  let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                DispatchQueue.main.async {
+                    completion(.failure(error ?? NSError(domain: "Discover failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil)))
+                }
+                return
+            }
+
+            do {
+                let decodedResponse = try JSONDecoder().decode([Movie].self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(decodedResponse))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+
     func addMovieToList(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/addToList") else { return }
         

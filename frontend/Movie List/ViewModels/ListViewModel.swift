@@ -72,45 +72,13 @@ class ListViewModel: ObservableObject {
     }
     
     func createAndSaveMovie(from networkMovie: Movie) {
-            print("COUNTS", movies.count)
-            APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
-                switch result {
-                    case .success(let movieResponse):
-                    APIService.shared.addMovieToList(list_id: self.movieList.id, movie_id: movieResponse.id, rank: self.movies.count + 1) { result in
-                        switch result {
-                        case .success:
-                            print("succesfully added movie to list")
-                            let newMovie = try! CDMovie(
-                                id: movieResponse.id,
-                                tmdb_id: Int32(movieResponse.tmdb_id)!,
-                                title: movieResponse.title,
-                                release_date: movieResponse.release_date,
-                                overview: movieResponse.overview,
-                                rank: Int32(self.movies.count + 1),
-                                poster_path: movieResponse.poster_path,
-                                original_language: movieResponse.original_language,
-                                popularity: movieResponse.popularity,
-                                context: self.context)
-                            self.movieList.addToMovies_(newMovie)
-                            withAnimation(Theme.spring) {
-                                self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
-                            }
-                            
-                            do {
-                                print("saving context")
-                                try self.context.save()
-                            } catch {
-                                print("Error saving context: \(error)")
-                            }
-                        case .failure(let error):
-                            print(error.localizedDescription)
-                        }
-                    }
-                case .failure(let error):
-                    print("Backend request failed, deleting from Core Data:", error.localizedDescription)
-                }
+        movieList.addMovie(networkMovie, context: context) { newMovie in
+            guard newMovie != nil else { return }
+            withAnimation(Theme.spring) {
+                self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
             }
         }
+    }
     
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
