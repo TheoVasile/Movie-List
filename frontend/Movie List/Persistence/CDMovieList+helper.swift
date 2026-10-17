@@ -89,7 +89,8 @@ extension CDMovieList {
     
     static func fetch(predicate: NSPredicate = .all) -> NSFetchRequest<CDMovieList> {
         let request = CDMovieList.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.date_modified, ascending: true)]
+        // Creation order stays put as films are added; date_modified changes with every addition
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CDMovieList.creation_date, ascending: true)]
         request.predicate = predicate
         
         return request

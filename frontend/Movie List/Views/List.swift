@@ -15,19 +15,25 @@ struct ListView: View {
     @State private var detailMovie: CDMovie? = nil
     @State private var showDetail = false
     @State private var highlightedMovieID: Int64? = nil
+    // Bumped by the recommend button so the list scrolls up to the new pick
+    @State private var recommendationScrollRequest = 0
+    // Set while asking to confirm marking the whole list watched (true) or unwatched (false)
+    @State private var pendingBulkWatched: Bool? = nil
 
     init(movieList: CDMovieList, context: NSManagedObjectContext) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
     }
     
+    // Search and genre filters only change which rows are shown; ranks stay as they are
     var filteredMovies: [CDMovie] {
-        if viewModel.searchText.isEmpty {
-            return viewModel.movies
-        } else {
-            return viewModel.movies.filter { movie in
-                (movie.title ?? "").localizedCaseInsensitiveContains(viewModel.searchText)
-                        }
+        viewModel.movies.filter { movie in
+            (viewModel.searchText.isEmpty || (movie.title ?? "").localizedCaseInsensitiveContains(viewModel.searchText))
+                && viewModel.matchesGenreFilter(movie)
         }
+    }
+
+    var isFiltering: Bool {
+        !viewModel.searchText.isEmpty || !viewModel.selectedGenres.isEmpty
     }
 
     var body: some View {
@@ -40,7 +46,13 @@ struct ListView: View {
                     .onTapGesture { dismissCompare() }
                     .transition(.opacity)
                     .zIndex(1)
-                CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie), onCancel: dismissCompare) { updatedMovie, rank in
+                CompareMovieView(
+                    movies: $viewModel.movies,
+                    movie: Binding.constant(selectedMovie),
+                    prompt: viewModel.isRankingNewMovie ? "Where does \(selectedMovie.title ?? "it") rank?" : "Which do you prefer?",
+                    cancelTitle: viewModel.isRankingNewMovie ? "Skip — keep it at the bottom" : "Cancel",
+                    onCancel: dismissCompare
+                ) { updatedMovie, rank in
                     dismissCompare()
                     viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                 }
@@ -57,9 +69,25 @@ struct ListView: View {
             }
         }
         .searchable(text: $viewModel.searchText, prompt: "Search this list")
+        .onAppear { viewModel.loadGenres() }
         .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
         .navigationBarTitleDisplayMode(.large)
         .toolbar { ToolbarOptions }
+        .confirmationDialog(
+            bulkWatchedTitle,
+            isPresented: Binding(get: { pendingBulkWatched != nil }, set: { if !$0 { pendingBulkWatched = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingBulkWatched
+        ) { watched in
+            Button(watched ? "Mark All as Watched" : "Mark All as Unwatched", role: watched ? nil : .destructive) {
+                Haptics.success()
+                viewModel.setAllWatched(watched)
+            }
+        } message: { watched in
+            if !watched {
+                Text("They'll also show as unwatched in your other lists.")
+            }
+        }
         .sheet(isPresented: $viewModel.showPopup) {
             AddMovieView(viewModel: viewModel)
         }
@@ -69,7 +97,8 @@ struct ListView: View {
                     movie: detailMovie,
                     listName: viewModel.movieList.name,
                     onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
-                    onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } }
+                    onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } },
+                    onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) }
                 )
             }
         }
@@ -93,8 +122,14 @@ private extension ListView {
                     .padding(.top, 60)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                } else if viewModel.searchText.isEmpty, let spotlight = viewModel.recommendedMovie ?? viewModel.movies.first {
-                    SpotlightCard(movie: spotlight, isRecommendation: viewModel.recommendedMovie != nil)
+                } else {
+                    genreFilterBar
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
+                }
+                if !isFiltering, let spotlight = viewModel.recommendedMovie {
+                    SpotlightCard(movie: spotlight)
                         // Prefixed so it can't collide with the ranked row of the same movie when scrolling
                         .id("spotlight-\(spotlight.id)")
                         .transition(.asymmetric(
@@ -106,23 +141,59 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
                 }
+                if !viewModel.selectedGenres.isEmpty && filteredMovies.isEmpty {
+                    Text("No films in this list match all of those genres.")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank) {
+                        viewModel.setWatched(movie, !movie.watched)
+                    }
                         .contentShape(Rectangle())
                         .onTapGesture { openDetail(movie) }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                         .overlay { highlightRing(for: movie) }
+                        // Rows with custom swipe actions lose the built-in swipe to delete, so it's added back here
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                Haptics.tap()
+                                viewModel.setWatched(movie, !movie.watched)
+                            } label: {
+                                Label(movie.watched ? "Unwatched" : "Watched", systemImage: movie.watched ? "eye.slash" : "eye")
+                            }
+                            .tint(movie.watched ? .gray : Theme.accentSecondary)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                delete(movie)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .id(movie.id)
                 }
-                .onDelete(perform: deleteFilteredMovies)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .onChange(of: viewModel.movedMovieID) { movieID in
                 guard let movieID else { return }
                 scrollToMovedMovie(movieID, proxy: proxy)
+            }
+            .onChange(of: recommendationScrollRequest) { _ in
+                guard let pick = viewModel.recommendedMovie else { return }
+                // Wait a run loop so the card for the new pick exists before scrolling to it
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.45)) {
+                        proxy.scrollTo("spotlight-\(pick.id)", anchor: .top)
+                    }
+                }
             }
         }
     }
@@ -142,9 +213,10 @@ private extension ListView {
 
     func scrollToMovedMovie(_ movieID: Int64, proxy: ScrollViewProxy) {
         viewModel.movedMovieID = nil
-        // A search that hides the movie would leave nothing to scroll to
+        // A search or genre filter that hides the movie would leave nothing to scroll to
         if !filteredMovies.contains(where: { $0.id == movieID }) {
             viewModel.searchText = ""
+            viewModel.selectedGenres = []
         }
         // Let the rows finish sliding into their new order before scrolling
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -168,11 +240,36 @@ private extension ListView {
             if viewModel.movies.count > 1 {
                 Button {
                     Haptics.tap()
+                    // The recommendation card is hidden while searching or filtering
+                    viewModel.searchText = ""
+                    viewModel.selectedGenres = []
                     withAnimation(Theme.spring) { viewModel.recommendMovie() }
+                    recommendationScrollRequest += 1
                 } label: {
                     Image(systemName: "dice.fill")
                 }
                 .accessibilityLabel("Recommend Movie")
+            }
+            if !viewModel.movies.isEmpty {
+                Menu {
+                    Section("\(viewModel.watchedCount) of \(viewModel.movies.count) watched") {
+                        Button {
+                            pendingBulkWatched = true
+                        } label: {
+                            Label("Mark All as Watched", systemImage: "eye")
+                        }
+                        .disabled(viewModel.watchedCount == viewModel.movies.count)
+                        Button {
+                            pendingBulkWatched = false
+                        } label: {
+                            Label("Mark All as Unwatched", systemImage: "eye.slash")
+                        }
+                        .disabled(viewModel.watchedCount == 0)
+                    }
+                } label: {
+                    Image(systemName: "checklist")
+                }
+                .accessibilityLabel("Watched Options")
             }
             Button {
                 Haptics.tap()
@@ -183,6 +280,69 @@ private extension ListView {
             }
             .accessibilityLabel("Add Movie")
         }
+    }
+
+    // Horizontally scrolling genre chips with counts. Tapping chips narrows the list to films that
+    // have every selected genre; it never changes the list itself
+    var genreFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if !viewModel.selectedGenres.isEmpty {
+                    Button {
+                        Haptics.tap()
+                        withAnimation(Theme.spring) { viewModel.selectedGenres = [] }
+                    } label: {
+                        Label("Clear", systemImage: "xmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Theme.surfaceRaised)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.92))
+                    .transition(.scale.combined(with: .opacity))
+                }
+                ForEach(viewModel.genreCounts, id: \.genre) { item in
+                    genreChip(item.genre, count: item.count)
+                }
+                if viewModel.isLoadingGenres {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Loading genres…")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(.horizontal, 10)
+                }
+            }
+            .padding(.horizontal, 16)
+            .animation(Theme.spring, value: viewModel.selectedGenres)
+        }
+    }
+
+    func genreChip(_ genre: Int, count: Int) -> some View {
+        let isSelected = viewModel.selectedGenres.contains(genre)
+        return Button {
+            Haptics.tap()
+            withAnimation(Theme.spring) { viewModel.toggleGenre(genre) }
+        } label: {
+            HStack(spacing: 5) {
+                Text(TasteProfile.genreNames[genre] ?? "Other")
+                Text("\(count)")
+                    .foregroundColor(isSelected ? .black.opacity(0.6) : Theme.textTertiary)
+            }
+            .font(.caption.weight(.bold))
+            .foregroundColor(isSelected ? .black : .white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(isSelected ? Color.clear : Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     func openDetail(_ movie: CDMovie) {
@@ -202,13 +362,18 @@ private extension ListView {
 
     func dismissCompare() {
         withAnimation(Theme.spring) { viewModel.showCompareMovieView = false }
+        viewModel.isRankingNewMovie = false
     }
 
-    // Offsets refer to the filtered rows, so map them back onto the full list
-    func deleteFilteredMovies(at offsets: IndexSet) {
-        let ids = Set(offsets.map { filteredMovies[$0].id })
-        let indices = IndexSet(viewModel.movies.indices.filter { ids.contains(viewModel.movies[$0].id) })
-        viewModel.deleteMovie(at: indices)
+    func delete(_ movie: CDMovie) {
+        guard let index = viewModel.movies.firstIndex(of: movie) else { return }
+        viewModel.deleteMovie(at: IndexSet(integer: index))
+    }
+
+    var bulkWatchedTitle: String {
+        let count = viewModel.movies.count
+        let films = "\(count) \(count == 1 ? "film" : "films")"
+        return pendingBulkWatched == false ? "Mark all \(films) as unwatched?" : "Mark all \(films) as watched?"
     }
 }
 
@@ -216,22 +381,15 @@ private extension ListView {
 
 private struct SpotlightCard: View {
     @ObservedObject var movie: CDMovie
-    let isRecommendation: Bool
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 16) {
             PosterImage(path: movie.poster_path, cornerRadius: 14, size: .medium)
                 .frame(width: 112, height: 168)
-                .overlay(alignment: .topLeading) {
-                    // The #1 card already says its rank in the label
-                    if isRecommendation {
-                        rankBadge
-                    }
-                }
+                .overlay(alignment: .topLeading) { rankBadge }
                 .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
             VStack(alignment: .leading, spacing: 8) {
-                Label(isRecommendation ? "TONIGHT'S PICK" : "#1 IN THIS LIST",
-                      systemImage: isRecommendation ? "sparkles" : "crown.fill")
+                Label("TONIGHT'S PICK", systemImage: "sparkles")
                     .font(.caption2.weight(.heavy))
                     .tracking(1.2)
                     .foregroundStyle(Theme.accentGradient)

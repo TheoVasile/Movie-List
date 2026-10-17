@@ -49,6 +49,14 @@ const createTables = async () => {
                 rank INT,
                 UNIQUE (list_id, movie_id)
             );
+
+            -- Watched is per user, not per list: a film watched once shows as watched in every list
+            CREATE TABLE IF NOT EXISTS watched_movies (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                movie_id INT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+                watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, movie_id)
+            );
         `);
 
         console.log("Tables created successfully");

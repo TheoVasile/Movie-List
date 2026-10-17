@@ -27,6 +27,7 @@ struct ContentView: View {
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
             DiscoverView()
+                .environmentObject(viewModel)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
                     Label("Discover", systemImage: "sparkles")

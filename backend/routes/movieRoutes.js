@@ -2,7 +2,12 @@ const express = require("express");
 const axios = require("axios");
 const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
+const requireListOwner = require("../middleware/listOwnership");
+const { setMovieWatched } = require("../models/watchedModel");
+const { mapWithConcurrency } = require("../services/letterboxdService");
+
 const router = express.Router();
+const ownsBodyList = requireListOwner((req) => req.body.list_id);
 
 // Lowercase, treat "&" as "and", drop punctuation and a leading article so
 // "Home, Alone" matches "Home Alone" and "godfather" matches "The Godfather"
@@ -102,26 +107,51 @@ function toDiscoverMovie(movie) {
         original_language: movie.original_language ?? "",
         popularity: movie.popularity ?? 0,
         vote_average: movie.vote_average ?? 0,
+        genre_ids: movie.genre_ids ?? [],
     };
 }
 
-// Films for the Discover tab: TMDb recommendations for the user's top-ranked films (seeds),
-// interleaved so no single seed dominates, followed by this week's trending films.
-// The app filters out films already in a list, so this doesn't need the user's lists
+// Comma-separated TMDb ids from a query parameter, e.g. "28,35"
+function parseIds(value, limit) {
+    return String(value ?? "")
+        .split(",")
+        .map((id) => parseInt(id, 10))
+        .filter((id) => id > 0)
+        .slice(0, limit);
+}
+
+// Films for the Discover tab: TMDb recommendations for the given films (seeds: the user's top-ranked
+// and recently liked films) plus well-rated films in their favourite genres (genres), interleaved so
+// no single source dominates, followed by this week's trending films. avoid_genres keeps disliked
+// genres out of the genre feed. The app filters out films already in a list and orders by taste
 router.get("/discover", async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-        const seeds = String(req.query.seeds ?? "")
-            .split(",")
-            .map((id) => parseInt(id, 10))
-            .filter((id) => id > 0)
-            .slice(0, 5);
+        const seeds = parseIds(req.query.seeds, 8);
+        const genres = parseIds(req.query.genres, 3);
+        const avoidGenres = parseIds(req.query.avoid_genres, 3);
         const params = { api_key: process.env.API_KEY, language: "en-US", page };
+
+        // Films in any of the favourite genres ("|" means or), skipping obscure titles
+        const genreFeed = genres.length
+            ? [axios.get("https://api.themoviedb.org/3/discover/movie", {
+                params: {
+                    ...params,
+                    with_genres: genres.join("|"),
+                    without_genres: avoidGenres.join(","),
+                    sort_by: "popularity.desc",
+                    "vote_count.gte": 200,
+                    include_adult: false,
+                },
+            })]
+            : [];
 
         // allSettled so one seed TMDb doesn't know about can't fail the whole request
         const [trending, ...recommendations] = await Promise.allSettled([
             axios.get("https://api.themoviedb.org/3/trending/movie/week", { params }),
-            ...seeds.map((id) => axios.get(`https://api.themoviedb.org/3/movie/${id}/recommendations`, { params })),
+            // The app sends different seeds for every batch, so each seed's best (first page) recommendations are used
+            ...seeds.map((id) => axios.get(`https://api.themoviedb.org/3/movie/${id}/recommendations`, { params: { ...params, page: 1 } })),
+            ...genreFeed,
         ]);
         const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value.data.results : []);
 
@@ -158,7 +188,7 @@ router.post("/create", async (req, res) => {
     }
 });
 
-router.put("/updateRank", async (req, res) => {
+router.put("/updateRank", ownsBodyList, async (req, res) => {
     try {
         const { list_id, movie_id, rank } = req.body;
         const updatedMovie = await updateMovieRank(list_id, movie_id, rank);
@@ -168,7 +198,49 @@ router.put("/updateRank", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
-router.delete("/removeFromList/:list_id/:movie_id", async (req, res) => {
+// Genre ids for up to 50 TMDb films at a time, e.g. ?ids=771,496243 -> [{ id: 771, genre_ids: [35, 10751] }].
+// Read-only: the app caches these to filter its lists by genre. Films TMDb can't find are left out
+router.get("/genres", async (req, res) => {
+    try {
+        const ids = parseIds(req.query.ids, 50);
+        const films = await mapWithConcurrency(ids, async (id) => {
+            try {
+                const response = await axios.get(`https://api.themoviedb.org/3/movie/${id}`, {
+                    params: { api_key: process.env.API_KEY },
+                    timeout: 15000,
+                });
+                return { id, genre_ids: (response.data.genres ?? []).map((genre) => genre.id) };
+            } catch (error) {
+                return null;
+            }
+        });
+        res.json(films.filter(Boolean));
+    } catch (error) {
+        console.error("Error fetching genres:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Marks a film watched or unwatched for the signed-in user, in every list it appears in
+router.put("/watched", async (req, res) => {
+    try {
+        const movieId = Number(req.body.movie_id);
+        if (!Number.isInteger(movieId) || typeof req.body.watched !== "boolean") {
+            return res.status(400).json({ error: "movie_id and a true/false watched are required." });
+        }
+        await setMovieWatched(req.user.uid, movieId, req.body.watched);
+        res.status(200).json({ movie_id: movieId, watched: req.body.watched });
+    } catch (error) {
+        // 23503: the film doesn't exist
+        if (error.code === "23503") {
+            return res.status(404).json({ error: "Movie not found." });
+        }
+        console.error("Error updating watched status:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/removeFromList/:list_id/:movie_id", requireListOwner((req) => req.params.list_id), async (req, res) => {
     try {
         const { list_id, movie_id } = req.params;
         const removedMovie = await removeMovieFromList(list_id, movie_id);
@@ -179,7 +251,7 @@ router.delete("/removeFromList/:list_id/:movie_id", async (req, res) => {
     }
 });
 
-router.post("/addToList", async (req, res) => {
+router.post("/addToList", ownsBodyList, async (req, res) => {
     try {
         const { list_id, movie_id, rank } = req.body;
         const newMovie = await addMovieToList(list_id, movie_id, rank);

@@ -7,10 +7,10 @@ const router = express.Router();
 
 router.post("/login", verifyToken, loginUser);
 
-router.post("/create", async (req, res) => {
+router.post("/create", verifyToken, async (req, res) => {
     try {
-        const { firebase_id, email, username } = req.body;
-        const newUser = await createUser(firebase_id, email, username);
+        const { username } = req.body;
+        const newUser = await createUser(req.user.uid, req.user.email ?? req.body.email, username);
         res.status(200).json(newUser);
     } catch (error) {
         console.error("Error creating user:", error);
@@ -18,9 +18,12 @@ router.post("/create", async (req, res) => {
     }
 });
 
-router.delete("/delete/:uid", async (req, res) => {
+router.delete("/delete/:uid", verifyToken, async (req, res) => {
     try {
         const { uid } = req.params;
+        if (uid !== req.user.uid) {
+            return res.status(403).json({ error: "You can only delete your own account." });
+        }
         const removedUser = await deleteUser(uid);
         res.status(200).json(removedUser);
     } catch (error) {

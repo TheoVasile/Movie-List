@@ -10,6 +10,7 @@ import SwiftUI
 
 struct DiscoverView: View {
     @Environment(\.managedObjectContext) var context
+    @EnvironmentObject var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @StateObject private var viewModel = DiscoverViewModel()
 
@@ -20,6 +21,14 @@ struct DiscoverView: View {
     @State private var showListPicker = false
     @State private var choseList = false
     @State private var toast: String? = nil
+    // Creating a new list from the list picker
+    @State private var showNewListField = false
+    @State private var newListName = ""
+    @State private var isCreatingList = false
+    @State private var createListFailed = false
+    @FocusState private var newListFocused: Bool
+    // Placing a film just added from Discover within its list, using the same head-to-head Compare
+    @State private var ranking: (model: ListViewModel, movie: CDMovie)? = nil
 
     private let swipeThreshold: CGFloat = 110
 
@@ -31,6 +40,10 @@ struct DiscoverView: View {
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.5), value: viewModel.topMovie?.id)
                 VStack(spacing: 22) {
+                    if !favoriteGenreNames.isEmpty {
+                        tasteSummary
+                            .transition(.opacity)
+                    }
                     cardStack
                         .frame(maxHeight: .infinity)
                     if viewModel.topMovie != nil {
@@ -40,6 +53,16 @@ struct DiscoverView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
+                if let ranking {
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                        .onTapGesture { endRanking() }
+                        .transition(.opacity)
+                        .zIndex(1)
+                    rankingOverlay(model: ranking.model, movie: ranking.movie)
+                        .transition(.scale(scale: 0.92).combined(with: .opacity))
+                        .zIndex(2)
+                }
             }
             .overlay(alignment: .top) { toastView }
             .navigationTitle("Discover")
@@ -47,10 +70,18 @@ struct DiscoverView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button {
-                            withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
-                        } label: {
-                            Label("Show Skipped Films Again", systemImage: "arrow.counterclockwise")
+                        Section(profileDescription) {
+                            Button {
+                                withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
+                            } label: {
+                                Label("Show Skipped Films Again", systemImage: "arrow.counterclockwise")
+                            }
+                            Button(role: .destructive) {
+                                withAnimation(Theme.spring) { viewModel.resetProfile() }
+                            } label: {
+                                Label("Reset Taste Profile", systemImage: "trash")
+                            }
+                            .disabled(viewModel.profile.swipeCount == 0)
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -95,6 +126,33 @@ private extension DiscoverView {
                 }
             }
         }
+    }
+
+    var favoriteGenreNames: [String] {
+        viewModel.profile.favoriteGenres.compactMap { TasteProfile.genreNames[$0] }
+    }
+
+    var profileDescription: String {
+        let swipes = viewModel.profile.swipeCount
+        guard swipes > 0 else { return "Swipe to teach Discover your taste" }
+        return "Learned from \(swipes) \(swipes == 1 ? "swipe" : "swipes")"
+    }
+
+    // Shows what the swipes have taught Discover so far
+    var tasteSummary: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles")
+                .foregroundStyle(Theme.accentGradient)
+            Text("Tuned to \(favoriteGenreNames.joined(separator: ", "))")
+                .foregroundColor(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .animation(Theme.spring, value: favoriteGenreNames)
     }
 
     // 0 at rest, 1 once the top card has been dragged past the swipe threshold
@@ -250,13 +308,48 @@ private extension DiscoverView {
         withAnimation(Theme.spring) {
             viewModel.add(movie, to: list, context: context) { newMovie in
                 if let newMovie {
-                    showToast("Added to \(list.name ?? "your list") at #\(newMovie.rank)")
+                    // New films land at the bottom, so ask where it belongs, unless it's the only film
+                    if list.movies.count > 1 {
+                        startRanking(newMovie, in: list)
+                    } else {
+                        showToast("Added to \(list.name ?? "your list") at #\(newMovie.rank)")
+                    }
                 } else {
                     showToast("Couldn't add \(movie.title). Try again.")
                 }
             }
             dragOffset = .zero
             showDetails = false
+        }
+    }
+
+    func startRanking(_ movie: CDMovie, in list: CDMovieList) {
+        let model = ListViewModel(movieList: list, context: context)
+        // Give the list picker time to finish closing before Compare appears
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(Theme.spring) { ranking = (model, movie) }
+        }
+    }
+
+    func endRanking() {
+        withAnimation(Theme.spring) { ranking = nil }
+    }
+
+    func rankingOverlay(model: ListViewModel, movie: CDMovie) -> some View {
+        let listName = model.movieList.name ?? "your list"
+        return CompareMovieView(
+            movies: Binding(get: { model.movies }, set: { model.movies = $0 }),
+            movie: .constant(movie),
+            prompt: "Where does \(movie.title ?? "it") rank in \(listName)?",
+            cancelTitle: "Skip — keep it at the bottom",
+            onCancel: {
+                endRanking()
+                showToast("Added to \(listName) at #\(movie.rank)")
+            }
+        ) { rankedMovie, rank in
+            model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
+            endRanking()
+            showToast("Ranked #\(rank) in \(listName)")
         }
     }
 
@@ -268,6 +361,9 @@ private extension DiscoverView {
         }
         choseList = false
         pendingMovie = nil
+        showNewListField = false
+        newListName = ""
+        createListFailed = false
     }
 
     func showToast(_ message: String) {
@@ -323,22 +419,15 @@ private extension DiscoverView {
                             }
                             .padding(.bottom, 8)
                         }
-                        if movieLists.isEmpty {
-                            EmptyStateView(
-                                icon: "film.stack",
-                                title: "No lists yet",
-                                message: "Create a list on the Lists tab, then come back to add films to it."
-                            )
-                        } else {
-                            ForEach(Array(movieLists.enumerated()), id: \.element) { index, list in
-                                Button {
-                                    choose(list)
-                                } label: {
-                                    listRow(list)
-                                }
-                                .buttonStyle(PressableButtonStyle(scale: 0.98))
-                                .appearAnimation(delay: Double(min(index, 8)) * 0.04)
+                        newListSection
+                        ForEach(Array(listsByLastAdded.enumerated()), id: \.element) { index, list in
+                            Button {
+                                choose(list)
+                            } label: {
+                                listRow(list)
                             }
+                            .buttonStyle(PressableButtonStyle(scale: 0.98))
+                            .appearAnimation(delay: Double(min(index, 8)) * 0.04)
                         }
                     }
                     .padding(20)
@@ -352,6 +441,108 @@ private extension DiscoverView {
                 }
             }
         }
+    }
+
+    // A "New List" button that opens into a name field. With no lists yet, the field shows straight away
+    @ViewBuilder
+    var newListSection: some View {
+        if showNewListField || movieLists.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(systemName: "list.star")
+                        .foregroundStyle(Theme.accentGradient)
+                    TextField("New list name", text: $newListName)
+                        .focused($newListFocused)
+                        .disableAutocorrection(true)
+                        .submitLabel(.done)
+                        .onSubmit(createListAndAdd)
+                        .disabled(isCreatingList)
+                }
+                .padding(14)
+                .background(Theme.surfaceRaised)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                if createListFailed {
+                    Label("Couldn't create the list. Try again.", systemImage: "exclamationmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(Theme.accentSecondary)
+                        .transition(.opacity)
+                }
+                Button(action: createListAndAdd) {
+                    HStack(spacing: 8) {
+                        if isCreatingList {
+                            ProgressView().tint(.black)
+                        }
+                        Text(isCreatingList ? "Creating…" : "Create List & Add")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(trimmedNewListName.isEmpty || isCreatingList)
+                .opacity(trimmedNewListName.isEmpty ? 0.5 : 1)
+            }
+            .padding(.bottom, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .onAppear { newListFocused = true }
+        } else {
+            Button {
+                Haptics.tap()
+                withAnimation(Theme.spring) { showNewListField = true }
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "plus")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Theme.accentGradient)
+                        .frame(width: 40, height: 60)
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text("New List")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
+                }
+                .padding(12)
+                .background(Theme.surfaceRaised)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Theme.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                )
+            }
+            .buttonStyle(PressableButtonStyle(scale: 0.98))
+        }
+    }
+
+    var trimmedNewListName: String {
+        newListName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // The film can only be added once the backend has given the list its id, so create the list first
+    func createListAndAdd() {
+        let name = trimmedNewListName
+        guard !name.isEmpty, !isCreatingList, let userID = authViewModel.user?.uid else { return }
+        isCreatingList = true
+        withAnimation { createListFailed = false }
+        APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: true) { result in
+            isCreatingList = false
+            switch result {
+            case .success(let serverList):
+                let list = CDMovieList(id: serverList.id, name: serverList.name, overview: serverList.overview, context: context)
+                do {
+                    try context.save()
+                } catch {
+                    print("Error saving new list:", error)
+                }
+                choose(list)
+            case .failure(let error):
+                print("Error creating list:", error.localizedDescription)
+                Haptics.tap()
+                withAnimation { createListFailed = true }
+            }
+        }
+    }
+
+    // The list a film was most recently added to comes first, since it's the likeliest pick again
+    var listsByLastAdded: [CDMovieList] {
+        movieLists.sorted { ($0.date_modified ?? .distantPast) > ($1.date_modified ?? .distantPast) }
     }
 
     func listRow(_ list: CDMovieList) -> some View {
@@ -385,19 +576,23 @@ private extension DiscoverView {
         Set(movieLists.flatMap { list in list.movies.map { Int64($0.tmdb_id) } })
     }
 
-    // The top two films of each list, best ranked first, to base recommendations on
-    var seeds: [Int64] {
-        let favourites = movieLists
-            .flatMap { $0.movies.sorted { $0.rank < $1.rank }.prefix(2) }
-            .sorted { $0.rank < $1.rank }
-            .map { Int64($0.tmdb_id) }
-            .filter { $0 > 0 }
-        var seen = Set<Int64>()
-        return Array(favourites.filter { seen.insert($0).inserted }.prefix(5))
+    // Every film in every list, weighted by its rank within that list (#1 of n weighs n times the last),
+    // so recommendations draw on the whole collection with favourites likelier
+    var seedPool: [(id: Int64, weight: Double)] {
+        var weights: [Int64: Double] = [:]
+        for list in movieLists {
+            let ranked = list.movies.sorted { $0.rank < $1.rank }
+            for (index, movie) in ranked.enumerated() where movie.tmdb_id > 0 {
+                let weight = Double(ranked.count - index) / Double(ranked.count)
+                // A film in several lists counts with its best placing
+                weights[Int64(movie.tmdb_id)] = max(weights[Int64(movie.tmdb_id)] ?? 0, weight)
+            }
+        }
+        return weights.map { (id: $0.key, weight: $0.value) }
     }
 
     func syncWithLists() {
-        viewModel.update(listedIDs: listedIDs, seeds: seeds)
+        viewModel.update(listedIDs: listedIDs, seedPool: seedPool)
     }
 }
 
@@ -460,6 +655,7 @@ struct DiscoverView_Previews: PreviewProvider {
     static var previews: some View {
         DiscoverView()
             .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            .environmentObject(AuthenticationViewModel())
             .preferredColorScheme(.dark)
     }
 }

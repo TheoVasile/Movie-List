@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import FirebaseAuth
 
 struct ListRequest: Codable {
     let user_id: String
@@ -71,6 +72,8 @@ struct MovieDetailsResponse: Codable {
     let created_at: String
     let release_date: String
     let rank: Int
+    // Optional so responses from before watched tracking still decode
+    let watched: Bool?
 }
 
 struct ListDetailsResponse: Codable {
@@ -93,6 +96,25 @@ struct LetterboxdImportRequest: Encodable {
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
+
+    /// Sends a request to the backend as the signed-in Firebase user. The backend identifies
+    /// the caller from this ID token, so every request has to go through here
+    private func send(_ request: URLRequest, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        guard let user = Auth.auth().currentUser else {
+            completion(nil, nil, NSError(domain: "Not signed in", code: 401, userInfo: nil))
+            return
+        }
+        // Firebase caches the token and only refreshes it when it is close to expiring
+        user.getIDToken { token, error in
+            guard let token = token else {
+                completion(nil, nil, error ?? NSError(domain: "Not signed in", code: 401, userInfo: nil))
+                return
+            }
+            var request = request
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            URLSession.shared.dataTask(with: request, completionHandler: completion).resume()
+        }
+    }
     
     func fetchData(firebase_id: String, completion: @escaping (Result<[ListDetailsResponse], Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/fetch?user_id=\(firebase_id)") else { return }
@@ -101,7 +123,7 @@ class APIService {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -127,7 +149,7 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
     }
     
     func importLetterboxdLists(userID: String, lists: [LetterboxdList], completion: @escaping (Result<[ListDetailsResponse], Error>) -> Void) {
@@ -146,7 +168,7 @@ class APIService {
             return
         }
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -171,7 +193,7 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
     }
 
     func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
@@ -190,7 +212,7 @@ class APIService {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -215,7 +237,7 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
         
     }
     
@@ -226,7 +248,7 @@ class APIService {
         request.httpMethod = "DELETE"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -239,7 +261,7 @@ class APIService {
                 completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
             }
 
-        }.resume()
+        }
     }
     
     func searchMovies(name: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
@@ -255,7 +277,7 @@ class APIService {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -281,13 +303,15 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
     }
-    /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) plus trending films
-    func discoverMovies(seeds: [Int64], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
+    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
             URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
+            URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
+            URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "page", value: String(page)),
         ]
         guard let url = components?.url else {
@@ -295,7 +319,7 @@ class APIService {
             return
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        send(URLRequest(url: url)) { data, response, error in
             guard let data = data, error == nil,
                   let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 DispatchQueue.main.async {
@@ -314,7 +338,7 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
     }
 
     func addMovieToList(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -337,7 +361,7 @@ class APIService {
             return
         }
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -356,10 +380,69 @@ class APIService {
                 completion(.success(()))
             }
         }
-
-        task.resume()
     }
     
+    /// TMDb genre ids for up to 50 films, keyed by TMDb id. Calls back on the main thread
+    func fetchGenres(tmdbIDs: [Int64], completion: @escaping (Result<[Int64: [Int]], Error>) -> Void) {
+        struct FilmGenres: Decodable {
+            let id: Int64
+            let genre_ids: [Int]
+        }
+        var components = URLComponents(string: "\(baseURL)/movies/genres")
+        components?.queryItems = [URLQueryItem(name: "ids", value: tmdbIDs.map(String.init).joined(separator: ","))]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<[Int64: [Int]], Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let films = try? JSONDecoder().decode([FilmGenres].self, from: data) {
+                result = .success(Dictionary(films.map { ($0.id, $0.genre_ids) }, uniquingKeysWith: { first, _ in first }))
+            } else {
+                result = .failure(error ?? NSError(domain: "Genre lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// Marks a film watched or unwatched for the signed-in user, across all of their lists
+    func setMovieWatched(movie_id: Int64, watched: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/watched") else { return }
+        putWatched(url: url, body: ["movie_id": movie_id, "watched": watched], completion: completion)
+    }
+
+    /// Marks every film in a list watched or unwatched for the signed-in user
+    func setListWatched(list_id: Int64, watched: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(list_id)/watched") else { return }
+        putWatched(url: url, body: ["watched": watched], completion: completion)
+    }
+
+    private func putWatched(url: URL, body: [String: Any], completion: @escaping (Result<Void, Error>) -> Void) {
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        send(request) { _, response, error in
+            let result: Result<Void, Error>
+            if let error = error {
+                result = .failure(error)
+            } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                result = .success(())
+            } else {
+                result = .failure(NSError(domain: "Watched update failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
     func updateMovieRanking(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/updateRank") else { return }
         
@@ -380,7 +463,7 @@ class APIService {
                 return
             }
 
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            send(request) { data, response, error in
                 if let error = error {
                     completion(.failure(error))
                     return
@@ -394,8 +477,6 @@ class APIService {
 
                 completion(.success(()))
             }
-
-            task.resume()
     }
     
     func removeMovieFromList(list_id: Int64, movie_id: Int64, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -405,7 +486,7 @@ class APIService {
         request.httpMethod = "DELETE"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -418,7 +499,7 @@ class APIService {
                 completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
             }
 
-        }.resume()
+        }
         
     }
     
@@ -438,7 +519,7 @@ class APIService {
             return
         }
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -463,7 +544,7 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
         
     }
     
@@ -473,7 +554,7 @@ class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 completion(.failure(error)) // Return error if request fails
                 return
@@ -484,7 +565,7 @@ class APIService {
             } else {
                 completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
             }
-        }.resume()
+        }
     }
 
     func createList(userID: String, name: String, overview: String, isRanked: Bool, completion: @escaping (Result<ListResponse, Error>) -> Void) {
@@ -503,7 +584,7 @@ class APIService {
             return
         }
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        send(request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async {
                     completion(.failure(error))
@@ -528,6 +609,6 @@ class APIService {
                     completion(.failure(error))
                 }
             }
-        }.resume()
+        }
     }
 }

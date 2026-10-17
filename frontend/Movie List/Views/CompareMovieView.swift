@@ -21,12 +21,16 @@ struct CompareMovieView: View {
     @State private var round: Int = 1
     var onRankingUpdate: (CDMovie, Int) -> Void
     var onCancel: (() -> Void)?
+    var prompt: String
+    var cancelTitle: String
 
     private enum Side { case selected, other }
     
-    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, onCancel: (() -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
+    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, prompt: String = "Which do you prefer?", cancelTitle: String = "Cancel", onCancel: (() -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
             self._movies = movies
             self._movie = movie
+            self.prompt = prompt
+            self.cancelTitle = cancelTitle
             self.onCancel = onCancel
             self.onRankingUpdate = onRankingUpdate
         }
@@ -58,7 +62,7 @@ struct CompareMovieView: View {
                     .padding(.vertical, 40)
             }
             if let onCancel {
-                Button("Cancel", action: onCancel)
+                Button(cancelTitle, action: onCancel)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(Theme.textSecondary)
             }
@@ -94,9 +98,11 @@ struct CompareMovieView: View {
                 .tracking(2)
                 .foregroundStyle(Theme.accentGradient)
                 .contentTransition(.numericText())
-            Text("Which do you prefer?")
+            Text(prompt)
                 .font(.title3.weight(.bold))
                 .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
             ProgressView(value: progress)
                 .tint(Theme.accent)
                 .animation(Theme.spring, value: progress)

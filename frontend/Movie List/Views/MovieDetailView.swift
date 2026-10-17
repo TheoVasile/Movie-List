@@ -13,6 +13,7 @@ struct MovieDetailView: View {
     var listName: String? = nil
     var onCompare: (() -> Void)? = nil
     var onSetRank: (() -> Void)? = nil
+    var onToggleWatched: (() -> Void)? = nil
 
     @State private var revealed = false
 
@@ -56,11 +57,17 @@ struct MovieDetailView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
-                if movie.rank > 0 {
-                    Text(listName.map { "#\(movie.rank) IN \($0.uppercased())" } ?? "#\(movie.rank)")
-                        .font(.caption.weight(.heavy))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.accentGradient)
+                HStack(spacing: 10) {
+                    if movie.rank > 0 {
+                        Text(listName.map { "#\(movie.rank) IN \($0.uppercased())" } ?? "#\(movie.rank)")
+                            .font(.caption.weight(.heavy))
+                            .tracking(1.5)
+                            .foregroundStyle(Theme.accentGradient)
+                    }
+                    if movie.watched {
+                        WatchedTag()
+                            .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    }
                 }
                 Text(movie.title ?? "")
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
@@ -104,6 +111,18 @@ struct MovieDetailView: View {
                     }
                 }
                 .appearAnimation(delay: 0.26)
+            }
+
+            if let onToggleWatched {
+                Button {
+                    Haptics.tap()
+                    onToggleWatched()
+                } label: {
+                    Label(movie.watched ? "Mark as Unwatched" : "Mark as Watched",
+                          systemImage: movie.watched ? "eye.slash" : "eye")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .appearAnimation(delay: 0.3)
             }
 
             if let overview = movie.overview, !overview.isEmpty {

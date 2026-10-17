@@ -53,9 +53,17 @@ struct PersistenceController {
     @discardableResult
     static func insert(_ listResponse: ListDetailsResponse, into context: NSManagedObjectContext) -> CDMovieList {
         let curList = CDMovieList(id: listResponse.id, name: listResponse.name, overview: listResponse.overview, context: context)
+        // Keep the server's dates rather than the time of this sync
+        if let created = parseServerDate(listResponse.creation_date) {
+            curList.creation_date = created
+        }
+        if let modified = parseServerDate(listResponse.date_modified) {
+            curList.date_modified = modified
+        }
         for movieResponse in listResponse.movies {
             do {
                 let curMovie = try CDMovie(id: movieResponse.id, tmdb_id: Int32(movieResponse.tmdb_id)!, title: movieResponse.title, release_date: movieResponse.release_date, overview: movieResponse.overview, rank: Int32(movieResponse.rank), poster_path: movieResponse.poster_path, original_language: movieResponse.original_language, popularity: movieResponse.popularity, context: context)
+                curMovie.watched = movieResponse.watched ?? false
                 curList.addToMovies_(curMovie)
             } catch {
                 print("Failed to create CD Movie", error)
@@ -64,6 +72,17 @@ struct PersistenceController {
         return curList
     }
     
+    // The backend sends timestamps like "2026-10-17T06:52:17.123Z"
+    private static func parseServerDate(_ string: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: string) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: string)
+    }
+
     func deleteAllCoreDataObjects() {
         let context = container.viewContext
         let persistentStoreCoordinator = context.persistentStoreCoordinator

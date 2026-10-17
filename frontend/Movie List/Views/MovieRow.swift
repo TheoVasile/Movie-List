@@ -13,6 +13,7 @@ struct MovieRow: View {
     @Binding var showCompareMovieView: Bool
     @Binding var selectedMovie: CDMovie?
     @Binding var showSetRank: Bool
+    var onToggleWatched: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 14) {
@@ -34,6 +35,10 @@ struct MovieRow: View {
                 }
                 .font(.caption.weight(.medium))
                 .foregroundColor(Theme.textSecondary)
+                if movie.watched {
+                    WatchedTag()
+                        .transition(.scale(scale: 0.8, anchor: .leading).combined(with: .opacity))
+                }
             }
             Spacer(minLength: 0)
             Menu {
@@ -47,6 +52,15 @@ struct MovieRow: View {
                     present { showCompareMovieView = true }
                 } label: {
                     Label("Compare", systemImage: "arrow.left.arrow.right")
+                }
+                if let onToggleWatched {
+                    Button {
+                        Haptics.tap()
+                        onToggleWatched()
+                    } label: {
+                        Label(movie.watched ? "Mark as Unwatched" : "Mark as Watched",
+                              systemImage: movie.watched ? "eye.slash" : "eye")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -75,10 +89,14 @@ struct MovieRow: View {
 
     private var rankBadge: some View {
         Text("\(movie.rank)")
-            .font(.system(size: movie.rank < 100 ? 28 : 20, weight: .heavy, design: .rounded))
+            .font(.system(size: movie.rank < 100 ? 28 : movie.rank < 1000 ? 22 : 18, weight: .heavy, design: .rounded))
+            // Equal-width digits so every rank with the same number of digits is the same size
+            .monospacedDigit()
             .foregroundStyle(movie.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-            .frame(width: 40)
-            .minimumScaleFactor(0.6)
+            // One line, shrinking to fit the column rather than wrapping onto a second line
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .frame(width: 44)
             .contentTransition(.numericText())
             .animation(Theme.spring, value: movie.rank)
     }
@@ -87,6 +105,20 @@ struct MovieRow: View {
         Haptics.tap()
         selectedMovie = movie
         withAnimation(Theme.spring, change)
+    }
+}
+
+/// Small "Watched" badge shown under a film's details
+struct WatchedTag: View {
+    var body: some View {
+        Label("Watched", systemImage: "checkmark.circle.fill")
+            .font(.caption2.weight(.bold))
+            .foregroundColor(.black)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Theme.accentGradient)
+            .clipShape(Capsule())
+            .accessibilityLabel("Watched")
     }
 }
 

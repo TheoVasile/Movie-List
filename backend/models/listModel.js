@@ -14,6 +14,8 @@ async function fetchLists(user_id) {
         [user_id]
     );
     const lists = result.rows;
+    const watched = await pool.query("SELECT movie_id FROM watched_movies WHERE user_id = $1", [user_id]);
+    const watchedIDs = new Set(watched.rows.map((row) => row.movie_id));
 
     for (const list of lists) {
         list.movies = [];
@@ -28,6 +30,7 @@ async function fetchLists(user_id) {
             );
             const movieDetailsResult = movieDetails.rows[0];
             movieDetailsResult.rank = movie.rank;
+            movieDetailsResult.watched = watchedIDs.has(movie.movie_id);
             list.movies.push(movieDetailsResult);
         }
     }
@@ -51,4 +54,12 @@ async function deleteList(list_id) {
     }
 }
 
-module.exports = { createList, deleteList, fetchLists };
+async function isListOwner(list_id, user_id) {
+    const result = await pool.query(
+        "SELECT 1 FROM lists WHERE id = $1 AND user_id = $2",
+        [list_id, user_id]
+    );
+    return result.rowCount > 0;
+}
+
+module.exports = { createList, deleteList, fetchLists, isListOwner };

@@ -4,6 +4,7 @@ const listRoutes = require("./routes/listRoutes");
 const movieRoutes = require("./routes/movieRoutes");
 const letterboxdRoutes = require("./routes/letterboxdRoutes");
 const createTables = require("./migrations/setupDB");
+const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
 const pool = require("./config/db");
 
@@ -15,9 +16,10 @@ app.use(cors());
 createTables();
 
 app.use("/auth", authRoutes);
-app.use("/lists", listRoutes);
-app.use("/movies", movieRoutes);
-app.use("/letterboxd", letterboxdRoutes);
+// Everything except account setup needs a signed-in user; /auth checks tokens per route
+app.use("/lists", verifyToken, listRoutes);
+app.use("/movies", verifyToken, movieRoutes);
+app.use("/letterboxd", verifyToken, letterboxdRoutes);
 
 app.listen(3000, () => console.log("Server running on port 3000"));
 

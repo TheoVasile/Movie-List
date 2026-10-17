@@ -8,9 +8,10 @@ const router = express.Router();
 // Takes lists parsed from a Letterboxd data export and copies each into a new ranked list,
 // keeping Letterboxd's order as the ranking
 router.post("/import", async (req, res) => {
-    const { user_id, lists } = req.body;
-    if (!user_id || !Array.isArray(lists) || lists.length === 0) {
-        return res.status(400).json({ error: "User ID and at least one list are required." });
+    const user_id = req.user.uid;
+    const { lists } = req.body;
+    if (!Array.isArray(lists) || lists.length === 0) {
+        return res.status(400).json({ error: "At least one list is required." });
     }
 
     const imported = [];

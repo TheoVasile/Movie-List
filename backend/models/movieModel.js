@@ -65,6 +65,8 @@ async function addMovieToList(list_id, movie_id, rank) {
             "INSERT INTO list_movies (list_id, movie_id, rank) VALUES ($1, $2, $3)",
             [list_id, movie_id, rank]
         );
+        // date_modified tracks when a film was last added, so the app can offer recently used lists first
+        await pool.query("UPDATE lists SET date_modified = CURRENT_TIMESTAMP WHERE id = $1", [list_id]);
         return result.rows[0];
     } catch (error) {
         console.error("Error adding movie to list:", error);

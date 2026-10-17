@@ -17,4 +17,5 @@ struct Movie: Identifiable, Decodable {
     var popularity: Double
     // Only sent by the discover endpoint
     var vote_average: Double?
+    var genre_ids: [Int]?
 }
