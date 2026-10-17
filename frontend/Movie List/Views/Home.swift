@@ -17,69 +17,124 @@ struct Home: View {
     @State var listName = ""
     @State var showFileSelector: Bool = false
     
-    //init() {
-    //    _viewModel = ObservedObject(wrappedValue: HomeViewModel())
-    //}
-    
+    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+
     var body: some View{
-        ZStack{
-            NavigationView{
-                VStack{
-                    movieListsView
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        header
+                        movieListsView
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
                 }
-                .navigationTitle("Movie Lists")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar{
-                    ToolbarItem(placement: .navigationBarTrailing){
-                        Menu {
-                            Button("Add") {
-                                withAnimation{ showPopup.toggle() }
-                            }
-                            Button("Import") {
-                                showFileSelector = true
-                            }
+            }
+            .navigationTitle("Your Lists")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            Haptics.tap()
+                            showPopup = true
                         } label: {
-                            Image(systemName: "plus")
+                            Label("New List", systemImage: "plus.rectangle.on.rectangle")
                         }
+                        Button {
+                            showFileSelector = true
+                        } label: {
+                            Label("Import from Excel", systemImage: "square.and.arrow.down")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Theme.accentGradient)
                     }
                 }
             }
-            .overlay {
-                if showFileSelector {
-                    ExcelFilePickerView(showFileSelector: $showFileSelector)
-                }
+        }
+        .overlay {
+            if showFileSelector {
+                ExcelFilePickerView(showFileSelector: $showFileSelector)
             }
-            .popupNavigationView(horizontalPadding: 20, show: $showPopup){ newListPopup }
+        }
+        .sheet(isPresented: $showPopup) {
+            newListSheet
+                .presentationDetents([.height(280)])
+                .presentationDragIndicator(.visible)
         }
     }
 }
 
 private extension Home {
+    var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(greeting.uppercased())
+                .font(.caption.weight(.bold))
+                .tracking(1.5)
+                .foregroundStyle(Theme.accentGradient)
+            Text(movieLists.isEmpty
+                 ? "Start your first collection"
+                 : "\(movieLists.count) \(movieLists.count == 1 ? "list" : "lists") · \(totalMovies) films ranked")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+        }
+        .padding(.top, 4)
+        .appearAnimation()
+    }
+
+    var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        // displayName falls back to the email address, which reads badly in a greeting
+        let name = viewModel.user?.displayName ?? ""
+        let firstName = name.contains("@") ? "" : name.split(separator: " ").first.map(String.init) ?? ""
+        let timeOfDay = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
+        return firstName.isEmpty ? timeOfDay : "\(timeOfDay), \(firstName)"
+    }
+
+    var totalMovies: Int {
+        movieLists.reduce(0) { $0 + $1.movies.count }
+    }
+
     var movieListsView: some View {
         Group {
             if movieLists.isEmpty {
-                List{
-                    Text("No Lists, Add one Now!")
+                EmptyStateView(
+                    icon: "film.stack",
+                    title: "No lists yet",
+                    message: "Create a list and start ranking the films you love.",
+                    actionTitle: "Create a List"
+                ) {
+                    showPopup = true
                 }
+                .padding(.top, 60)
             } else {
-                List {
-                    ForEach(movieLists, id: \.self) { movieList in
-                        NavigationLink(movieList.name ?? "No Name", destination:
-                                        ListView(movieList: movieList, context: context)
-                            .environmentObject(NetworkService())
-                            .environmentObject(DatabaseService())
-                        )
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(Array(movieLists.enumerated()), id: \.element) { index, movieList in
+                        NavigationLink {
+                            ListView(movieList: movieList, context: context)
+                                .environmentObject(NetworkService())
+                                .environmentObject(DatabaseService())
+                        } label: {
+                            ListCard(movieList: movieList)
+                        }
+                        .buttonStyle(PressableButtonStyle())
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteList(movieList)
+                            } label: {
+                                Label("Delete List", systemImage: "trash")
+                            }
+                        }
+                        .appearAnimation(delay: Double(index) * 0.06)
                     }
-                    .onDelete(perform: deleteList)
-                    .padding(10)
                 }
             }
         }
     }
-    func closePopup() {
-        withAnimation{ showPopup.toggle() }
-    }
-    
+
     func addNewList() {
         if listName.count > 0 {
             let newList = CDMovieList(id: Int64(1), name: listName, overview: "", context: context)
@@ -92,7 +147,7 @@ private extension Home {
                 ) { result in
                     switch result {
                     case .success(let serverList):
-                        print("✅ List synced to backend:", serverList)
+                        print("List synced to backend:", serverList)
 
                         // Optionally, update Core Data with the server ID
                         DispatchQueue.main.async {
@@ -102,53 +157,137 @@ private extension Home {
 
                     case .failure(let error):
                         print(viewModel.user?.uid ?? "no uid")
-                        print("❌ Backend request failed, deleting from Core Data:", error.localizedDescription)
+                        print("Backend request failed, deleting from Core Data:", error.localizedDescription)
 
                         // Step 3: If request fails, delete the local entry
                         DispatchQueue.main.async {
-                            context.delete(newList)
-                            try? context.save()
+                            withAnimation(Theme.spring) {
+                                context.delete(newList)
+                                try? context.save()
+                            }
                         }
                     }
                 }
             
-            withAnimation { showPopup.toggle() }
+            Haptics.success()
+            listName = ""
+            showPopup = false
         }
     }
     
-    func deleteList(at offsets: IndexSet) {
-        withAnimation {
-            offsets.forEach { index in
-                let deleteItem = movieLists[index]
-                APIService.shared.deleteList(listID: deleteItem.id) { result in
-                        switch result {
-                        case .success(let serverList):
-                            print("✅ List synced to backend:", serverList)
-                            CDMovieList.delete(movieList: deleteItem)
-
-                        case .failure(let error):
-                            print("❌ Backend request failed", error.localizedDescription)
-                        }
+    func deleteList(_ deleteItem: CDMovieList) {
+        APIService.shared.deleteList(listID: deleteItem.id) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let serverList):
+                    print("List synced to backend:", serverList)
+                    withAnimation(Theme.spring) {
+                        CDMovieList.delete(movieList: deleteItem)
                     }
+
+                case .failure(let error):
+                    print("Backend request failed", error.localizedDescription)
+                }
             }
         }
     }
     
-    var newListPopup: some View {
-            TextField("List Name:", text: $listName)
-                .padding()
-                .disableAutocorrection(true)
-                .navigationTitle("Add New List")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Close") { closePopup() }
-                    }
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("Add") { addNewList() }
-                    }
+    var newListSheet: some View {
+        ZStack {
+            Theme.surface.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 18) {
+                Text("New List")
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.white)
+                HStack(spacing: 12) {
+                    Image(systemName: "list.star")
+                        .foregroundStyle(Theme.accentGradient)
+                    TextField("e.g. Christmas Classics", text: $listName)
+                        .disableAutocorrection(true)
+                        .submitLabel(.done)
+                        .onSubmit { addNewList() }
                 }
+                .padding(16)
+                .background(Theme.surfaceRaised)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Button("Create List") { addNewList() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(listName.isEmpty)
+                    .opacity(listName.isEmpty ? 0.5 : 1)
+                    .animation(.easeOut(duration: 0.2), value: listName.isEmpty)
+            }
+            .padding(24)
         }
+    }
+}
+
+// MARK: - List card
+
+private struct ListCard: View {
+    @ObservedObject var movieList: CDMovieList
+
+    private var topPosters: [String?] {
+        movieList.movies
+            .sorted { $0.rank < $1.rank }
+            .prefix(3)
+            .map { $0.poster_path }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            posterFan
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(movieList.name ?? "No Name")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding(14)
+        .background(
+            ZStack {
+                Theme.surface
+                PosterBackdrop(path: topPosters.first ?? nil)
+                    .opacity(0.6)
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Theme.stroke, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
+    }
+
+    // Top three films fanned out like a hand of cards, #1 in front
+    private var posterFan: some View {
+        ZStack {
+            if topPosters.isEmpty {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Theme.surfaceRaised)
+                    .frame(width: 90, height: 135)
+                    .overlay(
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .foregroundColor(Theme.textTertiary)
+                    )
+            } else {
+                ForEach(Array(topPosters.enumerated().reversed()), id: \.offset) { index, path in
+                    PosterImage(path: path, cornerRadius: 10)
+                        .frame(width: 90, height: 135)
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+                        .rotationEffect(.degrees(Double(index) * (index.isMultiple(of: 2) ? 9 : -9)))
+                        .offset(x: CGFloat(index) * (index.isMultiple(of: 2) ? 22 : -22), y: CGFloat(index) * 4)
+                        .scaleEffect(1 - CGFloat(index) * 0.08)
+                }
+            }
+        }
+    }
 }
 
 

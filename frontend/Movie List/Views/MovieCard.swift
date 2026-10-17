@@ -10,33 +10,31 @@ import SwiftUI
 
 struct MovieCard: View {
     @Binding var movie: CDMovie
+    var isHighlighted: Bool = false
+
     var body: some View {
-        ZStack {
-            Color.white
-            VStack{
+        VStack(alignment: .leading, spacing: 10) {
+            PosterImage(path: movie.poster_path, cornerRadius: 16)
+                .aspectRatio(2/3, contentMode: .fit)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Theme.accentGradient, lineWidth: isHighlighted ? 3 : 0)
+                )
+                .shadow(color: isHighlighted ? Theme.accent.opacity(0.5) : .black.opacity(0.45), radius: isHighlighted ? 18 : 10, y: 6)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(movie.title ?? "None")
-                    .fontWeight(.bold)
-                    .foregroundColor(.black) // Text color
-                Text(movie.get_date() ?? "None")
-                    .foregroundColor(.gray)
-                if let poster_path = movie.poster_path, !poster_path.isEmpty {
-                    AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2"+poster_path)) { image in
-                        image.resizable()
-                            .scaledToFit()
-                    } placeholder: {
-                        Color.gray.opacity(0.3) // Placeholder if no image
-                            .frame(maxWidth: .infinity)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .cornerRadius(10)
-                    .padding()
-                }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(Theme.year(from: movie.release_date))
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
             }
         }
-        .frame(maxWidth: .infinity) // Make width relative to screen size
-        .cornerRadius(20) // Rounded corners
-        .shadow(radius: 5) // Shadow effect
-        .padding(10) // Add padding
+        .frame(maxWidth: .infinity)
+        .scaleEffect(isHighlighted ? 1.04 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHighlighted)
     }
 }
 

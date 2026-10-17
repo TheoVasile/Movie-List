@@ -28,51 +28,62 @@ struct SignUpView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack{
-                Color(UIColor.systemGray6)
-                    .edgesIgnoringSafeArea(.all)
-                VStack {
-                    Spacer()
-                    Text("Sign Up")
-                    TextField("Name", text: $name)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                    TextField("Email", text: $authenticationViewModel.email)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                    SecureField("Password", text: $authenticationViewModel.password)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                    SecureField("Re-enter Password", text: $authenticationViewModel.confirmPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
+        ZStack{
+            AuthBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Create account")
+                            .font(.system(size: 32, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("Start building your ranked film lists.")
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .padding(.bottom, 12)
+                    .appearAnimation()
+
+                    AuthField(icon: "person.fill", placeholder: "Name", text: $name)
+                        .textContentType(.name)
+                        .appearAnimation(delay: 0.05)
+                    AuthField(icon: "envelope.fill", placeholder: "Email", text: $authenticationViewModel.email)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .appearAnimation(delay: 0.1)
+                    AuthField(icon: "lock.fill", placeholder: "Password", text: $authenticationViewModel.password, isSecure: true)
+                        .textContentType(.newPassword)
+                        .appearAnimation(delay: 0.15)
+                    AuthField(icon: "lock.rotation", placeholder: "Re-enter Password", text: $authenticationViewModel.confirmPassword, isSecure: true)
+                        .textContentType(.newPassword)
+                        .appearAnimation(delay: 0.2)
+
+                    if invalidCredentials {
+                        Label("Couldn't create your account. Check your details and try again.", systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(Theme.accentSecondary)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
                     Button("Create Account") {
                         signUpWithEmail()
                     }
-                    /*
-                    NavigationLink(destination: AccountView()) {
-                        Text("Create Account")
-                            .foregroundColor(.white)
-                            .padding(10)
-                    }
-                    .background(.blue)
-                    .cornerRadius(20)
-                    .padding()*/
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 8)
+                    .appearAnimation(delay: 0.25)
+
                     HStack {
                         Text("Already have an account?")
-                            .foregroundColor(.gray)
-                        NavigationLink("Sign in", destination: SignInView()
-                            .environmentObject(authenticationViewModel))
-                            .foregroundColor(.blue)
+                            .foregroundColor(Theme.textSecondary)
+                        Button("Sign in") { dismiss() }
+                            .foregroundColor(Theme.accent)
                             .bold()
                     }
-                    .padding()
-                    Spacer()
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 }
-                .background(.white)
-                .cornerRadius(20)
-                .padding(20)
+                .padding(24)
+                .padding(.top, 20)
+                .animation(Theme.spring, value: invalidCredentials)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -81,7 +92,9 @@ struct SignUpView: View {
 
 struct SignUpView_Previews: PreviewProvider {
     static var previews: some View {
-        SignUpView()
-            .environmentObject(AuthenticationViewModel())
+        NavigationStack {
+            SignUpView()
+                .environmentObject(AuthenticationViewModel())
+        }
     }
 }

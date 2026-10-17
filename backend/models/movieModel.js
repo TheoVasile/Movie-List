@@ -5,12 +5,12 @@ async function createMovie(tmdb_id, title, release_date, overview, poster_path, 
         "INSERT INTO movies (tmdb_id, title, release_date, overview, poster_path, original_language, popularity) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (tmdb_id) DO NOTHING RETURNING *;",
         [tmdb_id, title, release_date, overview, poster_path, original_language, popularity]
     );
-    // ✅ If the movie was inserted, return the newly created row
+    // If the movie was inserted, return the newly created row
     if (result.rows.length > 0) {
         return result.rows[0];
     }
 
-    // ✅ If no row was inserted, fetch the existing row
+    // If no row was inserted, fetch the existing row
     const existingMovie = await pool.query(
         `SELECT * FROM movies WHERE tmdb_id = $1;`,
         [tmdb_id]
@@ -24,7 +24,7 @@ async function removeMovieFromList(list_id, movie_id) {
     try {
         await client.query("BEGIN"); // Start transaction
 
-        // ✅ Delete the movie and return the deleted row
+        // Delete the movie and return the deleted row
         const result = await client.query(
             `DELETE FROM list_movies WHERE list_id = $1 AND movie_id = $2 RETURNING *`,
             [list_id, movie_id]
@@ -35,7 +35,7 @@ async function removeMovieFromList(list_id, movie_id) {
             return { message: "No matching movie found, but operation successful." };
         }
 
-        // ✅ Reorder rankings after deletion
+        // Reorder rankings after deletion
         await client.query(
             `UPDATE list_movies
              SET rank = new_rank
@@ -90,7 +90,7 @@ async function updateMovieRank(list_id, movie_id, new_rank) {
         const old_rank = rows[0].rank;
         if (old_rank === new_rank) {
             await client.query("COMMIT"); // No updates needed, but commit transaction
-            return rows[0]; // ✅ Return the existing row as-is
+            return rows[0]; // Return the existing row as is
         }
         // Shift affected movies up or down
         await client.query(

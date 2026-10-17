@@ -22,15 +22,19 @@ struct ContentView: View {
                 .environmentObject(db)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
-                    Label("Home", systemImage: "house.fill")
+                    Label("Lists", systemImage: "film.stack")
                 }
+                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
             UserProfileView()
                 .environmentObject(viewModel)
                 .environmentObject(network)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
-                    Label("Account", systemImage: "person.fill")
+                    Label("Profile", systemImage: "person.crop.circle.fill")
                 }
+                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
         }
     }
 }

@@ -16,59 +16,147 @@ struct UserProfileView: View {
     var body: some View {
         NavigationStack {
             ZStack{
-                Color(UIColor.systemGray6)
-                    .edgesIgnoringSafeArea(.all)
-                VStack{
-                    Spacer()
-                    img
-                    Text(viewModel.user?.displayName ?? "No Name")
-                        .padding()
-                    Text(viewModel.user?.email ?? "No Email")
-                        .padding()
-                    Text("Your Lists:")
-                    Group {
-                        if movieLists.isEmpty {
-                            List{
-                                Text("No Lists, Add one Now!")
-                            }
-                        } else {
-                            List {
-                                ForEach(movieLists, id: \.self) { movieList in
-                                    NavigationLink(movieList.name ?? "No Name", destination:
-                                                    ListView(movieList: movieList, context: context)
-                                        .environmentObject(NetworkService())
-                                        .environmentObject(DatabaseService())
-                                    )
-                                }
-                                .padding(10)
-                            }
-                        }
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 24) {
+                        profileHeader
+                        stats
+                        listsSection
                     }
-                    Spacer()
-                    
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 32)
                 }
-                .frame(maxWidth: .infinity)
-                .background(.white)
-                .cornerRadius(20)
-                .padding(20)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showSettings = true // Replace with actual navigation
-                        }) {
-                            Image(systemName: "gearshape.fill")
-                                .foregroundColor(.gray)
-                        }
+            }
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        Haptics.tap()
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(Theme.textSecondary)
                     }
                 }
-                .sheet(isPresented: $showSettings, content: {
-                    ZStack{
-                        UserSettingsView()
-                            .environmentObject(viewModel)
+            }
+            .sheet(isPresented: $showSettings, content: {
+                UserSettingsView()
+                    .environmentObject(viewModel)
+            })
+        }
+    }
+
+    private var profileHeader: some View {
+        VStack(spacing: 12) {
+            img
+                .padding(4)
+                .overlay(Circle().stroke(Theme.accentGradient, lineWidth: 3))
+                .shadow(color: Theme.accent.opacity(0.35), radius: 20)
+                .appearAnimation()
+            VStack(spacing: 4) {
+                Text(viewModel.user?.displayName ?? "No Name")
+                    .font(.title2.weight(.heavy))
+                    .foregroundColor(.white)
+                Text(viewModel.user?.email ?? "No Email")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .appearAnimation(delay: 0.08)
+        }
+        .padding(.top, 24)
+    }
+
+    private var stats: some View {
+        HStack(spacing: 12) {
+            statTile(value: "\(movieLists.count)", label: "Lists", icon: "film.stack")
+            statTile(value: "\(totalMovies)", label: "Films", icon: "film")
+            statTile(value: topLanguage, label: "Top Language", icon: "globe")
+        }
+        .appearAnimation(delay: 0.14)
+    }
+
+    private func statTile(value: String, label: String, icon: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundStyle(Theme.accentGradient)
+            Text(value)
+                .font(.title3.weight(.heavy))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .cardStyle(cornerRadius: 18)
+    }
+
+    private var totalMovies: Int {
+        movieLists.reduce(0) { $0 + $1.movies.count }
+    }
+
+    private var topLanguage: String {
+        let languages = movieLists.flatMap { $0.movies.compactMap { $0.original_language } }
+        let counts = Dictionary(grouping: languages, by: { $0 }).mapValues(\.count)
+        return counts.max { $0.value < $1.value }?.key.uppercased() ?? "—"
+    }
+
+    private var listsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Lists")
+                .font(.headline)
+                .foregroundColor(.white)
+            if movieLists.isEmpty {
+                Text("No lists yet. Create one from the Lists tab.")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
+                    .cardStyle()
+            } else {
+                ForEach(Array(movieLists.enumerated()), id: \.element) { index, movieList in
+                    NavigationLink {
+                        ListView(movieList: movieList, context: context)
+                            .environmentObject(NetworkService())
+                            .environmentObject(DatabaseService())
+                    } label: {
+                        listRow(movieList)
                     }
-                })
+                    .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    .appearAnimation(delay: 0.2 + Double(index) * 0.05)
+                }
             }
         }
+    }
+
+    private func listRow(_ movieList: CDMovieList) -> some View {
+        let top = movieList.movies.sorted { $0.rank < $1.rank }.first
+        return HStack(spacing: 14) {
+            PosterImage(path: top?.poster_path, cornerRadius: 8)
+                .frame(width: 44, height: 66)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(movieList.name ?? "No Name")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Text(top.map { "#1 · \($0.title ?? "")" } ?? "No films yet")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text("\(movieList.movies.count)")
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(Theme.textSecondary)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.bold))
+                .foregroundColor(Theme.textTertiary)
+        }
+        .padding(12)
+        .cardStyle(cornerRadius: 16)
     }
     
     var img: some View {
@@ -80,15 +168,13 @@ struct UserProfileView: View {
                         image
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 80, height: 80)
+                            .frame(width: 96, height: 96)
                             .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            .shadow(radius: 3)
 
                     case .failure(_):
                         placeholderImage
 
-                    case .empty:
+                    default:
                         placeholderImage
                     }
                 }
@@ -102,12 +188,10 @@ struct UserProfileView: View {
         Image(systemName: "person.circle.fill")
             .resizable()
             .scaledToFill()
-            .frame(width: 80, height: 80)
-            .foregroundColor(.gray)
-            .background(Circle().fill(Color(.systemGray5)))
+            .frame(width: 96, height: 96)
+            .foregroundColor(Theme.textTertiary)
+            .background(Circle().fill(Theme.surfaceRaised))
             .clipShape(Circle())
-            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            .shadow(radius: 3)
     }
 }
 

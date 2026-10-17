@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
+		FA7E5A012F00000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000001 /* Theme.swift */; };
 		FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = FA01249A2BDE150800A1C13C /* MovieListModel.xcdatamodeld */; };
 		FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01249E2BDEBDAB00A1C13C /* CDMovie+helper.swift */; };
 		FA0124A12BDEC1B500A1C13C /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0124A02BDEC1B500A1C13C /* PersistenceController.swift */; };
@@ -67,6 +69,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
+		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FA01249B2BDE150800A1C13C /* Movie.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Movie.xcdatamodel; sourceTree = "<group>"; };
 		FA01249E2BDEBDAB00A1C13C /* CDMovie+helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CDMovie+helper.swift"; sourceTree = "<group>"; };
 		FA0124A02BDEC1B500A1C13C /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
@@ -212,6 +216,7 @@
 				FAE62ED32970D5C5000654E1 /* AddMovieView.swift */,
 				FAFF24F52BE687A000C4F78D /* MovieRow.swift */,
 				FAD23A742D52011600EACB94 /* MovieCard.swift */,
+				FA7E5A012F00000000000003 /* MovieDetailView.swift */,
 				FAE949E82D547D0300592081 /* AccountView.swift */,
 				FAE949EA2D5480A200592081 /* SignUpView.swift */,
 				FAE949EC2D54828200592081 /* SignInView.swift */,
@@ -236,6 +241,7 @@
 			isa = PBXGroup;
 			children = (
 				FAE62ECD2970BBE9000654E1 /* Extensions.swift */,
+				FA7E5A012F00000000000001 /* Theme.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -363,6 +369,8 @@
 				FA6F64C929F88B6E00B418DB /* NetworkService.swift in Sources */,
 				FAE62ED02970CF5A000654E1 /* List.swift in Sources */,
 				FAE62ECE2970BBE9000654E1 /* Extensions.swift in Sources */,
+				FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */,
+				FA7E5A012F00000000000002 /* Theme.swift in Sources */,
 				FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */,
 				FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */,
 				FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */,

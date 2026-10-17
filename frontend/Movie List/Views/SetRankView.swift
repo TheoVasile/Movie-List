@@ -24,34 +24,61 @@ struct SetRankView : View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.15)
+            Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    showSetRank = false
+                    withAnimation(Theme.spring) { showSetRank = false }
                 }
-            ZStack{
-                Color(.white)
-                VStack {
-                    Text("Select Rank")
-                        .padding()
-                    TextField("rank", value: $rank, formatter: NumberFormatter())
-                        .keyboardType(.numberPad)
-                        .frame(width: 100, height: 25)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding(.horizontal)
-                        .padding(.bottom)
-                        .disableAutocorrection(true)
-                        .onChange(of: rank) { newValue in
-                            rank = min(max(newValue, 1), movieCount)
-                                                }
-                    Button("Set Rank") {
-                        onRankingUpdate(movie, rank)
+                .transition(.opacity)
+            VStack(spacing: 18) {
+                HStack(spacing: 14) {
+                    PosterImage(path: movie.poster_path, cornerRadius: 10)
+                        .frame(width: 54, height: 81)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SET RANK")
+                            .font(.caption.weight(.heavy))
+                            .tracking(2)
+                            .foregroundStyle(Theme.accentGradient)
+                        Text(movie.title ?? "")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        Text("Currently #\(movie.rank)")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                Picker("Rank", selection: $rank) {
+                    ForEach(1...max(movieCount, 1), id: \.self) { value in
+                        Text("#\(value)")
+                            .font(.title3.weight(.bold))
+                            .tag(value)
                     }
                 }
+                .pickerStyle(.wheel)
+                .frame(height: 140)
+                .onChange(of: rank) { _ in Haptics.tap() }
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        withAnimation(Theme.spring) { showSetRank = false }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    Button("Set Rank") {
+                        Haptics.success()
+                        onRankingUpdate(movie, rank)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
             }
-            .frame(height: 200)
-            .cornerRadius(20)
-            .padding()
+            .padding(22)
+            .cardStyle(cornerRadius: 28)
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+            .padding(.horizontal, 20)
+            .transition(.scale(scale: 0.9).combined(with: .opacity))
+        }
+        .onAppear {
+            rank = min(max(Int(movie.rank), 1), max(movieCount, 1))
         }
     }
 }

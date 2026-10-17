@@ -42,11 +42,18 @@ class ListViewModel: ObservableObject {
                     switch result {
                     case .success:
                         if let managedObjectContext = poppedMovie.managedObjectContext {
+                            if self.recommendedMovie == poppedMovie {
+                                self.recommendedMovie = nil
+                            }
                             managedObjectContext.delete(poppedMovie)
-                            self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
-                            self.movies.remove(at: index)
-                            for (i, m) in self.movies.enumerated() {
-                                m.rank = Int32(i+1)
+                            withAnimation(Theme.spring) {
+                                // The deleted object can linger in the relationship until save, so remove it by identity
+                                self.movies = Array(self.movieList.movies)
+                                    .filter { $0 != poppedMovie }
+                                    .sorted(by: { $0.rank < $1.rank })
+                                for (i, m) in self.movies.enumerated() {
+                                    m.rank = Int32(i+1)
+                                }
                             }
                             self.movieList.movies = Set(self.movies)
                             do {
@@ -85,7 +92,9 @@ class ListViewModel: ObservableObject {
                                 popularity: movieResponse.popularity,
                                 context: self.context)
                             self.movieList.addToMovies_(newMovie)
-                            self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                            withAnimation(Theme.spring) {
+                                self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                            }
                             
                             do {
                                 print("saving context")
@@ -98,59 +107,59 @@ class ListViewModel: ObservableObject {
                         }
                     }
                 case .failure(let error):
-                    print("❌ Backend request failed, deleting from Core Data:", error.localizedDescription)
+                    print("Backend request failed, deleting from Core Data:", error.localizedDescription)
                 }
             }
         }
     
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
-            switch result {
+            DispatchQueue.main.async {
+                switch result {
                 case .success:
                     print("updated db rankings")
-                    // ✅ Ensure Core Data context exists
-                    /*guard let context = updatedMovie.managedObjectContext else {
-                        print("❌ Error: No Core Data context found")
-                        return
-                    }*/
-                    updatedMovie.rank = Int32(newRank)  // ✅ Update selected movie's rank
+                    // Convert NSSet to sorted array
+                    var reordered = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
 
-                    // ✅ Convert NSSet to sorted array
-                    self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
+                    // Remove the movie from the list
+                    reordered.removeAll { $0.id == updatedMovie.id }
 
-                    // ✅ Remove the movie from the list
-                    self.movies.removeAll { $0.id == updatedMovie.id }
+                    // Insert the movie at the new rank
+                    let insertIndex = min(max(newRank - 1, 0), reordered.count)
+                    reordered.insert(updatedMovie, at: insertIndex)
 
-                    // ✅ Insert the movie at the new rank
-                    self.movies.insert(updatedMovie, at: newRank - 1)
-
-                    // ✅ Reassign correct rankings for all movies
-                    for (index, movie) in self.movies.enumerated() {
-                        movie.rank = Int32(index + 1)
+                    // Reassign correct rankings for all movies, sliding rows into their new places
+                    withAnimation(Theme.spring) {
+                        self.movies = reordered
+                        for (index, movie) in self.movies.enumerated() {
+                            movie.rank = Int32(index + 1)
+                        }
                     }
 
-                    // ✅ Update movieList's relationship
+                    // Update movieList's relationship
                     self.movieList.movies = Set(self.movies)
 
-                    // ✅ Save changes to Core Data
-                    DispatchQueue.main.async {
-                        do {
-                            try self.context.save()
-                            print("✅ Core Data rankings updated successfully")
-                        } catch {
-                            print("❌ Error saving Core Data:", error)
-                        }
+                    // Save changes to Core Data
+                    do {
+                        try self.context.save()
+                        print("Core Data rankings updated successfully")
+                    } catch {
+                        print("Error saving Core Data:", error)
                     }
                 case .failure(let error):
                     print("error updating movie rank:", error)
                 }
+            }
         }
     }
     
     func searchMovies() {
         if newMovieSearchText.isEmpty { return }
-        APIService.shared.searchMovies(name: newMovieSearchText) { result in
+        let query = newMovieSearchText
+        APIService.shared.searchMovies(name: query) { result in
             DispatchQueue.main.async {
+                // A slower response for an older query must not replace newer results
+                guard query == self.newMovieSearchText else { return }
                 switch result {
                 case .success(let movies):
                     self.searchResults = movies

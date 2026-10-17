@@ -12,6 +12,8 @@ import CoreData
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
     @StateObject var viewModel: ListViewModel
+    @State private var detailMovie: CDMovie? = nil
+    @State private var showDetail = false
 
     init(movieList: CDMovieList, context: NSManagedObjectContext) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
@@ -22,45 +24,52 @@ struct ListView: View {
             return viewModel.movies
         } else {
             return viewModel.movies.filter { movie in
-                movie.title!.localizedCaseInsensitiveContains(viewModel.searchText)
+                (movie.title ?? "").localizedCaseInsensitiveContains(viewModel.searchText)
                         }
         }
     }
 
     var body: some View {
         ZStack {
-            NavigationStack {
-                VStack {
-                    MovieListSection
-                }
-                .searchable(text: $viewModel.searchText)
-                .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarOptions }
-            }
-            //.overlay { if viewModel.showPopup { PopupOverlay } }
-            if viewModel.showPopup {
-                Color.primary
-                    .opacity(0.15)
+            Theme.background.ignoresSafeArea()
+            MovieListSection
+            if viewModel.showCompareMovieView, let selectedMovie = viewModel.selectedMovie {
+                Color.black.opacity(0.6)
                     .ignoresSafeArea()
-                popup
-                    .padding()
-            }
-            else if viewModel.showCompareMovieView {
-                if let selectedMovie = viewModel.selectedMovie {
-                    CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie)) { updatedMovie, rank in
-                        viewModel.showCompareMovieView = false
-                        viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
-                    }
+                    .onTapGesture { dismissCompare() }
+                    .transition(.opacity)
+                    .zIndex(1)
+                CompareMovieView(movies: $viewModel.movies, movie: Binding.constant(selectedMovie), onCancel: dismissCompare) { updatedMovie, rank in
+                    dismissCompare()
+                    viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                 }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+                .zIndex(2)
             }
-            else if viewModel.showSetRank {
-                if let selectedMovie = viewModel.selectedMovie {
-                    SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count, showSetRank: $viewModel.showSetRank) {updatedMovie, rank in
-                        viewModel.showSetRank = false
-                        viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
-                    }
+            else if viewModel.showSetRank, let selectedMovie = viewModel.selectedMovie {
+                SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count, showSetRank: $viewModel.showSetRank) {updatedMovie, rank in
+                    withAnimation(Theme.spring) { viewModel.showSetRank = false }
+                    viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                 }
+                .transition(.opacity)
+                .zIndex(2)
+            }
+        }
+        .searchable(text: $viewModel.searchText, prompt: "Search this list")
+        .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar { ToolbarOptions }
+        .sheet(isPresented: $viewModel.showPopup) {
+            AddMovieView(viewModel: viewModel)
+        }
+        .navigationDestination(isPresented: $showDetail) {
+            if let detailMovie {
+                MovieDetailView(
+                    movie: detailMovie,
+                    listName: viewModel.movieList.name,
+                    onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
+                    onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } }
+                )
             }
         }
     }
@@ -71,107 +80,152 @@ private extension ListView {
     var MovieListSection: some View {
         List {
             if viewModel.movies.isEmpty {
-                Text("No Movies Added")
-            } else if viewModel.recommendedMovie != nil {
-                DailyMovieView(movie: viewModel.recommendedMovie!)
+                EmptyStateView(
+                    icon: "film",
+                    title: "This list is empty",
+                    message: "Add a few films, then rank them head to head.",
+                    actionTitle: "Add a Film"
+                ) {
+                    viewModel.showPopup = true
+                }
+                .padding(.top, 60)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            } else if viewModel.searchText.isEmpty, let spotlight = viewModel.recommendedMovie ?? viewModel.movies.first {
+                SpotlightCard(movie: spotlight, isRecommendation: viewModel.recommendedMovie != nil)
+                    .id(spotlight.id)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+                    .onTapGesture { openDetail(spotlight) }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
+                    .appearAnimation()
             }
-            ForEach(filteredMovies, id: \.id) { movie in
+            ForEach(Array(filteredMovies.enumerated()), id: \.element.id) { index, movie in
                 MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
+                    .contentShape(Rectangle())
+                    .onTapGesture { openDetail(movie) }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    .appearAnimation(delay: Double(min(index, 10)) * 0.04)
             }
-            .onDelete(perform: viewModel.deleteMovie)
+            .onDelete(perform: deleteFilteredMovies)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
     
-    var SearchResultsList: some View {
-        ForEach(viewModel.searchResults, id: \.id) { result in
-            Text(result.title).searchCompletion(result.title)
-        }
-    }
-    
-    var ToolbarOptions: some View {
-        Menu("Options") {
-            Button("Add Movie") { viewModel.showPopup.toggle() }
-            Button("Recommend Movie") { viewModel.recommendMovie() }
-        }
-    }
-    
-    var popup: some View {
-            VStack{
-                HStack{
-                    Button(action: {
-                        withAnimation { viewModel.showPopup.toggle() }
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .medium)) // Adjust size & weight
-                    }
-                    TextField("Search...", text: $viewModel.newMovieSearchText)
-                        .padding(8)
-                        .padding(.horizontal, 24)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                        .overlay(
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.gray)
-                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                                    .padding(.leading, 8)
-                            }
-                        )
-                        .submitLabel(.search) // 🔥 This makes the keyboard show a "Search" button
-                        .onSubmit {
-                            viewModel.searchMovies() // Call your search function when the user taps "Search"
-                        }
+    @ToolbarContentBuilder
+    var ToolbarOptions: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            if viewModel.movies.count > 1 {
+                Button {
+                    Haptics.tap()
+                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
+                } label: {
+                    Image(systemName: "dice.fill")
                 }
-                GeometryReader { geometry in
-                    VStack{
-                        List {
-                            ForEach(viewModel.searchResults, id: \.id) { apiMovie in
-                                Text("\(apiMovie.title), \(apiMovie.release_date)")
-                                    .onTapGesture {
-                                        print("adding movie")
-                                        viewModel.createAndSaveMovie(from: apiMovie)
-                                        viewModel.showPopup.toggle()
-                                    }
-                                }
-                            }
-                            .listStyle(.plain)
-                            .cornerRadius(10)
-                        }
-                    .frame(maxHeight: min(CGFloat(viewModel.searchResults.count * 50), geometry.size.height))
-                    }
-                    .navigationTitle("Add New Movie")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Close"){ withAnimation{ viewModel.showPopup.toggle() } }
-                    }
-                }
+                .accessibilityLabel("Recommend Movie")
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            Button {
+                Haptics.tap()
+                viewModel.showPopup = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Theme.accentGradient)
+            }
+            .accessibilityLabel("Add Movie")
         }
+    }
+
+    func openDetail(_ movie: CDMovie) {
+        Haptics.tap()
+        detailMovie = movie
+        showDetail = true
+    }
+
+    // Pops the detail screen, then brings up a ranking overlay once the pop has finished
+    func rankFromDetail(_ movie: CDMovie, show: @escaping () -> Void) {
+        showDetail = false
+        viewModel.selectedMovie = movie
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            withAnimation(Theme.spring, show)
+        }
+    }
+
+    func dismissCompare() {
+        withAnimation(Theme.spring) { viewModel.showCompareMovieView = false }
+    }
+
+    // Offsets refer to the filtered rows, so map them back onto the full list
+    func deleteFilteredMovies(at offsets: IndexSet) {
+        let ids = Set(offsets.map { filteredMovies[$0].id })
+        let indices = IndexSet(viewModel.movies.indices.filter { ids.contains(viewModel.movies[$0].id) })
+        viewModel.deleteMovie(at: indices)
+    }
 }
 
-// MARK: - Daily Movie View
-struct DailyMovieView: View {
-    let movie: CDMovie
-    
+// MARK: - Spotlight
+
+private struct SpotlightCard: View {
+    @ObservedObject var movie: CDMovie
+    let isRecommendation: Bool
+
     var body: some View {
-        Section("Movie of the Day: \(movie.title ?? "")") {
-            AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2/\(movie.poster_path ?? "")")) { image in
-                image.resizable().aspectRatio(contentMode: .fit)
-            } placeholder: {
-                ProgressView()
+        HStack(alignment: .bottom, spacing: 16) {
+            PosterImage(path: movie.poster_path, cornerRadius: 14)
+                .frame(width: 112, height: 168)
+                .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
+            VStack(alignment: .leading, spacing: 8) {
+                Label(isRecommendation ? "TONIGHT'S PICK" : "#1 IN THIS LIST",
+                      systemImage: isRecommendation ? "sparkles" : "crown.fill")
+                    .font(.caption2.weight(.heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.accentGradient)
+                Text(movie.title ?? "")
+                    .font(.title3.weight(.heavy))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                Text(Theme.year(from: movie.release_date))
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                if let overview = movie.overview, !overview.isEmpty {
+                    Text(overview)
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(3)
+                }
             }
-            .frame(width: 300, height: 200)
+            Spacer(minLength: 0)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(
+            ZStack {
+                Theme.surface
+                PosterBackdrop(path: movie.poster_path)
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Theme.accent.opacity(0.25), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
     }
 }
 
 
 struct List_Previews: PreviewProvider {
     static var previews: some View {
-        ListView(movieList: CDMovieList.example, context: PersistenceController.preview.container.viewContext)
-            .environmentObject(NetworkService())
+        NavigationStack {
+            ListView(movieList: CDMovieList.example, context: PersistenceController.preview.container.viewContext)
+                .environmentObject(NetworkService())
+        }
+        .preferredColorScheme(.dark)
     }
 }

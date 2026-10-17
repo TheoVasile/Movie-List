@@ -15,54 +15,83 @@ struct MovieRow: View {
     @Binding var showSetRank: Bool
     
     var body: some View {
-        ZStack{
-            Color(.white)
-            HStack{
-                Text("\(String(movie.rank)).")
-                    .frame(alignment: .leading)
-                    .padding()
-                if let poster_path = movie.poster_path, !poster_path.isEmpty {
-                    AsyncImage(url: URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2"+poster_path)) { image in
-                        image.resizable()
-                            .scaledToFit()
-                    } placeholder: {
-                        Color.gray.opacity(0.3) // Placeholder if no image
-                            .frame(maxWidth: .infinity)
-                    }
-                    .cornerRadius(10)
-                    .padding(5)
-                }
+        HStack(spacing: 14) {
+            rankBadge
+            PosterImage(path: movie.poster_path, cornerRadius: 10)
+                .frame(width: 58, height: 87)
+                .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+            VStack(alignment: .leading, spacing: 6) {
                 Text(movie.title ?? "No title")
-                Spacer()
-                Text(yearString(from: movie.release_date ?? Date()))
-                    .padding()
-                Menu {
-                    Button("Set Rank") {
-                        showSetRank = true
-                        selectedMovie = movie
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Text(Theme.year(from: movie.release_date))
+                    if !movie.original_language.isNilOrEmpty {
+                        Text("·")
+                        Text((movie.original_language ?? "").uppercased())
                     }
-                    Button("Compare") {
-                        print("Compare Tapped")
-                        showCompareMovieView = true
-                        selectedMovie = movie
-                    }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .rotationEffect(.degrees(90)) // Makes it vertical like ⋮
-                            .padding()
-                    }
+                }
+                .font(.caption.weight(.medium))
+                .foregroundColor(Theme.textSecondary)
+            }
+            Spacer(minLength: 0)
+            Menu {
+                Button {
+                    present { showSetRank = true }
+                } label: {
+                    Label("Set Rank", systemImage: "number")
+                }
+                Button {
+                    print("Compare Tapped")
+                    present { showCompareMovieView = true }
+                } label: {
+                    Label("Compare", systemImage: "arrow.left.arrow.right")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.bold))
+                    .rotationEffect(.degrees(90)) // Makes it vertical like ⋮
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 36, height: 44)
+                    .contentShape(Rectangle())
             }
         }
-        .frame(height: 100)
-        .cornerRadius(20)
-        .shadow(radius: /*@START_MENU_TOKEN@*/10/*@END_MENU_TOKEN@*/)
+        .padding(12)
+        .background(
+            ZStack {
+                Theme.surface
+                if movie.rank == 1 {
+                    Theme.accentGradient.opacity(0.12)
+                }
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(movie.rank == 1 ? Theme.accent.opacity(0.35) : Theme.stroke, lineWidth: 1)
+        )
     }
-    
-    func yearString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy"
-        return formatter.string(from: date)
+
+    private var rankBadge: some View {
+        Text("\(movie.rank)")
+            .font(.system(size: movie.rank < 100 ? 28 : 20, weight: .heavy, design: .rounded))
+            .foregroundStyle(movie.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+            .frame(width: 40)
+            .minimumScaleFactor(0.6)
+            .contentTransition(.numericText())
+            .animation(Theme.spring, value: movie.rank)
     }
+
+    private func present(_ change: () -> Void) {
+        Haptics.tap()
+        selectedMovie = movie
+        withAnimation(Theme.spring, change)
+    }
+}
+
+private extension Optional where Wrapped == String {
+    var isNilOrEmpty: Bool { self?.isEmpty ?? true }
 }
 
 #Preview {

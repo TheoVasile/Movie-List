@@ -14,88 +14,79 @@ struct UserSettingsView : View {
     @State var firstName: String = "Theo"
     @State var lastName: String = "Vasile"
     @State var pronouns: String = "He/Him"
+    @Environment(\.dismiss) var dismiss
+    @State private var confirmDeactivate = false
+
+    private let pronounOptions = ["They/Them", "He/Him", "He/Them", "She/Her", "She/Them", "Xe/Xem", "Ze/Hir", "It/Its"]
+
     var body : some View {
-        VStack {
-            HStack{
-                Text("First Name")
-                    .padding()
-                Spacer()
-                TextField("type here", text: $firstName)
-                    .padding()
-                    .frame(width: 200, height: 30)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-            }
-            .padding(.vertical)
-            Divider()
-            HStack{
-                Text("Last Name")
-                    .padding(.horizontal)
-                Spacer()
-                TextField("type here", text: $lastName)
-                    .padding()
-                    .frame(width: 200, height: 30)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-            }
-            .padding(.vertical)
-            Divider()
-            HStack{
-                Text("Pronouns")
-                    .padding(.horizontal)
-                Spacer()
-                Menu {
-                    Button("They/Them") {
-                        pronouns = "They/Them"
+        NavigationStack {
+            Form {
+                Section("Profile") {
+                    HStack {
+                        Text("First Name")
+                        Spacer()
+                        TextField("type here", text: $firstName)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundColor(Theme.textSecondary)
                     }
-                    Button("He/Him") {
-                        pronouns = "He/Him"
+                    HStack {
+                        Text("Last Name")
+                        Spacer()
+                        TextField("type here", text: $lastName)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundColor(Theme.textSecondary)
                     }
-                    Button("He/Them") {
-                        pronouns = "He/Them"
-                    }
-                    Button("She/Her") {
-                        pronouns = "She/Her"
-                    }
-                    Button("She/Them") {
-                        pronouns = "She/Them"
-                    }
-                    Button("Xe/Xem") {
-                        pronouns = "Xe/Xem"
-                    }
-                    Button("Ze/Hir") {
-                        pronouns = "Ze/Hir"
-                    }
-                    Button("It/Its") {
-                        pronouns = "It/Its"
-                    }
-                } label: {
-                    Text(pronouns)
-                        .padding(.horizontal)
-                }
-            }
-            .padding(.vertical)
-            Divider()
-            Button("Sign Out") { authenticationViewModel.signOut() }
-                .padding(.vertical)
-            Divider()
-            Button("Deactivate Account") {
-                APIService.shared.deleteUser(firebase_id: authenticationViewModel.user!.uid) { result in
-                    switch result {
-                    case .success:
-                        Task {
-                            await authenticationViewModel.deleteAccount()
+                    Picker("Pronouns", selection: $pronouns) {
+                        ForEach(pronounOptions, id: \.self) { option in
+                            Text(option).tag(option)
                         }
-                    case .failure(let error):
-                        print(error)
                     }
                 }
+                .listRowBackground(Theme.surface)
+
+                Section {
+                    Button {
+                        Haptics.tap()
+                        authenticationViewModel.signOut()
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.white)
+                    }
+                    Button(role: .destructive) {
+                        confirmDeactivate = true
+                    } label: {
+                        Label("Deactivate Account", systemImage: "person.crop.circle.badge.xmark")
+                    }
+                }
+                .listRowBackground(Theme.surface)
             }
-                .foregroundStyle(.red)
-                .padding(.vertical)
-            Spacer()
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .bold()
+                }
+            }
+            .confirmationDialog("Deactivate your account?", isPresented: $confirmDeactivate, titleVisibility: .visible) {
+                Button("Deactivate Account", role: .destructive) {
+                    APIService.shared.deleteUser(firebase_id: authenticationViewModel.user!.uid) { result in
+                        switch result {
+                        case .success:
+                            Task {
+                                await authenticationViewModel.deleteAccount()
+                            }
+                        case .failure(let error):
+                            print(error)
+                        }
+                    }
+                }
+            } message: {
+                Text("This permanently deletes your account and all of your lists.")
+            }
         }
     }
 }
