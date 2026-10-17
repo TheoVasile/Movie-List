@@ -13,6 +13,14 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- The backend on the Mac is plain http, which iOS only allows for local network addresses -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Movie List connects to its server on your local network to load and save your lists.</string>
 	<key>GIDClientID</key>
 	<string>263609300559-cun073mb085m1ppuj49tko388c9fmi85.apps.googleusercontent.com</string>
 </dict>
