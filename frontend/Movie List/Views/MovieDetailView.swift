@@ -16,6 +16,9 @@ struct MovieDetailView: View {
     var onToggleWatched: (() -> Void)? = nil
 
     @State private var revealed = false
+    @State private var imdbID: String? = nil
+
+    private static let imdbCacheKey = "imdbIDs"
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -36,7 +39,64 @@ struct MovieDetailView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
                 revealed = true
             }
+            loadIMDbID()
         }
+    }
+
+    // The film's IMDb page once its id is known, otherwise an IMDb search for its title and year
+    private var imdbURL: URL? {
+        if let imdbID {
+            return URL(string: "https://www.imdb.com/title/\(imdbID)/")
+        }
+        var components = URLComponents(string: "https://www.imdb.com/find/")
+        let year = Theme.year(from: movie.release_date)
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: [movie.title ?? "", year].filter { !$0.isEmpty }.joined(separator: " ")),
+            URLQueryItem(name: "s", value: "tt"),
+        ]
+        return components?.url
+    }
+
+    // IMDb ids never change, so each one is looked up once and kept on this device
+    private func loadIMDbID() {
+        let key = String(movie.tmdb_id)
+        let cache = UserDefaults.standard.dictionary(forKey: Self.imdbCacheKey) as? [String: String] ?? [:]
+        if let cached = cache[key] {
+            imdbID = cached
+            return
+        }
+        guard movie.tmdb_id > 0 else { return }
+        APIService.shared.fetchIMDbID(tmdbID: Int64(movie.tmdb_id)) { result in
+            guard case .success(let id?) = result else { return }
+            imdbID = id
+            var cache = UserDefaults.standard.dictionary(forKey: Self.imdbCacheKey) as? [String: String] ?? [:]
+            cache[key] = id
+            UserDefaults.standard.set(cache, forKey: Self.imdbCacheKey)
+        }
+    }
+
+    private var imdbLink: some View {
+        Link(destination: imdbURL ?? URL(string: "https://www.imdb.com")!) {
+            HStack(spacing: 10) {
+                Text("IMDb")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color(red: 0.96, green: 0.77, blue: 0.09))
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                Text(imdbID == nil ? "Search on IMDb" : "View on IMDb")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .padding(14)
+            .cardStyle()
+        }
+        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
     }
 
     private var hero: some View {
@@ -124,6 +184,9 @@ struct MovieDetailView: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .appearAnimation(delay: 0.3)
             }
+
+            imdbLink
+                .appearAnimation(delay: 0.32)
 
             if let overview = movie.overview, !overview.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {

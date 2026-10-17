@@ -221,6 +221,28 @@ router.get("/genres", async (req, res) => {
     }
 });
 
+// The IMDb id for a TMDb film, e.g. ?tmdb_id=771 -> { tmdb_id: 771, imdb_id: "tt0099785" }.
+// imdb_id is null when TMDb doesn't know it
+router.get("/imdb", async (req, res) => {
+    const tmdbId = Number(req.query.tmdb_id);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
+    try {
+        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/external_ids`, {
+            params: { api_key: process.env.API_KEY },
+            timeout: 15000,
+        });
+        res.json({ tmdb_id: tmdbId, imdb_id: response.data.imdb_id || null });
+    } catch (error) {
+        if (error.response?.status === 404) {
+            return res.json({ tmdb_id: tmdbId, imdb_id: null });
+        }
+        console.error("Error fetching IMDb id:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Marks a film watched or unwatched for the signed-in user, in every list it appears in
 router.put("/watched", async (req, res) => {
     try {
