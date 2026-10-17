@@ -9,13 +9,56 @@ import Foundation
 import SwiftUI
 import CoreData
 
-/// What Discover has learned from the user's swipes. Kept on this device only, as TMDb film ids and
-/// a score per genre: liking a film raises its genres' scores, passing lowers them a little
+/// Optional details the user can share to personalise AI picks in Discover. Kept on this device and
+/// only sent along with AI Discover requests
+enum Personalization {
+    static let useAIKey = "discover.useAI"
+    static let ageRangeKey = "personalization.ageRange"
+    static let genderKey = "personalization.gender"
+    static let notShared = "Prefer not to say"
+    static let ageRanges = [notShared, "Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"]
+    static let genders = [notShared, "Woman", "Man", "Non-binary"]
+
+    static var useAI: Bool {
+        UserDefaults.standard.object(forKey: useAIKey) as? Bool ?? true
+    }
+
+    /// The stored answer, or nil when the user hasn't shared one
+    static func value(for key: String) -> String? {
+        guard let value = UserDefaults.standard.string(forKey: key), value != notShared else { return nil }
+        return value
+    }
+}
+
+/// What Discover has learned from the user's swipes. Kept on this device only, as TMDb film ids, a
+/// score per genre (liking a film raises its genres' scores, passing lowers them a little) and the
+/// titles of recent swipes, which AI Discover uses when the user's lists are empty
 struct TasteProfile: Codable {
+    struct RecentFilm: Codable {
+        let title: String
+        let year: String
+    }
+
     private(set) var genreScores: [Int: Double] = [:]
     // Most recent first
     private(set) var likedMovieIDs: [Int64] = []
+    private(set) var recentLiked: [RecentFilm] = []
+    private(set) var recentPassed: [RecentFilm] = []
     private(set) var swipeCount = 0
+
+    private static let recentLimit = 50
+
+    init() {}
+
+    // Profiles saved before recent swipes were kept don't have them
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        genreScores = try container.decode([Int: Double].self, forKey: .genreScores)
+        likedMovieIDs = try container.decode([Int64].self, forKey: .likedMovieIDs)
+        recentLiked = try container.decodeIfPresent([RecentFilm].self, forKey: .recentLiked) ?? []
+        recentPassed = try container.decodeIfPresent([RecentFilm].self, forKey: .recentPassed) ?? []
+        swipeCount = try container.decode(Int.self, forKey: .swipeCount)
+    }
 
     static let genreNames: [Int: String] = [
         28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime", 99: "Documentary",
@@ -36,6 +79,12 @@ struct TasteProfile: Codable {
         if liked {
             likedMovieIDs.removeAll { $0 == movie.id }
             likedMovieIDs = Array(([movie.id] + likedMovieIDs).prefix(20))
+        }
+        let film = RecentFilm(title: movie.title, year: Theme.year(from: movie.release_date))
+        if liked {
+            recentLiked = Array(([film] + recentLiked).prefix(Self.recentLimit))
+        } else {
+            recentPassed = Array(([film] + recentPassed).prefix(Self.recentLimit))
         }
         swipeCount += 1
     }
@@ -74,6 +123,14 @@ class DiscoverViewModel: ObservableObject {
     private var listedIDs: Set<Int64> = []
     // Films swiped left, remembered across launches so they don't come back
     private var passedIDs: Set<Int64>
+    // Whether to ask the AI for the next batch. Turned off for the session if the server says AI isn't
+    // set up, the daily limit is reached, a request fails, or it keeps suggesting films already seen
+    private var aiAvailable = true
+    private var aiEmptyBatches = 0
+    // Titles the AI has suggested this session, so it doesn't suggest them again
+    private var aiSuggestedTitles: [String] = []
+    // Every film dealt this session
+    private var shownIDs: Set<Int64> = []
 
     private static let passedKey = "discover.passedMovieIDs"
     private static let profileKey = "discover.tasteProfile"
@@ -149,6 +206,7 @@ class DiscoverViewModel: ObservableObject {
 
     func showSkippedAgain() {
         usedSeeds = []
+        resetAI()
         passedIDs = []
         UserDefaults.standard.removeObject(forKey: Self.passedKey)
         page = 1
@@ -160,6 +218,7 @@ class DiscoverViewModel: ObservableObject {
     /// Forgets everything learned from swipes and starts the deck over
     func resetProfile() {
         usedSeeds = []
+        resetAI()
         profile = TasteProfile()
         UserDefaults.standard.removeObject(forKey: Self.profileKey)
         page = 1
@@ -178,6 +237,13 @@ class DiscoverViewModel: ObservableObject {
     func retry() {
         loadFailed = false
         loadMore()
+    }
+
+    private func resetAI() {
+        aiAvailable = true
+        aiEmptyBatches = 0
+        aiSuggestedTitles = []
+        shownIDs = []
     }
 
     // Puts the films that best match the profile first, while spreading out similar ones: each genre a
@@ -209,20 +275,68 @@ class DiscoverViewModel: ObservableObject {
 
     private func loadMore() {
         guard !isLoading, !isExhausted, !loadFailed else { return }
+        if Personalization.useAI && aiAvailable {
+            loadFromAI()
+        } else {
+            loadFromTMDb()
+        }
+    }
+
+    private func isFresh(_ movie: Movie) -> Bool {
+        !listedIDs.contains(movie.id) && !passedIDs.contains(movie.id) && !shownIDs.contains(movie.id)
+            && !deck.contains { $0.id == movie.id }
+    }
+
+    private func deal(_ movies: [Movie]) {
+        shownIDs.formUnion(movies.map(\.id))
+        withAnimation(Theme.spring) {
+            deck.append(contentsOf: movies)
+        }
+    }
+
+    private func loadFromAI() {
+        isLoading = true
+        let film = { (recent: TasteProfile.RecentFilm) in AIDiscoverRequest.Film(title: recent.title, year: recent.year) }
+        let genreName = { (id: Int) in TasteProfile.genreNames[id] }
+        let request = AIDiscoverRequest(
+            liked: profile.recentLiked.map(film),
+            passed: profile.recentPassed.map(film),
+            favorite_genres: profile.favoriteGenres.compactMap(genreName),
+            avoided_genres: profile.avoidedGenres.compactMap(genreName),
+            age_range: Personalization.value(for: Personalization.ageRangeKey),
+            gender: Personalization.value(for: Personalization.genderKey),
+            already_suggested: Array(aiSuggestedTitles.suffix(150)),
+            exclude_ids: Array(passedIDs.union(shownIDs).prefix(2000)),
+            count: 20
+        )
+        APIService.shared.aiDiscoverMovies(request) { result in
+            self.isLoading = false
+            switch result {
+            case .success(let movies):
+                self.aiSuggestedTitles.append(contentsOf: movies.map(\.title))
+                let fresh = movies.filter(self.isFresh)
+                // Keep the AI's order: it already balances close matches with adventurous picks
+                self.deal(fresh)
+                self.aiEmptyBatches = fresh.isEmpty ? self.aiEmptyBatches + 1 : 0
+                if self.aiEmptyBatches >= 2 {
+                    self.aiAvailable = false
+                }
+            case .failure(let error):
+                print("AI discover unavailable, using TMDb recommendations:", error.localizedDescription)
+                self.aiAvailable = false
+            }
+            self.refillIfNeeded()
+        }
+    }
+
+    private func loadFromTMDb() {
         isLoading = true
         APIService.shared.discoverMovies(seeds: nextSeeds(), genres: profile.favoriteGenres, avoidGenres: profile.avoidedGenres, page: page) { result in
             self.isLoading = false
             switch result {
             case .success(let movies):
                 self.page += 1
-                let fresh = movies.filter { movie in
-                    !self.listedIDs.contains(movie.id)
-                        && !self.passedIDs.contains(movie.id)
-                        && !self.deck.contains { $0.id == movie.id }
-                }
-                withAnimation(Theme.spring) {
-                    self.deck.append(contentsOf: self.orderedByTaste(fresh))
-                }
+                self.deal(self.orderedByTaste(movies.filter(self.isFresh)))
                 if movies.isEmpty || self.page > Self.maxPages {
                     self.isExhausted = true
                 } else {

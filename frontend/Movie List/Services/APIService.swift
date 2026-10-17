@@ -93,6 +93,22 @@ struct LetterboxdImportRequest: Encodable {
     let lists: [LetterboxdList]
 }
 
+struct AIDiscoverRequest: Encodable {
+    struct Film: Encodable {
+        let title: String
+        let year: String
+    }
+    let liked: [Film]
+    let passed: [Film]
+    let favorite_genres: [String]
+    let avoided_genres: [String]
+    let age_range: String?
+    let gender: String?
+    let already_suggested: [String]
+    let exclude_ids: [Int64]
+    let count: Int
+}
+
 class APIService {
     static let shared = APIService()
     let baseURL = "http://localhost:3000"
@@ -338,6 +354,29 @@ class APIService {
                     completion(.failure(error))
                 }
             }
+        }
+    }
+
+    /// Films picked by AI from the user's lists, swipes and anything they chose to share. Fails with
+    /// code 503 when AI isn't set up on the server and 429 at the daily limit
+    func aiDiscoverMovies(_ body: AIDiscoverRequest, completion: @escaping (Result<[Movie], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/ai-discover") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Choosing films takes the AI a few seconds
+        request.timeoutInterval = 60
+        request.httpBody = try? JSONEncoder().encode(body)
+
+        send(request) { data, response, error in
+            let result: Result<[Movie], Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let movies = try? JSONDecoder().decode([Movie].self, from: data) {
+                result = .success(movies)
+            } else {
+                result = .failure(error ?? NSError(domain: "AI discover failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
         }
     }
 

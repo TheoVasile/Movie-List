@@ -5,6 +5,8 @@ const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = re
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched } = require("../models/watchedModel");
 const { mapWithConcurrency } = require("../services/letterboxdService");
+const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
+const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 
 const router = express.Router();
 const ownsBodyList = requireListOwner((req) => req.body.list_id);
@@ -170,6 +172,79 @@ router.get("/discover", async (req, res) => {
     } catch (error) {
         console.error("Error fetching discover movies:", error.message);
         res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Short strings from the app, trimmed and capped so a request can't inflate the AI prompt
+function cleanText(value, maxLength = 120) {
+    return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function cleanFilms(value, limit) {
+    return (Array.isArray(value) ? value : [])
+        .slice(0, limit)
+        .map((film) => ({ title: cleanText(film?.title), year: cleanText(String(film?.year ?? ""), 4) }))
+        .filter((film) => film.title);
+}
+
+function cleanStrings(value, limit) {
+    return (Array.isArray(value) ? value : []).slice(0, limit).map((item) => cleanText(item)).filter(Boolean);
+}
+
+// The TMDb film for an AI pick, matching on title and year (a year either side allows for festival
+// vs. general release dates), or null when TMDb doesn't have it
+async function findOnTmdb(title, year) {
+    const search = (params) => axios.get("https://api.themoviedb.org/3/search/movie", {
+        params: { api_key: process.env.API_KEY, query: title, include_adult: false, ...params },
+        timeout: 15000,
+    }).then((response) => response.data.results ?? []);
+    let results = await search({ year });
+    if (!results.length) {
+        results = (await search({})).filter((movie) => Math.abs(Number(String(movie.release_date).slice(0, 4)) - year) <= 1);
+    }
+    return results[0] ?? null;
+}
+
+// Films for the Discover tab chosen by Claude from everything in the user's lists, plus their Discover
+// swipes and anything they chose to share (age range, gender) for when their lists are empty.
+// Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover
+router.post("/ai-discover", async (req, res) => {
+    try {
+        const body = req.body ?? {};
+        const signals = {
+            liked: cleanFilms(body.liked, 50),
+            passed: cleanFilms(body.passed, 50),
+            favoriteGenres: cleanStrings(body.favorite_genres, 5),
+            avoidedGenres: cleanStrings(body.avoided_genres, 5),
+            ageRange: cleanText(body.age_range, 20),
+            gender: cleanText(body.gender, 30),
+            alreadySuggested: cleanStrings(body.already_suggested, 150),
+        };
+        const count = Math.min(Math.max(parseInt(body.count, 10) || 20, 1), 30);
+        const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 2000));
+
+        const [lists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
+        const picks = await recommendFilms(req.user.uid, lists, signals, count);
+
+        const found = await mapWithConcurrency(picks, async (pick) => {
+            try {
+                const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
+                return movie && { ...movie, reason: cleanText(pick.reason, 200) };
+            } catch (error) {
+                return null;
+            }
+        });
+        const seen = new Set();
+        res.json(found.filter((movie) => movie && !listedIds.has(movie.id) && !exclude.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id)));
+    } catch (error) {
+        if (error instanceof AIUnavailableError) {
+            return res.status(503).json({ error: "AI recommendations aren't set up." });
+        }
+        if (error instanceof AILimitError) {
+            return res.status(429).json({ error: error.message });
+        }
+        console.error("Error fetching AI recommendations:", error.message);
+        res.status(502).json({ error: "AI recommendations failed." });
     }
 });
 

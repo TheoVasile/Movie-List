@@ -626,6 +626,13 @@ private struct DiscoverCard: View {
                 .foregroundColor(Theme.posterText)
                 .lineLimit(3)
                 .minimumScaleFactor(0.7)
+            if let reason = movie.reason, !reason.isEmpty {
+                Label(reason, systemImage: "sparkles")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(Theme.posterText.opacity(0.9))
+                    .lineLimit(showDetails ? 4 : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if showDetails, !movie.overview.isEmpty {
                 Text(movie.overview)
                     .font(.subheadline)
@@ -635,7 +642,7 @@ private struct DiscoverCard: View {
             } else {
                 Label("Tap for details", systemImage: "hand.tap")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.posterText.opacity(0.62))
             }
         }
         .padding(20)

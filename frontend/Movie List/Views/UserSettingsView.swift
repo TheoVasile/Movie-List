@@ -17,6 +17,9 @@ struct UserSettingsView : View {
     @Environment(\.dismiss) var dismiss
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
+    @AppStorage(Personalization.useAIKey) private var useAI = true
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.genderKey) private var gender = Personalization.notShared
 
     private let pronounOptions = ["They/Them", "He/Him", "He/Them", "She/Her", "She/Them", "Xe/Xem", "Ze/Hir", "It/Its"]
 
@@ -71,6 +74,28 @@ struct UserSettingsView : View {
                     Text("Appearance")
                 } footer: {
                     Text(appearanceFooter)
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
+                    Toggle(isOn: $useAI) {
+                        Label("AI Picks in Discover", systemImage: "sparkles")
+                    }
+                    .tint(Theme.accent)
+                    if useAI {
+                        Picker("Age Range", selection: $ageRange) {
+                            ForEach(Personalization.ageRanges, id: \.self) { Text($0).tag($0) }
+                        }
+                        Picker("Gender", selection: $gender) {
+                            ForEach(Personalization.genders, id: \.self) { Text($0).tag($0) }
+                        }
+                    }
+                } header: {
+                    Text("Discover")
+                } footer: {
+                    Text(useAI
+                         ? "Discover asks Claude, Anthropic's AI, to pick films from the titles in your lists and your recent swipes. Age range and gender are optional; they stay on this iPhone and are sent only with those requests, to help when your lists are empty. Your name and email are never sent."
+                         : "Discover uses TMDb's recommendations for films in your lists. Nothing is sent to an AI.")
                 }
                 .listRowBackground(Theme.surface)
 
