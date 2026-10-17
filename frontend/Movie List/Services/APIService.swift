@@ -407,6 +407,30 @@ class APIService {
         }
     }
 
+    /// The film's IMDb id (e.g. "tt0099785"), or nil when TMDb doesn't have one
+    func fetchIMDbID(tmdbID: Int64, completion: @escaping (Result<String?, Error>) -> Void) {
+        struct IMDbResponse: Decodable {
+            let imdb_id: String?
+        }
+        var components = URLComponents(string: "\(baseURL)/movies/imdb")
+        components?.queryItems = [URLQueryItem(name: "tmdb_id", value: String(tmdbID))]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<String?, Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let decoded = try? JSONDecoder().decode(IMDbResponse.self, from: data) {
+                result = .success(decoded.imdb_id)
+            } else {
+                result = .failure(error ?? NSError(domain: "IMDb lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
     /// Marks a film watched or unwatched for the signed-in user, across all of their lists
     func setMovieWatched(movie_id: Int64, watched: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/watched") else { return }
