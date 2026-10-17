@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
+		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
+		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
+		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
 		FA7E5A012F00000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000001 /* Theme.swift */; };
 		FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = FA01249A2BDE150800A1C13C /* MovieListModel.xcdatamodeld */; };
 		FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA01249E2BDEBDAB00A1C13C /* CDMovie+helper.swift */; };
@@ -70,6 +73,8 @@
 
 /* Begin PBXFileReference section */
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
+		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
+		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FA01249B2BDE150800A1C13C /* Movie.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = Movie.xcdatamodel; sourceTree = "<group>"; };
 		FA01249E2BDEBDAB00A1C13C /* CDMovie+helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CDMovie+helper.swift"; sourceTree = "<group>"; };
@@ -122,6 +127,7 @@
 				FAE94A102D55639A00592081 /* FirebaseCore in Frameworks */,
 				FAE949F92D5549C900592081 /* GoogleSignIn in Frameworks */,
 				FA1613702D6C3A1400CD99D0 /* CoreXLSX in Frameworks */,
+				FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */,
 				FAE949FB2D5549C900592081 /* GoogleSignInSwift in Frameworks */,
 				FAE94A042D554E3700592081 /* FirebaseAppDistribution-Beta in Frameworks */,
 			);
@@ -192,6 +198,7 @@
 				FAE62F392970E552000654E1 /* DatabaseService.swift */,
 				FA6F64C829F88B6E00B418DB /* NetworkService.swift */,
 				FA2609A12D599679000A692D /* APIService.swift */,
+				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -225,6 +232,7 @@
 				FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */,
 				FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */,
 				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
+				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -282,6 +290,7 @@
 				FAE94A052D554EBB00592081 /* FirebaseAuth */,
 				FAE94A0F2D55639A00592081 /* FirebaseCore */,
 				FA16136F2D6C3A1400CD99D0 /* CoreXLSX */,
+				FA7E5A012F0000000000000A /* ZIPFoundation */,
 			);
 			productName = "Movie List";
 			productReference = FA10A9DC296A755800FDF445 /* Movie List.app */;
@@ -316,6 +325,7 @@
 				FAE949F42D5542AD00592081 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				FAE949F72D5549C900592081 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				FA16136E2D6C3A1400CD99D0 /* XCRemoteSwiftPackageReference "CoreXLSX" */,
+				FA7E5A012F00000000000009 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			productRefGroup = FA10A9DD296A755800FDF445 /* Products */;
 			projectDirPath = "";
@@ -350,6 +360,8 @@
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
 				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
 				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
+				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
+				FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
 				FAE94A182D55789F00592081 /* UserProfileView.swift in Sources */,
 				FAE94A162D55780000592081 /* AuthenticatedView.swift in Sources */,
@@ -618,9 +630,22 @@
 				minimumVersion = 0.15.3;
 			};
 		};
+		FA7E5A012F00000000000009 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		FA7E5A012F0000000000000A /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FA7E5A012F00000000000009 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
 		FA16136F2D6C3A1400CD99D0 /* CoreXLSX */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FA16136E2D6C3A1400CD99D0 /* XCRemoteSwiftPackageReference "CoreXLSX" */;

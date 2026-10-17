@@ -81,6 +81,13 @@ struct ListDetailsResponse: Codable {
     let creation_date: String
     let date_modified: String
     let movies: [MovieDetailsResponse]
+    // Only set on Letterboxd imports: films that couldn't be matched to TMDb
+    let skipped: [String]?
+}
+
+struct LetterboxdImportRequest: Encodable {
+    let user_id: String
+    let lists: [LetterboxdList]
 }
 
 class APIService {
@@ -123,6 +130,50 @@ class APIService {
         }.resume()
     }
     
+    func importLetterboxdLists(userID: String, lists: [LetterboxdList], completion: @escaping (Result<[ListDetailsResponse], Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/letterboxd/import") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Every film is matched against TMDb on the server, so long lists take a while
+        request.timeoutInterval = 600
+
+        do {
+            request.httpBody = try JSONEncoder().encode(LetterboxdImportRequest(user_id: userID, lists: lists))
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
+
+            guard let data = data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                DispatchQueue.main.async {
+                    completion(.failure(NSError(domain: "Import failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil)))
+                }
+                return
+            }
+
+            do {
+                let decodedResponse = try JSONDecoder().decode([ListDetailsResponse].self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(decodedResponse))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+
     func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/create") else { return }
         

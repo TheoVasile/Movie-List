@@ -16,6 +16,7 @@ struct Home: View {
     @State var showPopup: Bool = false
     @State var listName = ""
     @State var showFileSelector: Bool = false
+    @State var showLetterboxdImport: Bool = false
     
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
@@ -47,6 +48,12 @@ struct Home: View {
                         } label: {
                             Label("Import from Excel", systemImage: "square.and.arrow.down")
                         }
+                        Button {
+                            Haptics.tap()
+                            showLetterboxdImport = true
+                        } label: {
+                            Label("Import from Letterboxd", systemImage: "film.stack")
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
@@ -64,6 +71,11 @@ struct Home: View {
             newListSheet
                 .presentationDetents([.height(280)])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showLetterboxdImport) {
+            LetterboxdImportView()
+                .environmentObject(viewModel)
+                .environment(\.managedObjectContext, context)
         }
     }
 }

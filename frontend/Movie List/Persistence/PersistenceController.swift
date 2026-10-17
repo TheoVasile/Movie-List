@@ -36,15 +36,7 @@ struct PersistenceController {
                 switch result {
                 case .success (let listResponses):
                     for listResponse in listResponses {
-                        let curList = CDMovieList(id: listResponse.id, name: listResponse.name, overview: listResponse.overview, context: context)
-                        for movieResponse in listResponse.movies {
-                            do {
-                                let curMovie = try CDMovie(id: movieResponse.id, tmdb_id: Int32(movieResponse.tmdb_id)!, title: movieResponse.title, release_date: movieResponse.release_date, overview: movieResponse.overview, rank: Int32(movieResponse.rank), poster_path: movieResponse.poster_path, original_language: movieResponse.original_language, popularity: movieResponse.popularity, context: context)
-                                curList.addToMovies_(curMovie)
-                            } catch {
-                                print("Failed to create CD Movie", error)
-                            }
-                        }
+                        PersistenceController.insert(listResponse, into: context)
                     }
                     do {
                         try context.save()
@@ -56,6 +48,20 @@ struct PersistenceController {
                 }
             }
         }
+    }
+    
+    @discardableResult
+    static func insert(_ listResponse: ListDetailsResponse, into context: NSManagedObjectContext) -> CDMovieList {
+        let curList = CDMovieList(id: listResponse.id, name: listResponse.name, overview: listResponse.overview, context: context)
+        for movieResponse in listResponse.movies {
+            do {
+                let curMovie = try CDMovie(id: movieResponse.id, tmdb_id: Int32(movieResponse.tmdb_id)!, title: movieResponse.title, release_date: movieResponse.release_date, overview: movieResponse.overview, rank: Int32(movieResponse.rank), poster_path: movieResponse.poster_path, original_language: movieResponse.original_language, popularity: movieResponse.popularity, context: context)
+                curList.addToMovies_(curMovie)
+            } catch {
+                print("Failed to create CD Movie", error)
+            }
+        }
+        return curList
     }
     
     func deleteAllCoreDataObjects() {
