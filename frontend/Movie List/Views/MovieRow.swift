@@ -20,13 +20,13 @@ struct MovieRow: View {
         HStack(spacing: 14) {
             PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                 .frame(width: 58, height: 87)
-                .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 3)
                 // Rank sits on the poster's top-left corner, overhanging it slightly
                 .overlay(alignment: .topLeading) { rankBadge.offset(x: -8, y: -8) }
             VStack(alignment: .leading, spacing: 6) {
                 Text(movie.title ?? "No title")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     Text(Theme.year(from: movie.release_date))
@@ -102,7 +102,7 @@ struct MovieRow: View {
         Text("\(movie.rank)")
             .font(.system(size: 12, weight: .black, design: .rounded))
             .monospacedDigit()
-            .foregroundColor(movie.rank <= 3 ? .black : .white)
+            .foregroundColor(movie.rank <= 3 ? Theme.onAccent : Theme.textPrimary)
             .lineLimit(1)
             .fixedSize()
             .contentTransition(.numericText())
@@ -113,7 +113,7 @@ struct MovieRow: View {
                 Capsule().fill(movie.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
             )
             .overlay(Capsule().stroke(movie.rank <= 3 ? Color.clear : Theme.stroke, lineWidth: 1))
-            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+            .shadow(color: Theme.shadow.opacity(0.4), radius: 4, y: 2)
             .accessibilityLabel("Ranked \(movie.rank)")
     }
 
@@ -129,7 +129,7 @@ struct WatchedTag: View {
     var body: some View {
         Label("Watched", systemImage: "checkmark.circle.fill")
             .font(.caption2.weight(.bold))
-            .foregroundColor(.black)
+            .foregroundColor(Theme.onAccent)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(Theme.accentGradient)
@@ -145,12 +145,12 @@ struct CertificationBadge: View {
     var body: some View {
         Text(certification)
             .font(.caption2.weight(.heavy))
-            .foregroundColor(.white.opacity(0.85))
+            .foregroundColor(Theme.textPrimary.opacity(0.85))
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .overlay(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                    .stroke(Theme.textPrimary.opacity(0.5), lineWidth: 1)
             )
             .fixedSize()
             .accessibilityLabel("Rated \(certification)")

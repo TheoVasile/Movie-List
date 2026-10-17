@@ -123,13 +123,13 @@ private extension LetterboxdImportView {
         HStack(alignment: .top, spacing: 14) {
             Text("\(number)")
                 .font(.subheadline.weight(.bold))
-                .foregroundColor(.black)
+                .foregroundColor(Theme.onAccent)
                 .frame(width: 26, height: 26)
                 .background(Theme.accentGradient)
                 .clipShape(Circle())
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -182,7 +182,7 @@ private extension LetterboxdImportView {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(list.name)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
                     HStack(spacing: 6) {
                         Text("\(list.films.count) \(list.films.count == 1 ? "film" : "films")")
@@ -208,7 +208,7 @@ private extension LetterboxdImportView {
                 .tint(Theme.accent)
             Text("Matching your films")
                 .font(.title3.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
             Text("Each film is looked up on TMDb. Long lists can take a minute, so keep the app open.")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
@@ -234,14 +234,14 @@ private extension LetterboxdImportView {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("\(skipped.count) \(skipped.count == 1 ? "film" : "films") couldn't be matched")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(Theme.textPrimary)
                             Text("Add these yourself from the list if you'd like them.")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                             ForEach(Array(skipped.enumerated()), id: \.offset) { _, item in
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(item.film)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Theme.textPrimary)
                                     Spacer()
                                     Text(item.list)
                                         .foregroundColor(Theme.textTertiary)

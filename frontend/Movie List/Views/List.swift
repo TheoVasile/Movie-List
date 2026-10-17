@@ -41,7 +41,7 @@ struct ListView: View {
             Theme.background.ignoresSafeArea()
             MovieListSection
             if viewModel.showCompareMovieView, let selectedMovie = viewModel.selectedMovie {
-                Color.black.opacity(0.6)
+                Theme.scrim
                     .ignoresSafeArea()
                     .onTapGesture { dismissCompare() }
                     .transition(.opacity)
@@ -294,7 +294,7 @@ private extension ListView {
                     } label: {
                         Label("Clear", systemImage: "xmark")
                             .font(.caption.weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(Theme.surfaceRaised)
@@ -331,10 +331,10 @@ private extension ListView {
             HStack(spacing: 5) {
                 Text(TasteProfile.genreNames[genre] ?? "Other")
                 Text("\(count)")
-                    .foregroundColor(isSelected ? .black.opacity(0.6) : Theme.textTertiary)
+                    .foregroundColor(isSelected ? Theme.onAccent.opacity(0.6) : Theme.textTertiary)
             }
             .font(.caption.weight(.bold))
-            .foregroundColor(isSelected ? .black : .white)
+            .foregroundColor(isSelected ? Theme.onAccent : Theme.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
@@ -387,7 +387,7 @@ private struct SpotlightCard: View {
             PosterImage(path: movie.poster_path, cornerRadius: 14, size: .medium)
                 .frame(width: 112, height: 168)
                 .overlay(alignment: .topLeading) { rankBadge }
-                .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
+                .shadow(color: Theme.shadow.opacity(0.6), radius: 14, y: 8)
             VStack(alignment: .leading, spacing: 8) {
                 Label("TONIGHT'S PICK", systemImage: "sparkles")
                     .font(.caption2.weight(.heavy))
@@ -395,7 +395,7 @@ private struct SpotlightCard: View {
                     .foregroundStyle(Theme.accentGradient)
                 Text(movie.title ?? "")
                     .font(.title3.weight(.heavy))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                 Text(Theme.year(from: movie.release_date))
                     .font(.caption.weight(.semibold))
@@ -422,20 +422,20 @@ private struct SpotlightCard: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Theme.accent.opacity(0.25), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
+        .shadow(color: Theme.shadow.opacity(0.4), radius: 18, y: 10)
     }
 
     private var rankBadge: some View {
         Text("#\(movie.rank)")
             .font(.system(size: 15, weight: .black, design: .rounded))
-            .foregroundColor(.black)
+            .foregroundColor(Theme.onAccent)
             .contentTransition(.numericText())
             .animation(Theme.spring, value: movie.rank)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(Theme.accentGradient)
             .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+            .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 2)
             .padding(8)
             .accessibilityLabel("Ranked \(movie.rank) in this list")
     }

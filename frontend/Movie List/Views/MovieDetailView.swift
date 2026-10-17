@@ -75,7 +75,7 @@ struct MovieDetailView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.12), lineWidth: 5)
+                    .stroke(Theme.textPrimary.opacity(0.12), lineWidth: 5)
                 Circle()
                     .trim(from: 0, to: revealed ? info.voteAverage / 10 : 0)
                     .stroke(Theme.accentGradient, style: StrokeStyle(lineWidth: 5, lineCap: .round))
@@ -83,13 +83,13 @@ struct MovieDetailView: View {
                     .animation(.easeOut(duration: 0.8).delay(0.3), value: revealed)
                 Text(String(format: "%.1f", info.voteAverage))
                     .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
             }
             .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 3) {
                 Text("TMDb User Score")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Text("\(info.voteCount.formatted()) \(info.voteCount == 1 ? "rating" : "ratings")")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
@@ -99,12 +99,12 @@ struct MovieDetailView: View {
                 VStack(spacing: 3) {
                     Text(info.certification)
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
+                                .stroke(Theme.textPrimary.opacity(0.6), lineWidth: 1.5)
                         )
                     Text("Rated")
                         .font(.caption2)
@@ -141,14 +141,14 @@ struct MovieDetailView: View {
             HStack(spacing: 10) {
                 Text("IMDb")
                     .font(.system(size: 14, weight: .black))
-                    .foregroundColor(.black)
+                    .foregroundColor(Color.black)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(Color(red: 0.96, green: 0.77, blue: 0.09))
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 Text(imdbID == nil ? "Search on IMDb" : "View on IMDb")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Spacer()
                 Image(systemName: "arrow.up.right")
                     .font(.subheadline.weight(.bold))
@@ -166,7 +166,7 @@ struct MovieDetailView: View {
                 .frame(height: 460)
             PosterImage(path: movie.poster_path, cornerRadius: 18, size: .xlarge)
                 .frame(width: 200, height: 300)
-                .shadow(color: .black.opacity(0.6), radius: 30, y: 16)
+                .shadow(color: Theme.shadow.opacity(0.6), radius: 30, y: 16)
                 .scaleEffect(revealed ? 1 : 0.85)
                 .opacity(revealed ? 1 : 0)
                 .rotation3DEffect(.degrees(revealed ? 0 : 12), axis: (x: 1, y: 0, z: 0))
@@ -192,7 +192,7 @@ struct MovieDetailView: View {
                 }
                 Text(movie.title ?? "")
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .appearAnimation(delay: 0.1)
@@ -258,7 +258,7 @@ struct MovieDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Overview")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                     Text(overview)
                         .font(.body)
                         .foregroundColor(Theme.textSecondary)

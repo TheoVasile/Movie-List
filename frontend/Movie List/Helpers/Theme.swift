@@ -12,16 +12,28 @@ import UIKit
 // MARK: - Palette
 
 enum Theme {
-    static let background = Color(red: 0.04, green: 0.04, blue: 0.07)
-    static let surface = Color(red: 0.10, green: 0.10, blue: 0.14)
-    static let surfaceRaised = Color(red: 0.15, green: 0.15, blue: 0.20)
-    static let stroke = Color.white.opacity(0.08)
+    // Dark: a cinema at night. Light: crisp white with blue accents
+    static let background = Color(light: Color(red: 0.96, green: 0.97, blue: 1.0), dark: Color(red: 0.04, green: 0.04, blue: 0.07))
+    static let surface = Color(light: .white, dark: Color(red: 0.10, green: 0.10, blue: 0.14))
+    static let surfaceRaised = Color(light: Color(red: 0.91, green: 0.94, blue: 0.99), dark: Color(red: 0.15, green: 0.15, blue: 0.20))
+    static let stroke = Color(light: navy.opacity(0.10), dark: Color.white.opacity(0.08))
 
-    // Marquee gold fading into a cinema-seat red
-    static let accent = Color(red: 0.98, green: 0.76, blue: 0.27)
-    static let accentSecondary = Color(red: 0.93, green: 0.29, blue: 0.36)
-    static let textSecondary = Color.white.opacity(0.62)
-    static let textTertiary = Color.white.opacity(0.38)
+    // Dark: marquee gold fading into a cinema-seat red. Light: royal blue fading into sky blue
+    static let accent = Color(light: Color(red: 0.15, green: 0.39, blue: 0.92), dark: Color(red: 0.98, green: 0.76, blue: 0.27))
+    static let accentSecondary = Color(light: Color(red: 0.05, green: 0.65, blue: 0.91), dark: Color(red: 0.93, green: 0.29, blue: 0.36))
+    static let textPrimary = Color(light: navy, dark: .white)
+    static let textSecondary = Color(light: navy.opacity(0.62), dark: Color.white.opacity(0.62))
+    static let textTertiary = Color(light: navy.opacity(0.40), dark: Color.white.opacity(0.38))
+    // Text and icons drawn on top of the accent gradient
+    static let onAccent = Color(light: .white, dark: .black)
+    // Text drawn over a poster's dark gradient, which stays dark in both themes
+    static let posterText = Color.white
+    // Shadows are much softer on a light background
+    static let shadow = Color(light: navy.opacity(0.35), dark: .black)
+    // Dims the screen behind a pop-up
+    static let scrim = Color(light: navy.opacity(0.35), dark: Color.black.opacity(0.6))
+
+    private static let navy = Color(red: 0.04, green: 0.10, blue: 0.20)
 
     static let accentGradient = LinearGradient(
         colors: [accent, accentSecondary],
@@ -44,6 +56,15 @@ enum Theme {
     // TMDb search results return release dates as "yyyy-MM-dd"
     static func year(from releaseDate: String) -> String {
         String(releaseDate.prefix(4))
+    }
+}
+
+extension Color {
+    /// A color that follows the current light or dark appearance
+    init(light: Color, dark: Color) {
+        self.init(UIColor { traits in
+            UIColor(traits.userInterfaceStyle == .light ? light : dark)
+        })
     }
 }
 
@@ -198,7 +219,7 @@ struct Shimmer: View {
     var body: some View {
         GeometryReader { proxy in
             LinearGradient(
-                colors: [.clear, Color.white.opacity(0.08), .clear],
+                colors: [.clear, Theme.textPrimary.opacity(0.08), .clear],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -231,7 +252,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundColor(.black)
+            .foregroundColor(Theme.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(Theme.accentGradient)
@@ -246,7 +267,7 @@ struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(Theme.textPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(Theme.surfaceRaised)
@@ -270,10 +291,10 @@ struct MetaChip: View {
             Text(text)
                 .font(.caption.weight(.semibold))
         }
-        .foregroundColor(.white.opacity(0.85))
+        .foregroundColor(Theme.textPrimary.opacity(0.85))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.1))
+        .background(Theme.textPrimary.opacity(0.1))
         .clipShape(Capsule())
     }
 }
@@ -307,7 +328,7 @@ struct EmptyStateView: View {
             }
             Text(title)
                 .font(.title3.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)

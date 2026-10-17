@@ -24,7 +24,7 @@ struct SetRankView : View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Theme.scrim
                 .ignoresSafeArea()
                 .onTapGesture {
                     withAnimation(Theme.spring) { showSetRank = false }
@@ -41,7 +41,7 @@ struct SetRankView : View {
                             .foregroundStyle(Theme.accentGradient)
                         Text(movie.title ?? "")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.textPrimary)
                             .lineLimit(2)
                         Text("Currently #\(movie.rank)")
                             .font(.caption)
@@ -73,7 +73,7 @@ struct SetRankView : View {
             }
             .padding(22)
             .cardStyle(cornerRadius: 28)
-            .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+            .shadow(color: Theme.shadow.opacity(0.5), radius: 30, y: 12)
             .padding(.horizontal, 20)
             .transition(.scale(scale: 0.9).combined(with: .opacity))
         }

@@ -116,14 +116,14 @@ struct AddMovieView: View {
                         if alreadyAdded {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.title3)
-                                .foregroundStyle(.black, Theme.accent)
+                                .foregroundStyle(Theme.onAccent, Theme.accent)
                                 .padding(6)
                         }
                     }
                     .opacity(alreadyAdded ? 0.5 : 1)
                 Text(apiMovie.title)
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Text(Theme.year(from: apiMovie.release_date))

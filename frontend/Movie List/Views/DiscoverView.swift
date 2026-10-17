@@ -54,7 +54,7 @@ struct DiscoverView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
                 if let ranking {
-                    Color.black.opacity(0.6)
+                    Theme.scrim
                         .ignoresSafeArea()
                         .onTapGesture { endRanking() }
                         .transition(.opacity)
@@ -225,12 +225,12 @@ private extension DiscoverView {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: size * 0.36, weight: .heavy))
-                .foregroundStyle(filled ? AnyShapeStyle(Color.black) : style)
+                .foregroundStyle(filled ? AnyShapeStyle(Theme.onAccent) : style)
                 .frame(width: size, height: size)
                 .background(filled ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
-                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
         }
         .buttonStyle(PressableButtonStyle(scale: 0.88))
     }
@@ -380,14 +380,14 @@ private extension DiscoverView {
         if let toast {
             Label(toast, systemImage: "checkmark.circle.fill")
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
-                .shadow(color: .black.opacity(0.4), radius: 16, y: 8)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 16, y: 8)
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
         }
@@ -413,7 +413,7 @@ private extension DiscoverView {
                                         .foregroundStyle(Theme.accentGradient)
                                     Text(movie.title)
                                         .font(.headline)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Theme.textPrimary)
                                         .lineLimit(2)
                                 }
                             }
@@ -470,7 +470,7 @@ private extension DiscoverView {
                 Button(action: createListAndAdd) {
                     HStack(spacing: 8) {
                         if isCreatingList {
-                            ProgressView().tint(.black)
+                            ProgressView().tint(Theme.onAccent)
                         }
                         Text(isCreatingList ? "Creating…" : "Create List & Add")
                     }
@@ -496,7 +496,7 @@ private extension DiscoverView {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     Text("New List")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                     Spacer()
                 }
                 .padding(12)
@@ -553,7 +553,7 @@ private extension DiscoverView {
             VStack(alignment: .leading, spacing: 3) {
                 Text(list.name ?? "No Name")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Text("\(list.movies.count) \(list.movies.count == 1 ? "film" : "films")")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
@@ -607,7 +607,7 @@ private struct DiscoverCard: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(alignment: .bottom) { info }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .shadow(color: .black.opacity(0.55), radius: 24, y: 12)
+            .shadow(color: Theme.shadow.opacity(0.55), radius: 24, y: 12)
     }
 
     private var info: some View {
@@ -623,13 +623,13 @@ private struct DiscoverCard: View {
             }
             Text(movie.title)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.posterText)
                 .lineLimit(3)
                 .minimumScaleFactor(0.7)
             if showDetails, !movie.overview.isEmpty {
                 Text(movie.overview)
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundColor(Theme.posterText.opacity(0.85))
                     .lineLimit(9)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {

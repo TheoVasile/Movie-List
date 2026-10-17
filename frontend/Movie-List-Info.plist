@@ -13,6 +13,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Daylight mode uses your approximate location to switch to the light theme at sunrise and the dark theme at sunset. It stays on this iPhone.</string>
+	<key>NSLocationDefaultAccuracyReduced</key>
+	<true/>
 	<key>GIDClientID</key>
 	<string>263609300559-cun073mb085m1ppuj49tko388c9fmi85.apps.googleusercontent.com</string>
 </dict>

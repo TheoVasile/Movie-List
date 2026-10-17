@@ -80,7 +80,7 @@ struct CompareMovieView: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .stroke(Theme.stroke, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+        .shadow(color: Theme.shadow.opacity(0.5), radius: 30, y: 12)
         .padding(.horizontal, 16)
         .onAppear {
             low = 0
@@ -100,7 +100,7 @@ struct CompareMovieView: View {
                 .contentTransition(.numericText())
             Text(prompt)
                 .font(.title3.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
             ProgressView(value: progress)
@@ -113,7 +113,7 @@ struct CompareMovieView: View {
     private var versusBadge: some View {
         Text("VS")
             .font(.system(size: 15, weight: .black, design: .rounded))
-            .foregroundColor(.black)
+            .foregroundColor(Theme.onAccent)
             .frame(width: 44, height: 44)
             .background(Theme.accentGradient)
             .clipShape(Circle())
