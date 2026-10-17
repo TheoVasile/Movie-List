@@ -17,6 +17,7 @@ struct MovieDetailView: View {
 
     @State private var revealed = false
     @State private var imdbID: String? = nil
+    @State private var info: MovieInfo? = nil
 
     private static let imdbCacheKey = "imdbIDs"
 
@@ -40,6 +41,7 @@ struct MovieDetailView: View {
                 revealed = true
             }
             loadIMDbID()
+            loadInfo()
         }
     }
 
@@ -55,6 +57,65 @@ struct MovieDetailView: View {
             URLQueryItem(name: "s", value: "tt"),
         ]
         return components?.url
+    }
+
+    private func loadInfo() {
+        let tmdbID = Int64(movie.tmdb_id)
+        info = MovieInfoCache.shared.info(for: tmdbID)
+        // Fetches only if the film isn't cached or is out of date
+        MovieInfoCache.shared.fetchMissing([tmdbID], onBatch: {}, completion: {
+            withAnimation(Theme.spring) {
+                info = MovieInfoCache.shared.info(for: tmdbID)
+            }
+        })
+    }
+
+    /// TMDb's average user score as a ring, like TMDb's own "User Score"
+    private func userScore(_ info: MovieInfo) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.12), lineWidth: 5)
+                Circle()
+                    .trim(from: 0, to: revealed ? info.voteAverage / 10 : 0)
+                    .stroke(Theme.accentGradient, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.8).delay(0.3), value: revealed)
+                Text(String(format: "%.1f", info.voteAverage))
+                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("TMDb User Score")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                Text("\(info.voteCount.formatted()) \(info.voteCount == 1 ? "rating" : "ratings")")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            Spacer()
+            if !info.certification.isEmpty {
+                VStack(spacing: 3) {
+                    Text(info.certification)
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
+                        )
+                    Text("Rated")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Rated \(info.certification)")
+            }
+        }
+        .padding(14)
+        .cardStyle()
     }
 
     // IMDb ids never change, so each one is looked up once and kept on this device
@@ -183,6 +244,11 @@ struct MovieDetailView: View {
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 .appearAnimation(delay: 0.3)
+            }
+
+            if let info, info.voteCount > 0 || !info.certification.isEmpty {
+                userScore(info)
+                    .transition(.opacity)
             }
 
             imdbLink

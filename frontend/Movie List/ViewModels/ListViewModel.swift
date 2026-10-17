@@ -10,33 +10,49 @@ import Foundation
 import SwiftUI
 import CoreData
 
-/// TMDb genres for each film, keyed by TMDb id. A film's genres don't change, so they're fetched
-/// once and kept on this device. They're only used to filter what a list shows
-final class GenreCache {
-    static let shared = GenreCache()
+/// What TMDb says about a film: its genres, US age rating and average user score
+struct MovieInfo: Codable {
+    let genres: [Int]
+    // "G", "PG", "PG-13", "R", ...; empty when the film was never rated in the US
+    let certification: String
+    // Out of 10
+    let voteAverage: Double
+    let voteCount: Int
+    let fetched: Date
+}
 
-    private static let storageKey = "genreCache"
+/// TMDb info for each film, keyed by TMDb id, fetched once and kept on this device. Genres and
+/// ratings rarely change, but user scores drift, so entries are refreshed after a month
+final class MovieInfoCache {
+    static let shared = MovieInfoCache()
+
+    private static let storageKey = "movieInfoCache"
     private static let batchSize = 50
-    private var genresByID: [Int64: [Int]]
+    private static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+    private var infoByID: [Int64: MovieInfo]
 
     private init() {
-        let stored = UserDefaults.standard.dictionary(forKey: Self.storageKey) as? [String: [Int]] ?? [:]
-        genresByID = Dictionary(uniqueKeysWithValues: stored.compactMap { key, genres in Int64(key).map { ($0, genres) } })
+        let stored = UserDefaults.standard.data(forKey: Self.storageKey)
+            .flatMap { try? JSONDecoder().decode([String: MovieInfo].self, from: $0) } ?? [:]
+        infoByID = Dictionary(uniqueKeysWithValues: stored.compactMap { key, info in Int64(key).map { ($0, info) } })
+        // Replaced by this cache, which also holds ratings
+        UserDefaults.standard.removeObject(forKey: "genreCache")
     }
 
-    func genres(for tmdbID: Int64) -> [Int]? {
-        genresByID[tmdbID]
+    func info(for tmdbID: Int64) -> MovieInfo? {
+        infoByID[tmdbID]
     }
 
-    func store(_ genres: [Int], for tmdbID: Int64) {
-        genresByID[tmdbID] = genres
-        save()
+    private func needsFetch(_ tmdbID: Int64) -> Bool {
+        guard tmdbID > 0 else { return false }
+        guard let info = infoByID[tmdbID] else { return true }
+        return Date().timeIntervalSince(info.fetched) > Self.maxAge
     }
 
-    /// Fetches the films that aren't cached yet, two batches at a time so a big list stays within
-    /// TMDb's rate limit. Calls `onBatch` as each batch arrives, then `completion` at the end
+    /// Fetches the films that aren't cached or are out of date, two batches at a time so a big list
+    /// stays within TMDb's rate limit. Calls `onBatch` as each batch arrives, then `completion` at the end
     func fetchMissing(_ tmdbIDs: [Int64], onBatch: @escaping () -> Void, completion: @escaping () -> Void) {
-        let missing = Array(Set(tmdbIDs.filter { $0 > 0 && genresByID[$0] == nil }))
+        let missing = Array(Set(tmdbIDs.filter(needsFetch)))
         var batches = stride(from: 0, to: missing.count, by: Self.batchSize).map {
             Array(missing[$0..<min($0 + Self.batchSize, missing.count)])
         }
@@ -54,9 +70,9 @@ final class GenreCache {
                 return
             }
             running += 1
-            APIService.shared.fetchGenres(tmdbIDs: batch) { result in
+            APIService.shared.fetchMovieInfo(tmdbIDs: batch) { result in
                 if case .success(let found) = result {
-                    self.genresByID.merge(found) { _, new in new }
+                    self.infoByID.merge(found) { _, new in new }
                     onBatch()
                 }
                 running -= 1
@@ -68,8 +84,10 @@ final class GenreCache {
     }
 
     private func save() {
-        let stored = Dictionary(uniqueKeysWithValues: genresByID.map { (String($0.key), $0.value) })
-        UserDefaults.standard.set(stored, forKey: Self.storageKey)
+        let stored = Dictionary(uniqueKeysWithValues: infoByID.map { (String($0.key), $0.value) })
+        if let data = try? JSONEncoder().encode(stored) {
+            UserDefaults.standard.set(data, forKey: Self.storageKey)
+        }
     }
 }
 
@@ -155,12 +173,10 @@ class ListViewModel: ObservableObject {
     }
     
     func createAndSaveMovie(from networkMovie: Movie) {
-        // Search results already carry their genres, so there's nothing to look up later
-        if let genres = networkMovie.genre_ids {
-            GenreCache.shared.store(genres, for: networkMovie.id)
-        }
         movieList.addMovie(networkMovie, context: context) { newMovie in
             guard let newMovie else { return }
+            // Look up the new film's genres and ratings
+            self.loadInfo()
             withAnimation(Theme.spring) {
                 self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
             }
@@ -239,8 +255,12 @@ class ListViewModel: ObservableObject {
         }
     }
     
+    func info(of movie: CDMovie) -> MovieInfo? {
+        MovieInfoCache.shared.info(for: Int64(movie.tmdb_id))
+    }
+
     func genres(of movie: CDMovie) -> [Int]? {
-        GenreCache.shared.genres(for: Int64(movie.tmdb_id))
+        info(of: movie)?.genres
     }
 
     func matchesGenreFilter(_ movie: CDMovie) -> Bool {
@@ -259,11 +279,11 @@ class ListViewModel: ObservableObject {
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.genre < $1.genre }
     }
 
-    /// Looks up genres for films in this list that haven't been seen before
-    func loadGenres() {
+    /// Looks up genres and ratings for films in this list that haven't been seen recently
+    func loadInfo() {
         guard !isLoadingGenres else { return }
         isLoadingGenres = true
-        GenreCache.shared.fetchMissing(movies.map { Int64($0.tmdb_id) }, onBatch: {
+        MovieInfoCache.shared.fetchMissing(movies.map { Int64($0.tmdb_id) }, onBatch: {
             self.objectWillChange.send()
         }, completion: {
             self.isLoadingGenres = false
