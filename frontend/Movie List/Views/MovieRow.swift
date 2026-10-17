@@ -17,7 +17,7 @@ struct MovieRow: View {
     var body: some View {
         HStack(spacing: 14) {
             rankBadge
-            PosterImage(path: movie.poster_path, cornerRadius: 10)
+            PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                 .frame(width: 58, height: 87)
                 .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
             VStack(alignment: .leading, spacing: 6) {

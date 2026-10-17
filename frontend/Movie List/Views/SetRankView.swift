@@ -32,7 +32,7 @@ struct SetRankView : View {
                 .transition(.opacity)
             VStack(spacing: 18) {
                 HStack(spacing: 14) {
-                    PosterImage(path: movie.poster_path, cornerRadius: 10)
+                    PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                         .frame(width: 54, height: 81)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("SET RANK")

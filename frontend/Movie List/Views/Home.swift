@@ -140,7 +140,7 @@ private extension Home {
                                 Label("Delete List", systemImage: "trash")
                             }
                         }
-                        .appearAnimation(delay: Double(index) * 0.06)
+                        .appearAnimation(delay: Double(min(index, 8)) * 0.06)
                     }
                 }
             }
@@ -290,7 +290,7 @@ private struct ListCard: View {
                     )
             } else {
                 ForEach(Array(topPosters.enumerated().reversed()), id: \.offset) { index, path in
-                    PosterImage(path: path, cornerRadius: 10)
+                    PosterImage(path: path, cornerRadius: 10, size: .medium)
                         .frame(width: 90, height: 135)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
                         .rotationEffect(.degrees(Double(index) * (index.isMultiple(of: 2) ? 9 : -9)))

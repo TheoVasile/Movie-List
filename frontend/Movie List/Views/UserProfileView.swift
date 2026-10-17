@@ -127,7 +127,7 @@ struct UserProfileView: View {
                         listRow(movieList)
                     }
                     .buttonStyle(PressableButtonStyle(scale: 0.98))
-                    .appearAnimation(delay: 0.2 + Double(index) * 0.05)
+                    .appearAnimation(delay: 0.2 + Double(min(index, 8)) * 0.05)
                 }
             }
         }
@@ -136,7 +136,7 @@ struct UserProfileView: View {
     private func listRow(_ movieList: CDMovieList) -> some View {
         let top = movieList.movies.sorted { $0.rank < $1.rank }.first
         return HStack(spacing: 14) {
-            PosterImage(path: top?.poster_path, cornerRadius: 8)
+            PosterImage(path: top?.poster_path, cornerRadius: 8, size: .small)
                 .frame(width: 44, height: 66)
             VStack(alignment: .leading, spacing: 3) {
                 Text(movieList.name ?? "No Name")

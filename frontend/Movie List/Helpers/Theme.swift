@@ -31,9 +31,9 @@ enum Theme {
 
     static let spring = Animation.spring(response: 0.45, dampingFraction: 0.82)
 
-    static func posterURL(_ path: String?) -> URL? {
+    static func posterURL(_ path: String?, size: PosterSize = .large) -> URL? {
         guard let path, !path.isEmpty else { return nil }
-        return URL(string: "https://media.themoviedb.org/t/p/w600_and_h900_bestv2" + path)
+        return URL(string: "https://image.tmdb.org/t/p/\(size.rawValue)" + path)
     }
 
     static func year(from date: Date?) -> String {
@@ -63,35 +63,89 @@ enum Haptics {
 
 // MARK: - Posters
 
+/// TMDb poster widths. Ask for the smallest one that stays sharp at the size it's drawn,
+/// since every extra pixel has to be downloaded and decoded
+enum PosterSize: String {
+    case small = "w185"   // list rows, thumbnails, blurred backdrops
+    case medium = "w342"  // grids and cards around a third of the screen wide
+    case large = "w500"   // half-screen posters
+    case xlarge = "w780"  // full-width posters
+}
+
+/// Downloads each poster once and keeps the decoded image in memory, so a row that scrolls
+/// back into view shows its poster immediately instead of loading it again
+actor PosterLoader {
+    static let shared = PosterLoader()
+
+    private let cache: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.totalCostLimit = 150 * 1024 * 1024
+        return cache
+    }()
+    // Rows showing the same poster share one download
+    private var inFlight: [URL: Task<UIImage?, Never>] = [:]
+
+    // NSCache is thread-safe, so views can check it synchronously while rendering
+    nonisolated func cachedImage(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func image(for url: URL) async -> UIImage? {
+        if let image = cachedImage(for: url) {
+            return image
+        }
+        if let task = inFlight[url] {
+            return await task.value
+        }
+        let task = Task<UIImage?, Never> {
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data) else { return nil }
+            // Decode now, off the main thread, rather than on the first frame it's drawn
+            return await image.byPreparingForDisplay() ?? image
+        }
+        inFlight[url] = task
+        let image = await task.value
+        inFlight[url] = nil
+        if let image, let cgImage = image.cgImage {
+            cache.setObject(image, forKey: url as NSURL, cost: cgImage.bytesPerRow * cgImage.height)
+        }
+        return image
+    }
+}
+
 /// Fills whatever frame it is given with a poster, fading it in once loaded.
 struct PosterImage: View {
     let path: String?
     var cornerRadius: CGFloat = 12
+    var size: PosterSize = .large
+
+    // Remembers which URL the image belongs to, so a reused view never shows another film's poster
+    @State private var loaded: (url: URL, image: UIImage)? = nil
+    @State private var failedURL: URL? = nil
+
+    private var url: URL? { Theme.posterURL(path, size: size) }
+
+    private var image: UIImage? {
+        guard let url else { return nil }
+        if let loaded, loaded.url == url { return loaded.image }
+        return PosterLoader.shared.cachedImage(for: url)
+    }
 
     var body: some View {
         Rectangle()
             .fill(Theme.surfaceRaised)
             .overlay {
-                AsyncImage(url: Theme.posterURL(path), transaction: Transaction(animation: .easeOut(duration: 0.4))) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .transition(.opacity)
-                    case .failure:
-                        Image(systemName: "film")
-                            .font(.title2)
-                            .foregroundColor(Theme.textTertiary)
-                    default:
-                        if path?.isEmpty == false {
-                            Shimmer()
-                        } else {
-                            Image(systemName: "film")
-                                .font(.title2)
-                                .foregroundColor(Theme.textTertiary)
-                        }
-                    }
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                } else if url == nil || failedURL == url {
+                    Image(systemName: "film")
+                        .font(.title2)
+                        .foregroundColor(Theme.textTertiary)
+                } else {
+                    Shimmer()
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -99,6 +153,18 @@ struct PosterImage: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Theme.stroke, lineWidth: 1)
             )
+            .task(id: url) {
+                guard let url, PosterLoader.shared.cachedImage(for: url) == nil else { return }
+                let image = await PosterLoader.shared.image(for: url)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.3)) {
+                    if let image {
+                        loaded = (url, image)
+                    } else {
+                        failedURL = url
+                    }
+                }
+            }
     }
 }
 
@@ -108,7 +174,8 @@ struct PosterBackdrop: View {
 
     var body: some View {
         GeometryReader { proxy in
-            PosterImage(path: path, cornerRadius: 0)
+            // Blurred this heavily, the smallest poster looks the same and is far cheaper to draw
+            PosterImage(path: path, cornerRadius: 0, size: .small)
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .blur(radius: 40)
                 .saturation(1.3)

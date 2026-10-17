@@ -110,7 +110,7 @@ struct AddMovieView: View {
             dismiss()
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                PosterImage(path: apiMovie.poster_path, cornerRadius: 12)
+                PosterImage(path: apiMovie.poster_path, cornerRadius: 12, size: .medium)
                     .aspectRatio(2/3, contentMode: .fit)
                     .overlay(alignment: .topTrailing) {
                         if alreadyAdded {

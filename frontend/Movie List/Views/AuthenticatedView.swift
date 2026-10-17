@@ -173,7 +173,7 @@ private struct PosterWall: View {
         let direction: CGFloat = row.isMultiple(of: 2) ? -1 : 1
         return HStack(spacing: spacing) {
             ForEach(Array(order.enumerated()), id: \.offset) { _, path in
-                PosterImage(path: path, cornerRadius: 10)
+                PosterImage(path: path, cornerRadius: 10, size: .medium)
                     .frame(width: posterWidth, height: posterWidth * 1.5)
             }
         }

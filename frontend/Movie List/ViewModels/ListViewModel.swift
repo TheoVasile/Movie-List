@@ -20,6 +20,8 @@ class ListViewModel: ObservableObject {
     @Published var showCompareMovieView = false
     @Published var showSetRank = false
     @Published var selectedMovie: CDMovie? = nil
+    // Set once a movie's new rank is saved, so the list can scroll to where it landed
+    @Published var movedMovieID: Int64? = nil
     
     var movieList: CDMovieList
     private let context: NSManagedObjectContext
@@ -106,6 +108,7 @@ class ListViewModel: ObservableObject {
 
                     // Update movieList's relationship
                     self.movieList.movies = Set(self.movies)
+                    self.movedMovieID = updatedMovie.id
 
                     // Save changes to Core Data
                     do {
@@ -138,8 +141,22 @@ class ListViewModel: ObservableObject {
         }
     }
     
+    /// Picks a movie at random, weighted by rank: in a list of n, #1 is n times as likely as the last
+    /// movie, #2 is n-1 times as likely, and so on
     func recommendMovie() {
-        if movies.isEmpty { return }
-        recommendedMovie = movies.randomElement() // Simple random recommendation
+        // Skip the current pick so the button always shows something new
+        let candidates = movies.count > 1 ? movies.filter { $0 != recommendedMovie } : movies
+        guard !candidates.isEmpty else { return }
+
+        // `movies` is sorted by rank, so earlier movies get the larger weights
+        let weights = candidates.indices.map { candidates.count - $0 }
+        var roll = Int.random(in: 0..<weights.reduce(0, +))
+        for (movie, weight) in zip(candidates, weights) {
+            if roll < weight {
+                recommendedMovie = movie
+                return
+            }
+            roll -= weight
+        }
     }
 }

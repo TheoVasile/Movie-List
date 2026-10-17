@@ -308,7 +308,7 @@ private extension DiscoverView {
                     VStack(alignment: .leading, spacing: 12) {
                         if let movie = pendingMovie {
                             HStack(spacing: 14) {
-                                PosterImage(path: movie.poster_path, cornerRadius: 10)
+                                PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                                     .frame(width: 54, height: 81)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("ADD TO A LIST")
@@ -337,7 +337,7 @@ private extension DiscoverView {
                                     listRow(list)
                                 }
                                 .buttonStyle(PressableButtonStyle(scale: 0.98))
-                                .appearAnimation(delay: Double(index) * 0.04)
+                                .appearAnimation(delay: Double(min(index, 8)) * 0.04)
                             }
                         }
                     }
@@ -357,7 +357,7 @@ private extension DiscoverView {
     func listRow(_ list: CDMovieList) -> some View {
         let top = list.movies.sorted { $0.rank < $1.rank }.first
         return HStack(spacing: 14) {
-            PosterImage(path: top?.poster_path, cornerRadius: 8)
+            PosterImage(path: top?.poster_path, cornerRadius: 8, size: .small)
                 .frame(width: 40, height: 60)
             VStack(alignment: .leading, spacing: 3) {
                 Text(list.name ?? "No Name")
@@ -408,7 +408,7 @@ private struct DiscoverCard: View {
     let showDetails: Bool
 
     var body: some View {
-        PosterImage(path: movie.poster_path, cornerRadius: 28)
+        PosterImage(path: movie.poster_path, cornerRadius: 28, size: .xlarge)
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(alignment: .bottom) { info }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))

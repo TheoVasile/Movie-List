@@ -42,7 +42,7 @@ struct MovieDetailView: View {
         ZStack(alignment: .bottom) {
             PosterBackdrop(path: movie.poster_path)
                 .frame(height: 460)
-            PosterImage(path: movie.poster_path, cornerRadius: 18)
+            PosterImage(path: movie.poster_path, cornerRadius: 18, size: .xlarge)
                 .frame(width: 200, height: 300)
                 .shadow(color: .black.opacity(0.6), radius: 30, y: 16)
                 .scaleEffect(revealed ? 1 : 0.85)

@@ -14,6 +14,7 @@ struct ListView: View {
     @StateObject var viewModel: ListViewModel
     @State private var detailMovie: CDMovie? = nil
     @State private var showDetail = false
+    @State private var highlightedMovieID: Int64? = nil
 
     init(movieList: CDMovieList, context: NSManagedObjectContext) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
@@ -78,45 +79,87 @@ struct ListView: View {
 // MARK: - UI Components
 private extension ListView {
     var MovieListSection: some View {
-        List {
-            if viewModel.movies.isEmpty {
-                EmptyStateView(
-                    icon: "film",
-                    title: "This list is empty",
-                    message: "Add a few films, then rank them head to head.",
-                    actionTitle: "Add a Film"
-                ) {
-                    viewModel.showPopup = true
+        ScrollViewReader { proxy in
+            List {
+                if viewModel.movies.isEmpty {
+                    EmptyStateView(
+                        icon: "film",
+                        title: "This list is empty",
+                        message: "Add a few films, then rank them head to head.",
+                        actionTitle: "Add a Film"
+                    ) {
+                        viewModel.showPopup = true
+                    }
+                    .padding(.top, 60)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else if viewModel.searchText.isEmpty, let spotlight = viewModel.recommendedMovie ?? viewModel.movies.first {
+                    SpotlightCard(movie: spotlight, isRecommendation: viewModel.recommendedMovie != nil)
+                        // Prefixed so it can't collide with the ranked row of the same movie when scrolling
+                        .id("spotlight-\(spotlight.id)")
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                        .onTapGesture { openDetail(spotlight) }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
                 }
-                .padding(.top, 60)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            } else if viewModel.searchText.isEmpty, let spotlight = viewModel.recommendedMovie ?? viewModel.movies.first {
-                SpotlightCard(movie: spotlight, isRecommendation: viewModel.recommendedMovie != nil)
-                    .id(spotlight.id)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.95).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-                    .onTapGesture { openDetail(spotlight) }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
-                    .appearAnimation()
+                ForEach(filteredMovies, id: \.id) { movie in
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
+                        .contentShape(Rectangle())
+                        .onTapGesture { openDetail(movie) }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                        .overlay { highlightRing(for: movie) }
+                        .id(movie.id)
+                }
+                .onDelete(perform: deleteFilteredMovies)
             }
-            ForEach(Array(filteredMovies.enumerated()), id: \.element.id) { index, movie in
-                MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank)
-                    .contentShape(Rectangle())
-                    .onTapGesture { openDetail(movie) }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
-                    .appearAnimation(delay: Double(min(index, 10)) * 0.04)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .onChange(of: viewModel.movedMovieID) { movieID in
+                guard let movieID else { return }
+                scrollToMovedMovie(movieID, proxy: proxy)
             }
-            .onDelete(perform: deleteFilteredMovies)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+    }
+
+    // Outline that glows around a movie right after its rank changes. Only built for that one
+    // row, since a glow drawn at zero opacity still costs a shadow pass on every row
+    @ViewBuilder
+    func highlightRing(for movie: CDMovie) -> some View {
+        if highlightedMovieID == movie.id {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Theme.accentGradient, lineWidth: 2.5)
+                .shadow(color: Theme.accent.opacity(0.6), radius: 10)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
+    }
+
+    func scrollToMovedMovie(_ movieID: Int64, proxy: ScrollViewProxy) {
+        viewModel.movedMovieID = nil
+        // A search that hides the movie would leave nothing to scroll to
+        if !filteredMovies.contains(where: { $0.id == movieID }) {
+            viewModel.searchText = ""
+        }
+        // Let the rows finish sliding into their new order before scrolling
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                proxy.scrollTo(movieID, anchor: .center)
+            }
+            withAnimation(.easeOut(duration: 0.25).delay(0.35)) {
+                highlightedMovieID = movieID
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                withAnimation(.easeOut(duration: 0.6)) {
+                    if highlightedMovieID == movieID { highlightedMovieID = nil }
+                }
+            }
+        }
     }
     
     @ToolbarContentBuilder
@@ -177,8 +220,14 @@ private struct SpotlightCard: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 16) {
-            PosterImage(path: movie.poster_path, cornerRadius: 14)
+            PosterImage(path: movie.poster_path, cornerRadius: 14, size: .medium)
                 .frame(width: 112, height: 168)
+                .overlay(alignment: .topLeading) {
+                    // The #1 card already says its rank in the label
+                    if isRecommendation {
+                        rankBadge
+                    }
+                }
                 .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
             VStack(alignment: .leading, spacing: 8) {
                 Label(isRecommendation ? "TONIGHT'S PICK" : "#1 IN THIS LIST",
@@ -216,6 +265,21 @@ private struct SpotlightCard: View {
                 .stroke(Theme.accent.opacity(0.25), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
+    }
+
+    private var rankBadge: some View {
+        Text("#\(movie.rank)")
+            .font(.system(size: 15, weight: .black, design: .rounded))
+            .foregroundColor(.black)
+            .contentTransition(.numericText())
+            .animation(Theme.spring, value: movie.rank)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Theme.accentGradient)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+            .padding(8)
+            .accessibilityLabel("Ranked \(movie.rank) in this list")
     }
 }
 
