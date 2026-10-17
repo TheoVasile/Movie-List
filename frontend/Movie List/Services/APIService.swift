@@ -95,7 +95,13 @@ struct LetterboxdImportRequest: Encodable {
 
 class APIService {
     static let shared = APIService()
+    #if targetEnvironment(simulator)
     let baseURL = "http://localhost:3000"
+    #else
+    // On a real phone "localhost" is the phone itself, so reach the backend on this Mac over Wi-Fi.
+    // The phone must be on the same network as the Mac, with `node server.js` running
+    let baseURL = "http://Theodors-MacBook-Pro.local:3000"
+    #endif
 
     /// Sends a request to the backend as the signed-in Firebase user. The backend identifies
     /// the caller from this ID token, so every request has to go through here
