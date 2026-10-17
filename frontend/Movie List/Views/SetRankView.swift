@@ -9,7 +9,8 @@ import Foundation
 import SwiftUI
 
 struct SetRankView : View {
-    @State var rank: Int = 1
+    @State private var rankText = ""
+    @FocusState private var fieldFocused: Bool
     @Binding var movie: CDMovie
     @Binding var showSetRank: Bool
     var movieCount: Int
@@ -49,26 +50,52 @@ struct SetRankView : View {
                     }
                     Spacer(minLength: 0)
                 }
-                Picker("Rank", selection: $rank) {
-                    ForEach(1...max(movieCount, 1), id: \.self) { value in
-                        Text("#\(value)")
-                            .font(.title3.weight(.bold))
-                            .tag(value)
+                VStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("#")
+                            .foregroundStyle(Theme.accentGradient)
+                        TextField("\(movie.rank)", text: $rankText)
+                            .keyboardType(.numberPad)
+                            .focused($fieldFocused)
+                            .multilineTextAlignment(.center)
+                            .fixedSize()
+                            .onChange(of: rankText) { text in
+                                // Digits only, and never longer than the largest rank
+                                let digits = String(text.filter(\.isNumber).prefix(String(maxRank).count))
+                                if digits != text { rankText = digits }
+                            }
                     }
+                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+                    .frame(minWidth: 140)
+                    .background(Theme.surfaceRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(isOutOfRange ? Theme.accentSecondary : Theme.accent.opacity(fieldFocused ? 0.6 : 0), lineWidth: 1.5)
+                    )
+                    .onTapGesture { fieldFocused = true }
+                    Text(isOutOfRange ? "Enter a number from 1 to \(maxRank)" : "Any rank from 1 to \(maxRank)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(isOutOfRange ? Theme.accentSecondary : Theme.textSecondary)
+                        .animation(.easeOut(duration: 0.2), value: isOutOfRange)
                 }
-                .pickerStyle(.wheel)
-                .frame(height: 140)
-                .onChange(of: rank) { _ in Haptics.tap() }
                 HStack(spacing: 12) {
                     Button("Cancel") {
                         withAnimation(Theme.spring) { showSetRank = false }
                     }
                     .buttonStyle(SecondaryButtonStyle())
                     Button("Set Rank") {
+                        guard let enteredRank else { return }
                         Haptics.success()
-                        onRankingUpdate(movie, rank)
+                        fieldFocused = false
+                        onRankingUpdate(movie, enteredRank)
                     }
                     .buttonStyle(PrimaryButtonStyle())
+                    .disabled(enteredRank == nil)
+                    .opacity(enteredRank == nil ? 0.5 : 1)
                 }
             }
             .padding(22)
@@ -78,8 +105,21 @@ struct SetRankView : View {
             .transition(.scale(scale: 0.9).combined(with: .opacity))
         }
         .onAppear {
-            rank = min(max(Int(movie.rank), 1), max(movieCount, 1))
+            // Wait for the card's appear animation so the keyboard doesn't jump in underneath it
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { fieldFocused = true }
         }
+    }
+
+    private var maxRank: Int { max(movieCount, 1) }
+
+    // The typed rank, or nil if the field is empty or outside 1...maxRank
+    private var enteredRank: Int? {
+        guard let rank = Int(rankText), (1...maxRank).contains(rank) else { return nil }
+        return rank
+    }
+
+    private var isOutOfRange: Bool {
+        !rankText.isEmpty && enteredRank == nil
     }
 }
 
