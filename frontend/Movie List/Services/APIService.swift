@@ -388,13 +388,16 @@ class APIService {
         }
     }
     
-    /// TMDb genre ids for up to 50 films, keyed by TMDb id. Calls back on the main thread
-    func fetchGenres(tmdbIDs: [Int64], completion: @escaping (Result<[Int64: [Int]], Error>) -> Void) {
-        struct FilmGenres: Decodable {
+    /// Genres, US age rating and TMDb user score for up to 50 films, keyed by TMDb id. Calls back on the main thread
+    func fetchMovieInfo(tmdbIDs: [Int64], completion: @escaping (Result<[Int64: MovieInfo], Error>) -> Void) {
+        struct FilmInfo: Decodable {
             let id: Int64
             let genre_ids: [Int]
+            let certification: String
+            let vote_average: Double
+            let vote_count: Int
         }
-        var components = URLComponents(string: "\(baseURL)/movies/genres")
+        var components = URLComponents(string: "\(baseURL)/movies/info")
         components?.queryItems = [URLQueryItem(name: "ids", value: tmdbIDs.map(String.init).joined(separator: ","))]
         guard let url = components?.url else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
@@ -402,12 +405,39 @@ class APIService {
         }
 
         send(URLRequest(url: url)) { data, response, error in
-            let result: Result<[Int64: [Int]], Error>
+            let result: Result<[Int64: MovieInfo], Error>
             if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
-               let films = try? JSONDecoder().decode([FilmGenres].self, from: data) {
-                result = .success(Dictionary(films.map { ($0.id, $0.genre_ids) }, uniquingKeysWith: { first, _ in first }))
+               let films = try? JSONDecoder().decode([FilmInfo].self, from: data) {
+                let fetched = Date()
+                result = .success(Dictionary(films.map {
+                    ($0.id, MovieInfo(genres: $0.genre_ids, certification: $0.certification, voteAverage: $0.vote_average, voteCount: $0.vote_count, fetched: fetched))
+                }, uniquingKeysWith: { first, _ in first }))
             } else {
-                result = .failure(error ?? NSError(domain: "Genre lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+                result = .failure(error ?? NSError(domain: "Film info lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// The film's IMDb id (e.g. "tt0099785"), or nil when TMDb doesn't have one
+    func fetchIMDbID(tmdbID: Int64, completion: @escaping (Result<String?, Error>) -> Void) {
+        struct IMDbResponse: Decodable {
+            let imdb_id: String?
+        }
+        var components = URLComponents(string: "\(baseURL)/movies/imdb")
+        components?.queryItems = [URLQueryItem(name: "tmdb_id", value: String(tmdbID))]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<String?, Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let decoded = try? JSONDecoder().decode(IMDbResponse.self, from: data) {
+                result = .success(decoded.imdb_id)
+            } else {
+                result = .failure(error ?? NSError(domain: "IMDb lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }

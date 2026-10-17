@@ -13,6 +13,7 @@ struct MovieRow: View {
     @Binding var showCompareMovieView: Bool
     @Binding var selectedMovie: CDMovie?
     @Binding var showSetRank: Bool
+    var info: MovieInfo? = nil
     var onToggleWatched: (() -> Void)? = nil
     
     var body: some View {
@@ -31,6 +32,14 @@ struct MovieRow: View {
                     if !movie.original_language.isNilOrEmpty {
                         Text("·")
                         Text((movie.original_language ?? "").uppercased())
+                    }
+                    if let info {
+                        if !info.certification.isEmpty {
+                            CertificationBadge(certification: info.certification)
+                        }
+                        if info.voteCount > 0 {
+                            UserScoreLabel(score: info.voteAverage)
+                        }
                     }
                 }
                 .font(.caption.weight(.medium))
@@ -119,6 +128,38 @@ struct WatchedTag: View {
             .background(Theme.accentGradient)
             .clipShape(Capsule())
             .accessibilityLabel("Watched")
+    }
+}
+
+/// A film's US age rating ("PG-13", "R", ...), outlined like the rating box on a poster
+struct CertificationBadge: View {
+    let certification: String
+
+    var body: some View {
+        Text(certification)
+            .font(.caption2.weight(.heavy))
+            .foregroundColor(.white.opacity(0.85))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+            )
+            .fixedSize()
+            .accessibilityLabel("Rated \(certification)")
+    }
+}
+
+/// TMDb's average user score out of 10, e.g. "★ 7.4"
+struct UserScoreLabel: View {
+    let score: Double
+
+    var body: some View {
+        Label(String(format: "%.1f", score), systemImage: "star.fill")
+            .labelStyle(.titleAndIcon)
+            .foregroundColor(Theme.accent)
+            .fixedSize()
+            .accessibilityLabel("TMDb user score \(String(format: "%.1f", score)) out of 10")
     }
 }
 

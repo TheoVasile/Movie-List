@@ -69,7 +69,7 @@ struct ListView: View {
             }
         }
         .searchable(text: $viewModel.searchText, prompt: "Search this list")
-        .onAppear { viewModel.loadGenres() }
+        .onAppear { viewModel.loadInfo() }
         .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
         .navigationBarTitleDisplayMode(.large)
         .toolbar { ToolbarOptions }
@@ -151,7 +151,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie)) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())

@@ -198,25 +198,64 @@ router.put("/updateRank", ownsBodyList, async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
-// Genre ids for up to 50 TMDb films at a time, e.g. ?ids=771,496243 -> [{ id: 771, genre_ids: [35, 10751] }].
-// Read-only: the app caches these to filter its lists by genre. Films TMDb can't find are left out
-router.get("/genres", async (req, res) => {
+// US age rating ("G", "PG-13", "R", ...) from TMDb's release dates, preferring the theatrical release.
+// Empty when the film was never rated in the US
+function usCertification(releaseDates) {
+    const us = (releaseDates?.results ?? []).find((country) => country.iso_3166_1 === "US");
+    const rated = (us?.release_dates ?? []).filter((release) => release.certification?.trim());
+    const theatrical = rated.find((release) => release.type === 3) ?? rated[0];
+    return theatrical?.certification.trim() ?? "";
+}
+
+// Genres, US age rating and TMDb user score for up to 50 TMDb films at a time, e.g. ?ids=771 ->
+// [{ id: 771, genre_ids: [35, 10751], certification: "PG", vote_average: 7.4, vote_count: 11000 }].
+// Read-only: the app caches these to label films and filter its lists by genre. Films TMDb can't find are left out
+router.get("/info", async (req, res) => {
     try {
         const ids = parseIds(req.query.ids, 50);
         const films = await mapWithConcurrency(ids, async (id) => {
             try {
                 const response = await axios.get(`https://api.themoviedb.org/3/movie/${id}`, {
-                    params: { api_key: process.env.API_KEY },
+                    params: { api_key: process.env.API_KEY, append_to_response: "release_dates" },
                     timeout: 15000,
                 });
-                return { id, genre_ids: (response.data.genres ?? []).map((genre) => genre.id) };
+                const film = response.data;
+                return {
+                    id,
+                    genre_ids: (film.genres ?? []).map((genre) => genre.id),
+                    certification: usCertification(film.release_dates),
+                    vote_average: film.vote_average ?? 0,
+                    vote_count: film.vote_count ?? 0,
+                };
             } catch (error) {
                 return null;
             }
         });
         res.json(films.filter(Boolean));
     } catch (error) {
-        console.error("Error fetching genres:", error.message);
+        console.error("Error fetching film info:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The IMDb id for a TMDb film, e.g. ?tmdb_id=771 -> { tmdb_id: 771, imdb_id: "tt0099785" }.
+// imdb_id is null when TMDb doesn't know it
+router.get("/imdb", async (req, res) => {
+    const tmdbId = Number(req.query.tmdb_id);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
+    try {
+        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/external_ids`, {
+            params: { api_key: process.env.API_KEY },
+            timeout: 15000,
+        });
+        res.json({ tmdb_id: tmdbId, imdb_id: response.data.imdb_id || null });
+    } catch (error) {
+        if (error.response?.status === 404) {
+            return res.json({ tmdb_id: tmdbId, imdb_id: null });
+        }
+        console.error("Error fetching IMDb id:", error.message);
         res.status(500).json({ error: "Internal server error" });
     }
 });
