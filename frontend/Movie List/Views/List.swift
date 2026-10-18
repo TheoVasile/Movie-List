@@ -93,8 +93,10 @@ struct ListView: View {
             }
         }
         .toolbar {
+            // On the left, next to Back: the right side already has three buttons, and a fourth would be
+            // folded into a "more" (•••) menu
             if editMode.isEditing {
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Done") {
                         Haptics.success()
                         withAnimation(Theme.spring) { editMode = .inactive }
