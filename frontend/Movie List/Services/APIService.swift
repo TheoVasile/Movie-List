@@ -651,6 +651,36 @@ class APIService {
         }
     }
 
+    /// Renames a list and/or changes its description; nil leaves that field as it is
+    func updateList(listID: Int64, name: String?, overview: String?, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)") else { return }
+        var body: [String: Any] = [:]
+        if let name { body["name"] = name }
+        if let overview { body["overview"] = overview }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        send(request) { _, response, error in
+            let result: Result<Void, Error>
+            if let error = error {
+                result = .failure(error)
+            } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                result = .success(())
+            } else {
+                result = .failure(NSError(domain: "List update failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
     func createList(userID: String, name: String, overview: String, isRanked: Bool, completion: @escaping (Result<ListResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/create") else { return }
 

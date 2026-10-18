@@ -1,5 +1,5 @@
 const express = require("express");
-const { createList, deleteList, fetchLists } = require("../models/listModel");
+const { createList, deleteList, fetchLists, updateList } = require("../models/listModel");
 const requireListOwner = require("../middleware/listOwnership");
 const { setListWatched } = require("../models/watchedModel");
 
@@ -39,6 +39,27 @@ router.put("/:id/watched", requireListOwner((req) => req.params.id), async (req,
         res.status(200).json({ list_id: Number(req.params.id), watched: req.body.watched });
     } catch (error) {
         console.error("Error updating watched status for list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Renames a list and/or changes its description, e.g. { "name": "Best of 2026", "overview": "..." }
+router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) => {
+    try {
+        const { name, overview } = req.body;
+        if (name !== undefined && (typeof name !== "string" || !name.trim() || name.length > 100)) {
+            return res.status(400).json({ error: "A name must be 1 to 100 characters." });
+        }
+        if (overview !== undefined && (typeof overview !== "string" || overview.length > 2000)) {
+            return res.status(400).json({ error: "A description must be at most 2000 characters." });
+        }
+        if (name === undefined && overview === undefined) {
+            return res.status(400).json({ error: "Nothing to update." });
+        }
+        const list = await updateList(Number(req.params.id), { name: name?.trim(), overview });
+        res.status(200).json(list);
+    } catch (error) {
+        console.error("Error updating list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

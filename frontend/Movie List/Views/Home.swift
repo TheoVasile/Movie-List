@@ -17,6 +17,8 @@ struct Home: View {
     @State var listName = ""
     @State var showFileSelector: Bool = false
     @State var showLetterboxdImport: Bool = false
+    // The list whose name and description are being edited
+    @State private var editingList: CDMovieList? = nil
     
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
@@ -134,6 +136,11 @@ private extension Home {
                         }
                         .buttonStyle(PressableButtonStyle())
                         .contextMenu {
+                            Button {
+                                editingList = movieList
+                            } label: {
+                                Label("Edit List", systemImage: "pencil")
+                            }
                             Button(role: .destructive) {
                                 deleteList(movieList)
                             } label: {
@@ -144,6 +151,9 @@ private extension Home {
                     }
                 }
             }
+        }
+        .sheet(item: $editingList) { movieList in
+            EditListSheet(movieList: movieList)
         }
     }
 
@@ -302,6 +312,95 @@ private struct ListCard: View {
     }
 }
 
+// MARK: - Edit list
+
+/// Renames a list and edits its description, saving to the server first so the two never disagree
+struct EditListSheet: View {
+    @ObservedObject var movieList: CDMovieList
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.managedObjectContext) private var context
+    @State private var name: String
+    @State private var overview: String
+    @State private var isSaving = false
+    @State private var saveFailed = false
+
+    init(movieList: CDMovieList) {
+        self.movieList = movieList
+        _name = State(initialValue: movieList.name ?? "")
+        _overview = State(initialValue: movieList.overview ?? "")
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var hasChanges: Bool {
+        trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("List name", text: $name)
+                        .disableAutocorrection(true)
+                }
+                .listRowBackground(Theme.surface)
+                Section {
+                    TextField("What's this list about?", text: $overview, axis: .vertical)
+                        .lineLimit(3...8)
+                } header: {
+                    Text("Description")
+                } footer: {
+                    Text("Optional. Shown at the top of the list.")
+                }
+                .listRowBackground(Theme.surface)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Edit List")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") { save() }
+                            .bold()
+                            .disabled(trimmedName.isEmpty || trimmedName.count > 100 || !hasChanges)
+                    }
+                }
+            }
+            .alert("Couldn't save changes", isPresented: $saveFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Check your connection and try again.")
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        isSaving = true
+        APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview) { result in
+            isSaving = false
+            switch result {
+            case .success:
+                Haptics.success()
+                movieList.name = trimmedName
+                movieList.overview = overview
+                try? context.save()
+                dismiss()
+            case .failure(let error):
+                print("Error updating list:", error)
+                saveFailed = true
+            }
+        }
+    }
+}
 
 struct Home_Previews: PreviewProvider{
     static var previews: some View{
