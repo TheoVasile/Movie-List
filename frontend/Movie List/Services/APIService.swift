@@ -115,7 +115,10 @@ struct AIDiscoverRequest: Encodable {
 
 class APIService {
     static let shared = APIService()
-    #if targetEnvironment(simulator)
+    #if !DEBUG
+    // Release builds, including TestFlight, use the backend hosted on Render (see render.yaml)
+    let baseURL = "https://movie-list-backend.onrender.com"
+    #elseif targetEnvironment(simulator)
     let baseURL = "http://localhost:3000"
     #else
     // On a real phone "localhost" is the phone itself, so reach the backend on this Mac over Wi-Fi.

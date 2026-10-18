@@ -17,7 +17,8 @@ struct UserSettingsView : View {
     @Environment(\.dismiss) var dismiss
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
-    @AppStorage(Personalization.useAIKey) private var useAI = true
+    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
     @AppStorage(Personalization.genderKey) private var gender = Personalization.notShared
 
@@ -82,7 +83,9 @@ struct UserSettingsView : View {
                         Label("AI Picks in Discover", systemImage: "sparkles")
                     }
                     .tint(Theme.accent)
-                    if useAI {
+                    .disabled(isUnder18)
+                    .onChange(of: useAI) { _ in aiConsentAsked = true }
+                    if useAI || isUnder18 {
                         Picker("Age Range", selection: $ageRange) {
                             ForEach(Personalization.ageRanges, id: \.self) { Text($0).tag($0) }
                         }
@@ -93,7 +96,9 @@ struct UserSettingsView : View {
                 } header: {
                     Text("Discover")
                 } footer: {
-                    Text(useAI
+                    Text(isUnder18
+                         ? "AI Picks aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
+                         : useAI
                          ? "Discover asks Claude, Anthropic's AI, to pick films from every title in your lists, your Discover swipes and genre leanings, and your iPhone's country and language. Age range and gender are optional; they stay on this iPhone and are sent only with those requests. Your name and email are never sent. Turn this off for Classic recommendations from TMDb."
                          : "Discover uses TMDb's recommendations for films in your lists. Nothing is sent to an AI.")
                 }
@@ -146,6 +151,10 @@ struct UserSettingsView : View {
 }
 
 extension UserSettingsView {
+    private var isUnder18: Bool {
+        ageRange == Personalization.under18
+    }
+
     private var appearanceFooter: String {
         switch appearance.mode {
         case .dark, .light:

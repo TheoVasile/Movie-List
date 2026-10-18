@@ -13,7 +13,9 @@ struct DiscoverView: View {
     @EnvironmentObject var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @StateObject private var viewModel = DiscoverViewModel()
-    @AppStorage(Personalization.useAIKey) private var useAI = true
+    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
 
     @State private var dragOffset: CGSize = .zero
     @State private var showDetails = false
@@ -76,6 +78,7 @@ struct DiscoverView: View {
                                 Label("AI Picks", systemImage: "sparkles").tag(true)
                                 Label("Classic (TMDb)", systemImage: "film.stack").tag(false)
                             }
+                            .disabled(isUnder18)
                         }
                         Section(profileDescription) {
                             Button {
@@ -101,7 +104,16 @@ struct DiscoverView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: askForAIConsent) {
+            aiConsentSheet
+                .presentationDetents([.medium])
+                .interactiveDismissDisabled()
+        }
         .onChange(of: useAI) { _ in
+            aiConsentAsked = true
+            withAnimation(Theme.spring) { viewModel.sourceChanged() }
+        }
+        .onChange(of: ageRange) { _ in
             withAnimation(Theme.spring) { viewModel.sourceChanged() }
         }
         .onAppear(perform: syncWithLists)
@@ -142,7 +154,54 @@ private extension DiscoverView {
         viewModel.profile.favoriteGenres.compactMap { TasteProfile.genreNames[$0] }
     }
 
+    var isUnder18: Bool {
+        ageRange == Personalization.under18
+    }
+
+    // Asked once, the first time Discover opens, before anything is sent to the AI
+    var askForAIConsent: Binding<Bool> {
+        Binding(get: { !aiConsentAsked && !isUnder18 }, set: { _ in })
+    }
+
+    var aiConsentSheet: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 40))
+                .foregroundStyle(Theme.accentGradient)
+            Text("Try AI Picks?")
+                .font(.title2.bold())
+                .foregroundColor(Theme.textPrimary)
+            Text("Discover can send the titles in your lists, your Discover swipes, and your iPhone's country and language to Claude, Anthropic's AI, to pick films for you. Your name and email are never sent. You can change this any time in Settings.")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Haptics.tap()
+                aiConsentAsked = true
+                useAI = true
+            } label: {
+                Text("Allow AI Picks")
+                    .font(.headline)
+                    .foregroundColor(Theme.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.accentGradient, in: Capsule())
+            }
+            Button("Use Classic Recommendations") {
+                aiConsentAsked = true
+                useAI = false
+            }
+            .foregroundColor(Theme.accent)
+        }
+        .padding(24)
+        .frame(maxHeight: .infinity)
+        .background(Theme.background.ignoresSafeArea())
+    }
+
     var sourceDescription: String {
+        if isUnder18 {
+            return "Recommended by TMDb from your lists"
+        }
         if !useAI {
             return "Recommended by TMDb from your lists"
         }

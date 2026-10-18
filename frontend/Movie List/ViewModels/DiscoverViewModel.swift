@@ -10,17 +10,25 @@ import SwiftUI
 import CoreData
 
 /// Optional details the user can share to personalise AI picks in Discover. Kept on this device and
-/// only sent along with AI Discover requests
+/// only sent along with AI Discover requests. AI picks are off until the user agrees to them
 enum Personalization {
     static let useAIKey = "discover.useAI"
+    // Whether the user has been asked about AI picks yet
+    static let aiConsentAskedKey = "discover.aiConsentAsked"
+    static let under18 = "Under 18"
     static let ageRangeKey = "personalization.ageRange"
     static let genderKey = "personalization.gender"
     static let notShared = "Prefer not to say"
-    static let ageRanges = [notShared, "Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"]
+    static let ageRanges = [notShared, under18, "18–24", "25–34", "35–44", "45–54", "55–64", "65+"]
     static let genders = [notShared, "Woman", "Man", "Non-binary"]
 
     static var useAI: Bool {
-        UserDefaults.standard.object(forKey: useAIKey) as? Bool ?? true
+        UserDefaults.standard.bool(forKey: useAIKey) && !isUnder18
+    }
+
+    /// AI picks are never used for under-18s
+    static var isUnder18: Bool {
+        UserDefaults.standard.string(forKey: ageRangeKey) == under18
     }
 
     /// The stored answer, or nil when the user hasn't shared one

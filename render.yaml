@@ -1,0 +1,29 @@
+# Render blueprint for the backend: New -> Blueprint in the Render dashboard, then pick this repo.
+# Values marked sync: false are entered in the dashboard and never committed
+services:
+  - type: web
+    name: movie-list-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node server.js
+    healthCheckPath: /health
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      # The whole service-account JSON, pasted as one value
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_DAILY_LIMIT
+        value: "40"
