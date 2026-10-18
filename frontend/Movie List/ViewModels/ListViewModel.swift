@@ -110,6 +110,8 @@ class ListViewModel: ObservableObject {
     @Published private(set) var isLoadingGenres = false
     // Set once a movie's new rank is saved, so the list can scroll to where it landed
     @Published var movedMovieID: Int64? = nil
+    // Set when a drag to reorder couldn't be saved and the old order was put back
+    @Published var reorderFailed = false
     
     var movieList: CDMovieList
     private let context: NSManagedObjectContext
@@ -196,6 +198,38 @@ class ListViewModel: ObservableObject {
         }
     }
     
+    /// Drag to reorder: moves the rows straight away and saves in the background, putting the old
+    /// order back if the server can't save it
+    func moveMovie(from source: IndexSet, to destination: Int) {
+        guard let from = source.first else { return }
+        let movie = movies[from]
+        // destination counts the moved row's old slot, so moving down lands one place earlier
+        let newIndex = destination > from ? destination - 1 : destination
+        guard newIndex != from else { return }
+
+        let previous = movies
+        movies.move(fromOffsets: source, toOffset: destination)
+        for (index, movie) in movies.enumerated() {
+            movie.rank = Int32(index + 1)
+        }
+        try? context.save()
+
+        APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: movie.id, rank: newIndex + 1) { result in
+            DispatchQueue.main.async {
+                guard case .failure(let error) = result else { return }
+                print("error saving new order:", error)
+                withAnimation(Theme.spring) {
+                    self.movies = previous
+                    for (index, movie) in previous.enumerated() {
+                        movie.rank = Int32(index + 1)
+                    }
+                }
+                try? self.context.save()
+                self.reorderFailed = true
+            }
+        }
+    }
+
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
             DispatchQueue.main.async {

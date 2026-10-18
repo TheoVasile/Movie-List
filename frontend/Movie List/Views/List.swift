@@ -22,7 +22,13 @@ struct ListView: View {
 
     init(movieList: CDMovieList, context: NSManagedObjectContext) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
+        self.movieList = movieList
     }
+    // Observed so the title and description update right after the list is edited
+    @ObservedObject private var movieList: CDMovieList
+    // Active while the user drags films into a new order
+    @State private var editMode: EditMode = .inactive
+    @State private var editingDetails = false
     
     // Search and genre filters only change which rows are shown; ranks stay as they are
     var filteredMovies: [CDMovie] {
@@ -70,8 +76,43 @@ struct ListView: View {
         }
         .searchable(text: $viewModel.searchText, prompt: "Search this list")
         .onAppear { viewModel.loadInfo() }
-        .navigationTitle(viewModel.movieList.name ?? "No Movie Name")
+        .navigationTitle(movieList.name ?? "No Movie Name")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarTitleMenu {
+            Button {
+                editingDetails = true
+            } label: {
+                Label("Edit Details", systemImage: "pencil")
+            }
+            if viewModel.movies.count > 1 {
+                Button {
+                    startReordering()
+                } label: {
+                    Label("Reorder Films", systemImage: "arrow.up.arrow.down")
+                }
+            }
+        }
+        .toolbar {
+            // On the left, next to Back: the right side already has three buttons, and a fourth would be
+            // folded into a "more" (•••) menu
+            if editMode.isEditing {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") {
+                        Haptics.success()
+                        withAnimation(Theme.spring) { editMode = .inactive }
+                    }
+                    .bold()
+                }
+            }
+        }
+        .sheet(isPresented: $editingDetails) {
+            EditListSheet(movieList: movieList)
+        }
+        .alert("Couldn't save the new order", isPresented: $viewModel.reorderFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The list is back the way it was. Check your connection and try again.")
+        }
         .toolbar { ToolbarOptions }
         .confirmationDialog(
             bulkWatchedTitle,
@@ -110,6 +151,15 @@ private extension ListView {
     var MovieListSection: some View {
         ScrollViewReader { proxy in
             List {
+                if let overview = movieList.overview, !overview.isEmpty, !editMode.isEditing {
+                    Text(overview)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
+                }
                 if viewModel.movies.isEmpty {
                     EmptyStateView(
                         icon: "film",
@@ -179,7 +229,10 @@ private extension ListView {
                         }
                         .id(movie.id)
                 }
+                // Only while reordering, and never on a filtered list, where positions wouldn't be ranks
+                .onMove(perform: editMode.isEditing && !isFiltering ? viewModel.moveMovie : nil)
             }
+            .environment(\.editMode, $editMode)
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .onChange(of: viewModel.movedMovieID) { movieID in
@@ -346,6 +399,7 @@ private extension ListView {
     }
 
     func openDetail(_ movie: CDMovie) {
+        guard !editMode.isEditing else { return }
         Haptics.tap()
         detailMovie = movie
         showDetail = true
@@ -358,6 +412,14 @@ private extension ListView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             withAnimation(Theme.spring, show)
         }
+    }
+
+    // Shows every film so each one can be dragged to its new rank
+    func startReordering() {
+        Haptics.tap()
+        viewModel.searchText = ""
+        viewModel.selectedGenres = []
+        withAnimation(Theme.spring) { editMode = .active }
     }
 
     func dismissCompare() {

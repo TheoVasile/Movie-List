@@ -54,6 +54,18 @@ async function deleteList(list_id) {
     }
 }
 
+// Renames a list and/or changes its description. Fields left undefined keep their current value
+async function updateList(list_id, { name, overview }) {
+    const result = await pool.query(
+        `UPDATE lists
+         SET name = COALESCE($2, name), overview = COALESCE($3, overview), date_modified = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING *`,
+        [list_id, name ?? null, overview ?? null]
+    );
+    return result.rows[0];
+}
+
 async function isListOwner(list_id, user_id) {
     const result = await pool.query(
         "SELECT 1 FROM lists WHERE id = $1 AND user_id = $2",
@@ -62,4 +74,4 @@ async function isListOwner(list_id, user_id) {
     return result.rowCount > 0;
 }
 
-module.exports = { createList, deleteList, fetchLists, isListOwner };
+module.exports = { createList, deleteList, fetchLists, isListOwner, updateList };
