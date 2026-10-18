@@ -35,7 +35,7 @@ struct SignUpView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Create account")
                             .font(.system(size: 32, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.textPrimary)
                         Text("Start building your ranked film lists.")
                             .foregroundColor(Theme.textSecondary)
                     }

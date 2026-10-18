@@ -13,6 +13,9 @@ struct DiscoverView: View {
     @EnvironmentObject var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @StateObject private var viewModel = DiscoverViewModel()
+    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
 
     @State private var dragOffset: CGSize = .zero
     @State private var showDetails = false
@@ -54,7 +57,7 @@ struct DiscoverView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
                 if let ranking {
-                    Color.black.opacity(0.6)
+                    Theme.scrim
                         .ignoresSafeArea()
                         .onTapGesture { endRanking() }
                         .transition(.opacity)
@@ -70,6 +73,13 @@ struct DiscoverView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Section(sourceDescription) {
+                            Picker("Recommendations", selection: $useAI) {
+                                Label("AI Picks", systemImage: "brain").tag(true)
+                                Label("Classic (TMDb)", systemImage: "film.stack").tag(false)
+                            }
+                            .disabled(isUnder18)
+                        }
                         Section(profileDescription) {
                             Button {
                                 withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
@@ -93,6 +103,18 @@ struct DiscoverView: View {
             listPicker
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: askForAIConsent) {
+            aiConsentSheet
+                .presentationDetents([.medium])
+                .interactiveDismissDisabled()
+        }
+        .onChange(of: useAI) { _ in
+            aiConsentAsked = true
+            withAnimation(Theme.spring) { viewModel.sourceChanged() }
+        }
+        .onChange(of: ageRange) { _ in
+            withAnimation(Theme.spring) { viewModel.sourceChanged() }
         }
         .onAppear(perform: syncWithLists)
         .onChange(of: listedIDs) { _ in syncWithLists() }
@@ -132,6 +154,65 @@ private extension DiscoverView {
         viewModel.profile.favoriteGenres.compactMap { TasteProfile.genreNames[$0] }
     }
 
+    var isUnder18: Bool {
+        ageRange == Personalization.under18
+    }
+
+    // Asked once, the first time Discover opens, before anything is sent to the AI
+    var askForAIConsent: Binding<Bool> {
+        Binding(get: { !aiConsentAsked && !isUnder18 }, set: { _ in })
+    }
+
+    var aiConsentSheet: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "brain")
+                .font(.system(size: 40))
+                .foregroundStyle(Theme.accentGradient)
+            Text("Try AI Picks?")
+                .font(.title2.bold())
+                .foregroundColor(Theme.textPrimary)
+            Text("Discover can send the titles in your lists, your Discover swipes, and your iPhone's country and language to Claude, Anthropic's AI, to pick films for you. Your name and email are never sent. You can change this any time in Settings.")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+            Button {
+                Haptics.tap()
+                aiConsentAsked = true
+                useAI = true
+            } label: {
+                Text("Allow AI Picks")
+                    .font(.headline)
+                    .foregroundColor(Theme.onAccent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.accentGradient, in: Capsule())
+            }
+            Button("Use Classic Recommendations") {
+                aiConsentAsked = true
+                useAI = false
+            }
+            .foregroundColor(Theme.accent)
+        }
+        .padding(24)
+        .frame(maxHeight: .infinity)
+        .background(Theme.background.ignoresSafeArea())
+    }
+
+    var sourceDescription: String {
+        if isUnder18 {
+            return "Recommended by TMDb from your lists"
+        }
+        if !useAI {
+            return "Recommended by TMDb from your lists"
+        }
+        return viewModel.aiAvailable ? "Picked by Claude from your lists and swipes" : "AI picks unavailable, using TMDb for now"
+    }
+
+    // Sparkles mark AI recommendations, so they only appear while AI Picks is the chosen source
+    var showingAIPicks: Bool {
+        useAI && !isUnder18
+    }
+
     var profileDescription: String {
         let swipes = viewModel.profile.swipeCount
         guard swipes > 0 else { return "Swipe to teach Discover your taste" }
@@ -141,7 +222,7 @@ private extension DiscoverView {
     // Shows what the swipes have taught Discover so far
     var tasteSummary: some View {
         HStack(spacing: 8) {
-            Image(systemName: "sparkles")
+            Image(systemName: showingAIPicks ? "sparkles" : "heart.fill")
                 .foregroundStyle(Theme.accentGradient)
             Text("Tuned to \(favoriteGenreNames.joined(separator: ", "))")
                 .foregroundColor(Theme.textSecondary)
@@ -165,7 +246,7 @@ private extension DiscoverView {
             stamp("ADD", color: Theme.accent, rotation: -14)
                 .opacity(Double(max(dragOffset.width, 0) / swipeThreshold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            stamp("PASS", color: Theme.accentSecondary, rotation: 14)
+            stamp("NOT NOW", color: Theme.accentSecondary, rotation: 14)
                 .opacity(Double(max(-dragOffset.width, 0) / swipeThreshold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
@@ -205,11 +286,15 @@ private extension DiscoverView {
     }
 
     var actionButtons: some View {
-        HStack(spacing: 28) {
+        HStack(spacing: 22) {
+            circleButton(icon: "hand.thumbsdown", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
+                notForMe()
+            }
+            .accessibilityLabel("Not for me")
             circleButton(icon: "xmark", size: 64, style: AnyShapeStyle(Theme.accentSecondary), filled: false) {
                 swipeLeft()
             }
-            .accessibilityLabel("Pass")
+            .accessibilityLabel("Skip")
             circleButton(icon: showDetails ? "info.circle.fill" : "info", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
                 withAnimation(Theme.spring) { showDetails.toggle() }
             }
@@ -225,12 +310,12 @@ private extension DiscoverView {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: size * 0.36, weight: .heavy))
-                .foregroundStyle(filled ? AnyShapeStyle(Color.black) : style)
+                .foregroundStyle(filled ? AnyShapeStyle(Theme.onAccent) : style)
                 .frame(width: size, height: size)
                 .background(filled ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
-                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
         }
         .buttonStyle(PressableButtonStyle(scale: 0.88))
     }
@@ -283,6 +368,24 @@ private extension DiscoverView {
                 dragOffset = .zero
                 showDetails = false
             }
+        }
+    }
+
+    // Unlike a skip, this tells Discover the user doesn't want films like this one.
+    // The card drops away instead of sliding left, so the two feel different
+    func notForMe() {
+        guard let movie = viewModel.topMovie else { return }
+        Haptics.select()
+        withAnimation(.easeIn(duration: 0.22)) {
+            dragOffset = CGSize(width: 0, height: 900)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            withAnimation(Theme.spring) {
+                viewModel.dislike(movie)
+                dragOffset = .zero
+                showDetails = false
+            }
+            showToast("Got it, fewer films like this")
         }
     }
 
@@ -380,14 +483,14 @@ private extension DiscoverView {
         if let toast {
             Label(toast, systemImage: "checkmark.circle.fill")
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
-                .shadow(color: .black.opacity(0.4), radius: 16, y: 8)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 16, y: 8)
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
         }
@@ -413,7 +516,7 @@ private extension DiscoverView {
                                         .foregroundStyle(Theme.accentGradient)
                                     Text(movie.title)
                                         .font(.headline)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Theme.textPrimary)
                                         .lineLimit(2)
                                 }
                             }
@@ -470,7 +573,7 @@ private extension DiscoverView {
                 Button(action: createListAndAdd) {
                     HStack(spacing: 8) {
                         if isCreatingList {
-                            ProgressView().tint(.black)
+                            ProgressView().tint(Theme.onAccent)
                         }
                         Text(isCreatingList ? "Creating…" : "Create List & Add")
                     }
@@ -496,7 +599,7 @@ private extension DiscoverView {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     Text("New List")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                     Spacer()
                 }
                 .padding(12)
@@ -553,7 +656,7 @@ private extension DiscoverView {
             VStack(alignment: .leading, spacing: 3) {
                 Text(list.name ?? "No Name")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Text("\(list.movies.count) \(list.movies.count == 1 ? "film" : "films")")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
@@ -607,7 +710,7 @@ private struct DiscoverCard: View {
             .aspectRatio(2/3, contentMode: .fit)
             .overlay(alignment: .bottom) { info }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .shadow(color: .black.opacity(0.55), radius: 24, y: 12)
+            .shadow(color: Theme.shadow.opacity(0.55), radius: 24, y: 12)
     }
 
     private var info: some View {
@@ -623,19 +726,26 @@ private struct DiscoverCard: View {
             }
             Text(movie.title)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.posterText)
                 .lineLimit(3)
                 .minimumScaleFactor(0.7)
+            if let reason = movie.reason, !reason.isEmpty {
+                Label(reason, systemImage: "sparkles")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(Theme.posterText.opacity(0.9))
+                    .lineLimit(showDetails ? 4 : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if showDetails, !movie.overview.isEmpty {
                 Text(movie.overview)
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundColor(Theme.posterText.opacity(0.85))
                     .lineLimit(9)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
                 Label("Tap for details", systemImage: "hand.tap")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(Theme.posterText.opacity(0.62))
             }
         }
         .padding(20)

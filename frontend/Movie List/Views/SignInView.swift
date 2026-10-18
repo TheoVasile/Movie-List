@@ -39,7 +39,7 @@ struct SignInView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Welcome back")
                                 .font(.system(size: 32, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundColor(Theme.textPrimary)
                             Text("Sign in to pick up where you left off.")
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -156,7 +156,7 @@ struct AuthField: View {
             .focused($focused)
             .textInputAutocapitalization(.never)
             .disableAutocorrection(true)
-            .foregroundColor(.white)
+            .foregroundColor(Theme.textPrimary)
         }
         .padding(16)
         .background(Theme.surface.opacity(0.85))

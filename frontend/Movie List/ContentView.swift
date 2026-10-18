@@ -13,6 +13,13 @@ struct ContentView: View {
     @EnvironmentObject var db: DatabaseService
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @State var showingPopup = false
+    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+
+    // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
+    private var discoverIcon: String {
+        useAI && ageRange != Personalization.under18 ? "sparkles" : "rectangle.on.rectangle.angled"
+    }
     
     var body: some View {
         TabView {
@@ -30,7 +37,7 @@ struct ContentView: View {
                 .environmentObject(viewModel)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
                 .tabItem {
-                    Label("Discover", systemImage: "sparkles")
+                    Label("Discover", systemImage: discoverIcon)
                 }
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)

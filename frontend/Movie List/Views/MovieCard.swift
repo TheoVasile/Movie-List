@@ -20,11 +20,11 @@ struct MovieCard: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Theme.accentGradient, lineWidth: isHighlighted ? 3 : 0)
                 )
-                .shadow(color: isHighlighted ? Theme.accent.opacity(0.5) : .black.opacity(0.45), radius: isHighlighted ? 18 : 10, y: 6)
+                .shadow(color: isHighlighted ? Theme.accent.opacity(0.5) : Theme.shadow.opacity(0.45), radius: isHighlighted ? 18 : 10, y: 6)
             VStack(alignment: .leading, spacing: 2) {
                 Text(movie.title ?? "None")
                     .font(.subheadline.weight(.bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(Theme.year(from: movie.release_date))

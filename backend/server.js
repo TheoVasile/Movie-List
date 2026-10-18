@@ -15,13 +15,18 @@ app.use(cors());
 
 createTables();
 
+// For the host's health checks, so it needs no sign-in
+app.get("/health", (req, res) => res.send("ok"));
+
 app.use("/auth", authRoutes);
 // Everything except account setup needs a signed-in user; /auth checks tokens per route
 app.use("/lists", verifyToken, listRoutes);
 app.use("/movies", verifyToken, movieRoutes);
 app.use("/letterboxd", verifyToken, letterboxdRoutes);
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+// Hosts like Render choose the port; locally it's 3000
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on port ${port}`));
 
 const shutdown = () => {
     console.log("\n🔻 Closing database connection pool...");

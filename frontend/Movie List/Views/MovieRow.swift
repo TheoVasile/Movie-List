@@ -18,30 +18,28 @@ struct MovieRow: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            rankBadge
             PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                 .frame(width: 58, height: 87)
-                .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 3)
+                // Rank sits on the poster's top-left corner, overhanging it slightly
+                .overlay(alignment: .topLeading) { rankBadge.offset(x: -8, y: -8) }
             VStack(alignment: .leading, spacing: 6) {
                 Text(movie.title ?? "No title")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     Text(Theme.year(from: movie.release_date))
+                        .fixedSize()
                     if !movie.original_language.isNilOrEmpty {
                         Text("·")
                         Text((movie.original_language ?? "").uppercased())
                     }
-                    if let info {
-                        if !info.certification.isEmpty {
-                            CertificationBadge(certification: info.certification)
-                        }
-                        if info.voteCount > 0 {
-                            UserScoreLabel(score: info.voteAverage)
-                        }
+                    if let info, !info.certification.isEmpty {
+                        CertificationBadge(certification: info.certification)
                     }
                 }
+                .lineLimit(1)
                 .font(.caption.weight(.medium))
                 .foregroundColor(Theme.textSecondary)
                 if movie.watched {
@@ -50,6 +48,10 @@ struct MovieRow: View {
                 }
             }
             Spacer(minLength: 0)
+            if let info, info.voteCount > 0 {
+                UserScoreLabel(score: info.voteAverage)
+                    .font(.subheadline.weight(.bold))
+            }
             Menu {
                 Button {
                     present { showSetRank = true }
@@ -98,16 +100,21 @@ struct MovieRow: View {
 
     private var rankBadge: some View {
         Text("\(movie.rank)")
-            .font(.system(size: movie.rank < 100 ? 28 : movie.rank < 1000 ? 22 : 18, weight: .heavy, design: .rounded))
-            // Equal-width digits so every rank with the same number of digits is the same size
+            .font(.system(size: 12, weight: .black, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(movie.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-            // One line, shrinking to fit the column rather than wrapping onto a second line
+            .foregroundColor(movie.rank <= 3 ? Theme.onAccent : Theme.textPrimary)
             .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .frame(width: 44)
+            .fixedSize()
             .contentTransition(.numericText())
             .animation(Theme.spring, value: movie.rank)
+            .padding(.horizontal, 7)
+            .frame(minWidth: 24, minHeight: 22)
+            .background(
+                Capsule().fill(movie.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+            )
+            .overlay(Capsule().stroke(movie.rank <= 3 ? Color.clear : Theme.stroke, lineWidth: 1))
+            .shadow(color: Theme.shadow.opacity(0.4), radius: 4, y: 2)
+            .accessibilityLabel("Ranked \(movie.rank)")
     }
 
     private func present(_ change: () -> Void) {
@@ -122,7 +129,7 @@ struct WatchedTag: View {
     var body: some View {
         Label("Watched", systemImage: "checkmark.circle.fill")
             .font(.caption2.weight(.bold))
-            .foregroundColor(.black)
+            .foregroundColor(Theme.onAccent)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(Theme.accentGradient)
@@ -138,12 +145,12 @@ struct CertificationBadge: View {
     var body: some View {
         Text(certification)
             .font(.caption2.weight(.heavy))
-            .foregroundColor(.white.opacity(0.85))
+            .foregroundColor(Theme.textPrimary.opacity(0.85))
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .overlay(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                    .stroke(Theme.textPrimary.opacity(0.5), lineWidth: 1)
             )
             .fixedSize()
             .accessibilityLabel("Rated \(certification)")
@@ -155,11 +162,17 @@ struct UserScoreLabel: View {
     let score: Double
 
     var body: some View {
-        Label(String(format: "%.1f", score), systemImage: "star.fill")
-            .labelStyle(.titleAndIcon)
-            .foregroundColor(Theme.accent)
-            .fixedSize()
-            .accessibilityLabel("TMDb user score \(String(format: "%.1f", score)) out of 10")
+        HStack(spacing: 3) {
+            Image(systemName: "star.fill")
+                .imageScale(.small)
+            Text(String(format: "%.1f", score))
+                .monospacedDigit()
+        }
+        .foregroundColor(Theme.accent)
+        .lineLimit(1)
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("TMDb user score \(String(format: "%.1f", score)) out of 10")
     }
 }
 

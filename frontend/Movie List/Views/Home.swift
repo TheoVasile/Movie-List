@@ -210,7 +210,7 @@ private extension Home {
             VStack(alignment: .leading, spacing: 18) {
                 Text("New List")
                     .font(.title2.weight(.bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 HStack(spacing: 12) {
                     Image(systemName: "list.star")
                         .foregroundStyle(Theme.accentGradient)
@@ -253,7 +253,7 @@ private struct ListCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(movieList.name ?? "No Name")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
                 Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
                     .font(.caption)
@@ -273,7 +273,7 @@ private struct ListCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Theme.stroke, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 8)
+        .shadow(color: Theme.shadow.opacity(0.35), radius: 12, y: 8)
     }
 
     // Top three films fanned out like a hand of cards, #1 in front
@@ -292,7 +292,7 @@ private struct ListCard: View {
                 ForEach(Array(topPosters.enumerated().reversed()), id: \.offset) { index, path in
                     PosterImage(path: path, cornerRadius: 10, size: .medium)
                         .frame(width: 90, height: 135)
-                        .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+                        .shadow(color: Theme.shadow.opacity(0.5), radius: 8, y: 4)
                         .rotationEffect(.degrees(Double(index) * (index.isMultiple(of: 2) ? 9 : -9)))
                         .offset(x: CGFloat(index) * (index.isMultiple(of: 2) ? 22 : -22), y: CGFloat(index) * 4)
                         .scaleEffect(1 - CGFloat(index) * 0.08)

@@ -71,7 +71,7 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
                 } else {
                     Text("Oops! You're not logged in.")
                         .font(.title2.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.textPrimary)
                 }
                 Spacer()
                 Button("Get Started") {
@@ -104,7 +104,7 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
                                 .foregroundStyle(Theme.accentGradient)
                             Text("Signed in as \(viewModel.displayName)")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Theme.textPrimary)
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 18)
@@ -112,7 +112,7 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.4), radius: 16, y: 8)
+                        .shadow(color: Theme.shadow.opacity(0.4), radius: 16, y: 8)
                     }
                     .buttonStyle(PressableButtonStyle())
                     .padding(.bottom, 100)
