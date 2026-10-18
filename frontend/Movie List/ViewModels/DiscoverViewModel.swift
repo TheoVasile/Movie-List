@@ -180,9 +180,12 @@ class DiscoverViewModel: ObservableObject {
     private var aiSuggestedTitles: [String] = []
     // Every film dealt this session
     private var shownIDs: Set<Int64> = []
+    // Genres the user chose to see; empty means automatic, tuned to their taste. Kept across launches
+    @Published private(set) var genreFilter: Set<Int>
 
     private static let passedKey = "discover.passedMovieIDs"
     private static let dislikedKey = "discover.dislikedMovieIDs"
+    private static let genreFilterKey = "discover.genreFilter"
     private static let profileKey = "discover.tasteProfile"
     private static let maxPages = 30
     private static let refillThreshold = 5
@@ -191,6 +194,7 @@ class DiscoverViewModel: ObservableObject {
         let stored = UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? []
         passedIDs = Set(stored.map(Int64.init))
         dislikedIDs = Set((UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? []).map(Int64.init))
+        genreFilter = Set(UserDefaults.standard.array(forKey: Self.genreFilterKey) as? [Int] ?? [])
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
     }
@@ -272,6 +276,14 @@ class DiscoverViewModel: ObservableObject {
         isExhausted = false
         deck = []
         loadMore()
+    }
+
+    /// Shows only films in these genres (any of them), or goes back to automatic when empty. Starts the deck over
+    func setGenreFilter(_ genres: Set<Int>) {
+        guard genres != genreFilter else { return }
+        genreFilter = genres
+        UserDefaults.standard.set(Array(genres), forKey: Self.genreFilterKey)
+        sourceChanged()
     }
 
     /// Starts the deck over after switching between AI picks and TMDb recommendations
@@ -357,6 +369,8 @@ class DiscoverViewModel: ObservableObject {
     private func isFresh(_ movie: Movie) -> Bool {
         !listedIDs.contains(movie.id) && !passedIDs.contains(movie.id) && !dislikedIDs.contains(movie.id) && !shownIDs.contains(movie.id)
             && !deck.contains { $0.id == movie.id }
+            // The server and the AI are asked for these genres too; this catches any that slip through
+            && (genreFilter.isEmpty || !genreFilter.isDisjoint(with: movie.genre_ids ?? []))
     }
 
     private func deal(_ movies: [Movie]) {
@@ -377,6 +391,7 @@ class DiscoverViewModel: ObservableObject {
             disliked: profile.recentDisliked.map(film),
             favorite_genres: leanings.towards.compactMap(genreName),
             avoided_genres: leanings.awayFrom.compactMap(genreName),
+            required_genres: genreFilter.sorted().compactMap(genreName),
             swipe_count: profile.swipeCount,
             like_count: profile.likeCount,
             region: Locale.current.region?.identifier,
@@ -409,7 +424,15 @@ class DiscoverViewModel: ObservableObject {
 
     private func loadFromTMDb() {
         isLoading = true
-        APIService.shared.discoverMovies(seeds: nextSeeds(), genres: profile.favoriteGenres, avoidGenres: profile.avoidedGenres, page: page) { result in
+        // A chosen genre beats a learned dislike of it
+        let chosen = !genreFilter.isEmpty
+        APIService.shared.discoverMovies(
+            seeds: nextSeeds(),
+            genres: chosen ? genreFilter.sorted() : profile.favoriteGenres,
+            avoidGenres: profile.avoidedGenres.filter { !genreFilter.contains($0) },
+            onlyGenres: chosen,
+            page: page
+        ) { result in
             self.isLoading = false
             switch result {
             case .success(let movies):

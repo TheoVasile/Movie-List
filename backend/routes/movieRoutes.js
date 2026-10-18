@@ -125,12 +125,14 @@ function parseIds(value, limit) {
 // Films for the Discover tab: TMDb recommendations for the given films (seeds: the user's top-ranked
 // and recently liked films) plus well-rated films in their favourite genres (genres), interleaved so
 // no single source dominates, followed by this week's trending films. avoid_genres keeps disliked
-// genres out of the genre feed. The app filters out films already in a list and orders by taste
+// genres out of the genre feed. only_genres=1 means the user picked these genres themselves: then every
+// film returned has at least one of them. The app filters out films already in a list and orders by taste
 router.get("/discover", async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
         const seeds = parseIds(req.query.seeds, 8);
-        const genres = parseIds(req.query.genres, 3);
+        const onlyGenres = req.query.only_genres === "1";
+        const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
         const avoidGenres = parseIds(req.query.avoid_genres, 3);
         const params = { api_key: process.env.API_KEY, language: "en-US", page };
 
@@ -164,9 +166,11 @@ router.get("/discover", async (req, res) => {
         }
 
         const seen = new Set(seeds);
+        const wanted = new Set(genres);
         const movies = [...interleaved, ...resultsOf(trending)]
             .map(toDiscoverMovie)
-            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id));
+            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
+            .filter((movie) => !onlyGenres || movie.genre_ids.some((id) => wanted.has(id)));
 
         res.json(movies);
     } catch (error) {
@@ -219,6 +223,7 @@ router.post("/ai-discover", async (req, res) => {
             disliked: cleanFilms(body.disliked, 500),
             favoriteGenres: cleanStrings(body.favorite_genres, 10),
             avoidedGenres: cleanStrings(body.avoided_genres, 10),
+            requiredGenres: cleanStrings(body.required_genres, 20),
             ageRange: cleanText(body.age_range, 20),
             // Builds from before pronouns replaced gender still send "gender"; translate it like the app does
             pronouns: cleanText(body.pronouns ?? LEGACY_GENDER_PRONOUNS[body.gender], 30),

@@ -32,6 +32,9 @@ struct DiscoverView: View {
     @FocusState private var newListFocused: Bool
     // Placing a film just added from Discover within its list, using the same head-to-head Compare
     @State private var ranking: (model: ListViewModel, movie: CDMovie)? = nil
+    @State private var showGenrePicker = false
+    // Genres ticked in the picker, applied when it closes with Done
+    @State private var draftGenres: Set<Int> = []
 
     private let swipeThreshold: CGFloat = 110
 
@@ -43,10 +46,8 @@ struct DiscoverView: View {
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.5), value: viewModel.topMovie?.id)
                 VStack(spacing: 22) {
-                    if !favoriteGenreNames.isEmpty {
-                        tasteSummary
-                            .transition(.opacity)
-                    }
+                    tasteSummary
+                        .transition(.opacity)
                     cardStack
                         .frame(maxHeight: .infinity)
                     if viewModel.topMovie != nil {
@@ -101,6 +102,11 @@ struct DiscoverView: View {
         }
         .sheet(isPresented: $showListPicker, onDismiss: listPickerDismissed) {
             listPicker
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showGenrePicker) {
+            genrePicker
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -219,21 +225,141 @@ private extension DiscoverView {
         return "Learned from \(swipes) \(swipes == 1 ? "swipe" : "swipes")"
     }
 
-    // Shows what the swipes have taught Discover so far
+    // Which genres Discover is showing: the ones picked by the user, or what their swipes have taught it.
+    // Tapping it opens the genre picker
     var tasteSummary: some View {
-        HStack(spacing: 8) {
-            Image(systemName: showingAIPicks ? "sparkles" : "heart.fill")
-                .foregroundStyle(Theme.accentGradient)
-            Text("Tuned to \(favoriteGenreNames.joined(separator: ", "))")
-                .foregroundColor(Theme.textSecondary)
-                .lineLimit(1)
+        Button {
+            Haptics.tap()
+            draftGenres = viewModel.genreFilter
+            showGenrePicker = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: showingAIPicks ? "sparkles" : viewModel.genreFilter.isEmpty ? "heart.fill" : "line.3.horizontal.decrease")
+                    .foregroundStyle(Theme.accentGradient)
+                Text(genreSummary)
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .animation(Theme.spring, value: genreSummary)
         }
-        .font(.caption.weight(.semibold))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .animation(Theme.spring, value: favoriteGenreNames)
+        .buttonStyle(PressableButtonStyle(scale: 0.94))
+        .accessibilityLabel("Genres: \(genreSummary)")
+        .accessibilityHint("Choose which genres Discover shows")
+    }
+
+    var genreSummary: String {
+        if !viewModel.genreFilter.isEmpty {
+            return "Only " + Self.genreName(viewModel.genreFilter.sorted { Self.genreName($0) < Self.genreName($1) })
+        }
+        return favoriteGenreNames.isEmpty ? "All genres" : "Tuned to \(favoriteGenreNames.joined(separator: ", "))"
+    }
+
+    static func genreName(_ ids: [Int]) -> String {
+        ids.map(genreName).joined(separator: ", ")
+    }
+
+    static func genreName(_ id: Int) -> String {
+        TasteProfile.genreNames[id] ?? "Other"
+    }
+
+    // Every genre TMDb uses for films, alphabetically. TV Movie is left out, since Discover only deals feature films
+    static let pickableGenres = TasteProfile.genreNames.keys.filter { $0 != 10770 }.sorted { genreName($0) < genreName($1) }
+
+    var genrePicker: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Button {
+                        Haptics.tap()
+                        draftGenres = []
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "heart.fill")
+                                .foregroundStyle(Theme.accentGradient)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Automatic")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(favoriteGenreNames.isEmpty ? "Learns your taste from your lists and swipes" : "Tuned to \(favoriteGenreNames.joined(separator: ", "))")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            Spacer()
+                            if draftGenres.isEmpty {
+                                Image(systemName: "checkmark")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundColor(Theme.accent)
+                            }
+                        }
+                        .padding(14)
+                        .cardStyle(cornerRadius: 16)
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.97))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("OR PICK GENRES")
+                            .font(.caption2.weight(.heavy))
+                            .tracking(1.2)
+                            .foregroundColor(Theme.textSecondary)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+                            ForEach(Self.pickableGenres, id: \.self) { genre in
+                                genreOption(genre)
+                            }
+                        }
+                        Text("Discover will only show films in at least one of the genres you pick.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                }
+                .padding(20)
+            }
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Genres")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showGenrePicker = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        Haptics.success()
+                        showGenrePicker = false
+                        withAnimation(Theme.spring) { viewModel.setGenreFilter(draftGenres) }
+                    }
+                    .bold()
+                }
+            }
+        }
+    }
+
+    func genreOption(_ genre: Int) -> some View {
+        let isSelected = draftGenres.contains(genre)
+        return Button {
+            Haptics.tap()
+            if isSelected { draftGenres.remove(genre) } else { draftGenres.insert(genre) }
+        } label: {
+            Text(Self.genreName(genre))
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundColor(isSelected ? Theme.onAccent : Theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(isSelected ? Color.clear : Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // 0 at rest, 1 once the top card has been dragged past the swipe threshold
