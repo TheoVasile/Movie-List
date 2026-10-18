@@ -283,6 +283,9 @@ struct SecondaryButtonStyle: ButtonStyle {
 struct MetaChip: View {
     let icon: String
     let text: String
+    // On a poster the chip can't rely on the theme's colours, since the poster behind it can be any
+    // colour; it gets white text on a dark backing that reads over every poster in both themes
+    var onPoster = false
 
     var body: some View {
         HStack(spacing: 5) {
@@ -291,11 +294,12 @@ struct MetaChip: View {
             Text(text)
                 .font(.caption.weight(.semibold))
         }
-        .foregroundColor(Theme.textPrimary.opacity(0.85))
+        .foregroundColor(onPoster ? Theme.posterText : Theme.textPrimary.opacity(0.85))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Theme.textPrimary.opacity(0.1))
+        .background(onPoster ? Color.black.opacity(0.55) : Theme.textPrimary.opacity(0.1))
         .clipShape(Capsule())
+        .overlay(Capsule().stroke(onPoster ? Color.white.opacity(0.18) : .clear, lineWidth: 1))
     }
 }
 
