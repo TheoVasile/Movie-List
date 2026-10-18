@@ -1,0 +1,9 @@
+# macOS folder metadata
+.DS_Store
+
+# Per-user Xcode state (window layout, breakpoints, scheme order); changes on every launch
+xcuserdata/
+
+# Xcode build output
+DerivedData/
+build/
