@@ -114,6 +114,30 @@ struct AIDiscoverRequest: Encodable {
     let count: Int
 }
 
+/// A streaming service, shop or free service, as TMDb names it
+struct WatchProvider: Decodable, Hashable, Identifiable {
+    let id: Int
+    let name: String
+    let logo_path: String?
+
+    var logoURL: URL? {
+        logo_path.flatMap { URL(string: "https://image.tmdb.org/t/p/w92\($0)") }
+    }
+}
+
+/// Where a film can be watched in one country. Availability data is from JustWatch, via TMDb
+struct WatchProviders: Decodable {
+    let region: String
+    // TMDb's watch page for the film, which links out to each service
+    let link: String?
+    let stream: [WatchProvider]
+    let free: [WatchProvider]
+    let rent: [WatchProvider]
+    let buy: [WatchProvider]
+
+    var isEmpty: Bool { stream.isEmpty && free.isEmpty && rent.isEmpty && buy.isEmpty }
+}
+
 class APIService {
     static let shared = APIService()
     #if !DEBUG
@@ -485,6 +509,30 @@ class APIService {
                 result = .success(decoded.imdb_id)
             } else {
                 result = .failure(error ?? NSError(domain: "IMDb lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// Where the film can be streamed, rented or bought in the given country (two-letter code)
+    func fetchWatchProviders(tmdbID: Int64, region: String, completion: @escaping (Result<WatchProviders, Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/movies/providers")
+        components?.queryItems = [
+            URLQueryItem(name: "tmdb_id", value: String(tmdbID)),
+            URLQueryItem(name: "region", value: region),
+        ]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<WatchProviders, Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let decoded = try? JSONDecoder().decode(WatchProviders.self, from: data) {
+                result = .success(decoded)
+            } else {
+                result = .failure(error ?? NSError(domain: "Watch providers lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }

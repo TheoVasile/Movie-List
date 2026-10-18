@@ -704,6 +704,8 @@ private extension DiscoverView {
 private struct DiscoverCard: View {
     let movie: Movie
     let showDetails: Bool
+    // Fetched the first time the card's details are opened
+    @State private var providers: WatchProviders? = nil
 
     var body: some View {
         PosterImage(path: movie.poster_path, cornerRadius: 28, size: .xlarge)
@@ -742,6 +744,14 @@ private struct DiscoverCard: View {
                     .foregroundColor(Theme.posterText.opacity(0.85))
                     .lineLimit(9)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            if showDetails {
+                streamingRow
+                    .onAppear {
+                        WatchProvidersStore.shared.load(tmdbID: movie.id) { loaded in
+                            withAnimation(Theme.spring) { providers = loaded }
+                        }
+                    }
             } else {
                 Label("Tap for details", systemImage: "hand.tap")
                     .font(.caption.weight(.semibold))
@@ -758,6 +768,32 @@ private struct DiscoverCard: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    // Streaming and free services only, since that's what decides "can I watch this tonight?"
+    @ViewBuilder
+    private var streamingRow: some View {
+        if let providers {
+            let services = providers.stream + providers.free
+            if services.isEmpty {
+                Label("Not streaming in \(Locale.current.localizedString(forRegionCode: providers.region) ?? providers.region)", systemImage: "tv.slash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.posterText.opacity(0.62))
+            } else {
+                HStack(spacing: 8) {
+                    Text("Streaming on")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.posterText.opacity(0.75))
+                    ForEach(services.prefix(5)) { provider in
+                        ProviderLogo(provider: provider, size: 28)
+                    }
+                }
+                .transition(.opacity)
+            }
+        } else {
+            // Holds the row's place while loading, and gives onAppear something to fire on
+            Color.clear.frame(height: 28)
+        }
     }
 }
 

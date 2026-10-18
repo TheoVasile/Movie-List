@@ -18,6 +18,7 @@ struct MovieDetailView: View {
     @State private var revealed = false
     @State private var imdbID: String? = nil
     @State private var info: MovieInfo? = nil
+    @State private var providers: WatchProviders? = nil
 
     private static let imdbCacheKey = "imdbIDs"
 
@@ -42,6 +43,9 @@ struct MovieDetailView: View {
             }
             loadIMDbID()
             loadInfo()
+            WatchProvidersStore.shared.load(tmdbID: Int64(movie.tmdb_id)) { loaded in
+                withAnimation(Theme.spring) { providers = loaded }
+            }
         }
     }
 
@@ -251,6 +255,11 @@ struct MovieDetailView: View {
                     .transition(.opacity)
             }
 
+            if let providers {
+                WatchProvidersSection(providers: providers)
+                    .transition(.opacity)
+            }
+
             imdbLink
                 .appearAnimation(delay: 0.32)
 
@@ -268,6 +277,119 @@ struct MovieDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Where to watch
+
+/// Watch providers for the user's country, fetched once per film and kept for the rest of the session
+final class WatchProvidersStore {
+    static let shared = WatchProvidersStore()
+    private var cache: [Int64: WatchProviders] = [:]
+
+    /// The iPhone's country, which is where the user is most likely watching
+    static var region: String {
+        Locale.current.region?.identifier ?? "US"
+    }
+
+    /// Calls back on the main thread, straight away if cached; nothing happens when the lookup fails
+    func load(tmdbID: Int64, completion: @escaping (WatchProviders) -> Void) {
+        guard tmdbID > 0 else { return }
+        if let cached = cache[tmdbID] {
+            completion(cached)
+            return
+        }
+        APIService.shared.fetchWatchProviders(tmdbID: tmdbID, region: Self.region) { result in
+            guard case .success(let providers) = result else { return }
+            self.cache[tmdbID] = providers
+            completion(providers)
+        }
+    }
+}
+
+struct WatchProvidersSection: View {
+    let providers: WatchProviders
+
+    private var countryName: String {
+        Locale.current.localizedString(forRegionCode: providers.region) ?? providers.region
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Where to Watch")
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                Text(countryName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            if providers.isEmpty {
+                Text("Not available to stream, rent or buy in \(countryName) right now.")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+            } else {
+                group("Stream", providers.stream + providers.free)
+                group("Rent", providers.rent)
+                group("Buy", providers.buy)
+            }
+            HStack {
+                // TMDb's terms ask apps to credit JustWatch for this data
+                Text("Availability from JustWatch")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textTertiary)
+                Spacer()
+                if let link = providers.link.flatMap(URL.init(string:)), !providers.isEmpty {
+                    Link(destination: link) {
+                        Label("All options", systemImage: "arrow.up.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(Theme.accent)
+                    }
+                    .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+                }
+            }
+        }
+        .padding(14)
+        .cardStyle()
+    }
+
+    @ViewBuilder
+    private func group(_ title: String, _ items: [WatchProvider]) -> some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title.uppercased())
+                    .font(.caption2.weight(.heavy))
+                    .tracking(1.2)
+                    .foregroundColor(Theme.textSecondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(items) { provider in
+                            ProviderLogo(provider: provider, size: 44)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A service's square logo, with its name for VoiceOver
+struct ProviderLogo: View {
+    let provider: WatchProvider
+    let size: CGFloat
+
+    var body: some View {
+        AsyncImage(url: provider.logoURL) { image in
+            image.resizable().scaledToFit()
+        } placeholder: {
+            Theme.surfaceRaised
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+        .accessibilityLabel(provider.name)
     }
 }
 

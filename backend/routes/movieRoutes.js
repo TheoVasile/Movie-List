@@ -345,6 +345,49 @@ router.get("/imdb", async (req, res) => {
     }
 });
 
+// Where a film can be watched in one country, from TMDb (availability data by JustWatch), e.g.
+// ?tmdb_id=771&region=CA -> { region: "CA", link, stream: [{ id, name, logo_path }], free: [...], rent: [...], buy: [...] }.
+// Each group is in TMDb's display order; link is TMDb's watch page for the film. All empty when it isn't available there
+router.get("/providers", async (req, res) => {
+    const tmdbId = Number(req.query.tmdb_id);
+    const region = String(req.query.region ?? "US").toUpperCase();
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
+    if (!/^[A-Z]{2}$/.test(region)) {
+        return res.status(400).json({ error: "region must be a two-letter country code." });
+    }
+    const providers = (items) => {
+        const seen = new Set();
+        return (items ?? [])
+            .sort((a, b) => (a.display_priority ?? 0) - (b.display_priority ?? 0))
+            .filter((item) => !seen.has(item.provider_id) && seen.add(item.provider_id))
+            .map((item) => ({ id: item.provider_id, name: item.provider_name, logo_path: item.logo_path ?? null }));
+    };
+    try {
+        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/watch/providers`, {
+            params: { api_key: process.env.API_KEY },
+            timeout: 15000,
+        });
+        const country = response.data.results?.[region] ?? {};
+        res.json({
+            region,
+            link: country.link ?? null,
+            stream: providers(country.flatrate),
+            // Free with or without ads, e.g. Tubi or Pluto TV
+            free: providers([...(country.free ?? []), ...(country.ads ?? [])]),
+            rent: providers(country.rent),
+            buy: providers(country.buy),
+        });
+    } catch (error) {
+        if (error.response?.status === 404) {
+            return res.json({ region, link: null, stream: [], free: [], rent: [], buy: [] });
+        }
+        console.error("Error fetching watch providers:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Marks a film watched or unwatched for the signed-in user, in every list it appears in
 router.put("/watched", async (req, res) => {
     try {
