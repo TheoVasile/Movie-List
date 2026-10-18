@@ -248,55 +248,23 @@ private extension ListView {
     
     @ToolbarContentBuilder
     var ToolbarOptions: some ToolbarContent {
-        // Only Add lives in the navigation bar. With more buttons iOS folds some into a "more" (•••)
-        // menu, so the list's other actions are in a row at the top of the list instead
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                Haptics.tap()
-                viewModel.showPopup = true
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Theme.accentGradient)
-            }
-            .accessibilityLabel("Add Movie")
-        }
-    }
-
-    // Pick for Me, watched status and sharing, always visible above the films
-    var listActions: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                if viewModel.movies.count > 1 {
-                    Button {
-                        Haptics.tap()
-                        // The recommendation card is hidden while searching or filtering
-                        viewModel.searchText = ""
-                        viewModel.selectedGenres = []
-                        withAnimation(Theme.spring) { viewModel.recommendMovie() }
-                        recommendationScrollRequest += 1
-                    } label: {
-                        actionChip("Pick for Me", systemImage: "dice.fill")
-                    }
-                    .buttonStyle(PressableButtonStyle(scale: 0.92))
-                    .accessibilityLabel("Recommend Movie")
-                }
-                Menu {
-                    Button {
-                        pendingBulkWatched = true
-                    } label: {
-                        Label("Mark All as Watched", systemImage: "eye")
-                    }
-                    .disabled(viewModel.watchedCount == viewModel.movies.count)
-                    Button {
-                        pendingBulkWatched = false
-                    } label: {
-                        Label("Mark All as Unwatched", systemImage: "eye.slash")
-                    }
-                    .disabled(viewModel.watchedCount == 0)
+        // Three buttons at most: a fourth gets folded into a "more" (•••) menu, so watched status
+        // lives in a row at the top of the list instead
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            if viewModel.movies.count > 1 {
+                Button {
+                    Haptics.tap()
+                    // The recommendation card is hidden while searching or filtering
+                    viewModel.searchText = ""
+                    viewModel.selectedGenres = []
+                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
+                    recommendationScrollRequest += 1
                 } label: {
-                    actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
+                    Image(systemName: "dice.fill")
                 }
-                .accessibilityLabel("Watched Options")
+                .accessibilityLabel("Recommend Movie")
+            }
+            if !viewModel.movies.isEmpty {
                 Menu {
                     Button {
                         shareImage()
@@ -309,13 +277,49 @@ private extension ListView {
                         Label("Export List (ZIP)", systemImage: "doc.zipper")
                     }
                 } label: {
-                    actionChip(isPreparingShare ? "Preparing…" : "Share", systemImage: "square.and.arrow.up")
+                    if isPreparingShare {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                    }
                 }
                 .disabled(isPreparingShare)
                 .accessibilityLabel("Share List")
             }
-            .padding(.horizontal, 16)
+            Button {
+                Haptics.tap()
+                viewModel.showPopup = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Theme.accentGradient)
+            }
+            .accessibilityLabel("Add Movie")
         }
+    }
+
+    // How many films are watched, with the bulk watched actions
+    var listActions: some View {
+        HStack {
+            Menu {
+                Button {
+                    pendingBulkWatched = true
+                } label: {
+                    Label("Mark All as Watched", systemImage: "eye")
+                }
+                .disabled(viewModel.watchedCount == viewModel.movies.count)
+                Button {
+                    pendingBulkWatched = false
+                } label: {
+                    Label("Mark All as Unwatched", systemImage: "eye.slash")
+                }
+                .disabled(viewModel.watchedCount == 0)
+            } label: {
+                actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
+            }
+            .accessibilityLabel("Watched Options")
+            Spacer()
+        }
+        .padding(.horizontal, 16)
     }
 
     func actionChip(_ title: String, systemImage: String) -> some View {
