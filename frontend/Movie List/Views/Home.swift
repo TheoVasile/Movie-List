@@ -13,6 +13,8 @@ struct Home: View {
     @Environment(\.managedObjectContext) var context
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @EnvironmentObject var network: NetworkService
+    // The export ZIP waiting to go to the share sheet
+    @State private var exportItem: ShareItem? = nil
     @State var showPopup: Bool = false
     @State var listName = ""
     @State var showFileSelector: Bool = false
@@ -54,6 +56,14 @@ struct Home: View {
                         } label: {
                             Label("Import from Letterboxd", systemImage: "film.stack")
                         }
+                        if !movieLists.isEmpty {
+                            Divider()
+                            Button {
+                                exportAllLists()
+                            } label: {
+                                Label("Export All Lists (ZIP)", systemImage: "doc.zipper")
+                            }
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
@@ -76,6 +86,10 @@ struct Home: View {
             LetterboxdImportView()
                 .environmentObject(viewModel)
                 .environment(\.managedObjectContext, context)
+        }
+        .sheet(item: $exportItem) { item in
+            ShareSheet(items: item.items)
+                .presentationDetents([.medium, .large])
         }
     }
 }
@@ -187,6 +201,16 @@ private extension Home {
         }
     }
     
+    /// Every list in one ZIP, laid out like Letterboxd's data export
+    func exportAllLists() {
+        Haptics.tap()
+        do {
+            exportItem = ShareItem(items: [try ListExport.makeZip(lists: Array(movieLists))])
+        } catch {
+            print("Error exporting lists:", error)
+        }
+    }
+
     func deleteList(_ deleteItem: CDMovieList) {
         APIService.shared.deleteList(listID: deleteItem.id) { result in
             DispatchQueue.main.async {

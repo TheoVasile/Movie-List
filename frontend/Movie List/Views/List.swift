@@ -12,6 +12,10 @@ import CoreData
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
     @StateObject var viewModel: ListViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    // The image or ZIP waiting to go to the share sheet
+    @State private var shareItem: ShareItem? = nil
+    @State private var isPreparingShare = false
     @State private var detailMovie: CDMovie? = nil
     @State private var showDetail = false
     @State private var highlightedMovieID: Int64? = nil
@@ -90,6 +94,10 @@ struct ListView: View {
         }
         .sheet(isPresented: $viewModel.showPopup) {
             AddMovieView(viewModel: viewModel)
+        }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(items: item.items)
+                .presentationDetents([.medium, .large])
         }
         .navigationDestination(isPresented: $showDetail) {
             if let detailMovie {
@@ -271,6 +279,28 @@ private extension ListView {
                 }
                 .accessibilityLabel("Watched Options")
             }
+            if !viewModel.movies.isEmpty {
+                Menu {
+                    Button {
+                        shareImage()
+                    } label: {
+                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
+                    }
+                    Button {
+                        exportZip()
+                    } label: {
+                        Label("Export List (ZIP)", systemImage: "doc.zipper")
+                    }
+                } label: {
+                    if isPreparingShare {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isPreparingShare)
+                .accessibilityLabel("Share List")
+            }
             Button {
                 Haptics.tap()
                 viewModel.showPopup = true
@@ -343,6 +373,27 @@ private extension ListView {
         }
         .buttonStyle(PressableButtonStyle(scale: 0.92))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    func shareImage() {
+        Haptics.tap()
+        isPreparingShare = true
+        Task {
+            let image = await ListShareImage.render(viewModel.movieList, colorScheme: colorScheme)
+            isPreparingShare = false
+            if let image {
+                shareItem = ShareItem(items: [image])
+            }
+        }
+    }
+
+    func exportZip() {
+        Haptics.tap()
+        do {
+            shareItem = ShareItem(items: [try ListExport.makeZip(lists: [viewModel.movieList])])
+        } catch {
+            print("Error exporting list:", error)
+        }
     }
 
     func openDetail(_ movie: CDMovie) {
