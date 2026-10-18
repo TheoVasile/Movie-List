@@ -12,6 +12,10 @@ import CoreData
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
     @StateObject var viewModel: ListViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    // The image or ZIP waiting to go to the share sheet
+    @State private var shareItem: ShareItem? = nil
+    @State private var isPreparingShare = false
     @State private var detailMovie: CDMovie? = nil
     @State private var showDetail = false
     @State private var highlightedMovieID: Int64? = nil
@@ -132,6 +136,10 @@ struct ListView: View {
         .sheet(isPresented: $viewModel.showPopup) {
             AddMovieView(viewModel: viewModel)
         }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(items: item.items)
+                .presentationDetents([.medium, .large])
+        }
         .navigationDestination(isPresented: $showDetail) {
             if let detailMovie {
                 MovieDetailView(
@@ -173,6 +181,10 @@ private extension ListView {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 } else {
+                    listActions
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     genreFilterBar
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -289,6 +301,8 @@ private extension ListView {
     
     @ToolbarContentBuilder
     var ToolbarOptions: some ToolbarContent {
+        // Three buttons at most: a fourth gets folded into a "more" (•••) menu, so watched status
+        // lives in a row at the top of the list instead
         ToolbarItemGroup(placement: .navigationBarTrailing) {
             if viewModel.movies.count > 1 {
                 Button {
@@ -305,24 +319,25 @@ private extension ListView {
             }
             if !viewModel.movies.isEmpty {
                 Menu {
-                    Section("\(viewModel.watchedCount) of \(viewModel.movies.count) watched") {
-                        Button {
-                            pendingBulkWatched = true
-                        } label: {
-                            Label("Mark All as Watched", systemImage: "eye")
-                        }
-                        .disabled(viewModel.watchedCount == viewModel.movies.count)
-                        Button {
-                            pendingBulkWatched = false
-                        } label: {
-                            Label("Mark All as Unwatched", systemImage: "eye.slash")
-                        }
-                        .disabled(viewModel.watchedCount == 0)
+                    Button {
+                        shareImage()
+                    } label: {
+                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
+                    }
+                    Button {
+                        exportZip()
+                    } label: {
+                        Label("Export List (ZIP)", systemImage: "doc.zipper")
                     }
                 } label: {
-                    Image(systemName: "checklist")
+                    if isPreparingShare {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                    }
                 }
-                .accessibilityLabel("Watched Options")
+                .disabled(isPreparingShare)
+                .accessibilityLabel("Share List")
             }
             Button {
                 Haptics.tap()
@@ -333,6 +348,42 @@ private extension ListView {
             }
             .accessibilityLabel("Add Movie")
         }
+    }
+
+    // How many films are watched, with the bulk watched actions
+    var listActions: some View {
+        HStack {
+            Menu {
+                Button {
+                    pendingBulkWatched = true
+                } label: {
+                    Label("Mark All as Watched", systemImage: "eye")
+                }
+                .disabled(viewModel.watchedCount == viewModel.movies.count)
+                Button {
+                    pendingBulkWatched = false
+                } label: {
+                    Label("Mark All as Unwatched", systemImage: "eye.slash")
+                }
+                .disabled(viewModel.watchedCount == 0)
+            } label: {
+                actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
+            }
+            .accessibilityLabel("Watched Options")
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+    }
+
+    func actionChip(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(Theme.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Theme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
     }
 
     // Horizontally scrolling genre chips with counts. Tapping chips narrows the list to films that
@@ -396,6 +447,27 @@ private extension ListView {
         }
         .buttonStyle(PressableButtonStyle(scale: 0.92))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    func shareImage() {
+        Haptics.tap()
+        isPreparingShare = true
+        Task {
+            let image = await ListShareImage.render(viewModel.movieList, colorScheme: colorScheme)
+            isPreparingShare = false
+            if let image {
+                shareItem = ShareItem(items: [image])
+            }
+        }
+    }
+
+    func exportZip() {
+        Haptics.tap()
+        do {
+            shareItem = ShareItem(items: [try ListExport.makeZip(lists: [viewModel.movieList])])
+        } catch {
+            print("Error exporting list:", error)
+        }
     }
 
     func openDetail(_ movie: CDMovie) {
