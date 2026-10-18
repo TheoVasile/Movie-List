@@ -244,6 +244,32 @@ private extension ListView {
     
     @ToolbarContentBuilder
     var ToolbarOptions: some ToolbarContent {
+        // On its own on the left, next to Back: with four buttons on the right, iOS would fold one
+        // of them into a "more" (•••) menu
+        ToolbarItem(placement: .topBarLeading) {
+            if !viewModel.movies.isEmpty {
+                Menu {
+                    Button {
+                        shareImage()
+                    } label: {
+                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
+                    }
+                    Button {
+                        exportZip()
+                    } label: {
+                        Label("Export List (ZIP)", systemImage: "doc.zipper")
+                    }
+                } label: {
+                    if isPreparingShare {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isPreparingShare)
+                .accessibilityLabel("Share List")
+            }
+        }
         ToolbarItemGroup(placement: .navigationBarTrailing) {
             if viewModel.movies.count > 1 {
                 Button {
@@ -278,28 +304,6 @@ private extension ListView {
                     Image(systemName: "checklist")
                 }
                 .accessibilityLabel("Watched Options")
-            }
-            if !viewModel.movies.isEmpty {
-                Menu {
-                    Button {
-                        shareImage()
-                    } label: {
-                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
-                    }
-                    Button {
-                        exportZip()
-                    } label: {
-                        Label("Export List (ZIP)", systemImage: "doc.zipper")
-                    }
-                } label: {
-                    if isPreparingShare {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-                .disabled(isPreparingShare)
-                .accessibilityLabel("Share List")
             }
             Button {
                 Haptics.tap()
