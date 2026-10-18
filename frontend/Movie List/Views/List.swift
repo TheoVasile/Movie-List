@@ -131,6 +131,10 @@ private extension ListView {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 } else {
+                    listActions
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     genreFilterBar
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -244,10 +248,55 @@ private extension ListView {
     
     @ToolbarContentBuilder
     var ToolbarOptions: some ToolbarContent {
-        // On its own on the left, next to Back: with four buttons on the right, iOS would fold one
-        // of them into a "more" (•••) menu
-        ToolbarItem(placement: .topBarLeading) {
-            if !viewModel.movies.isEmpty {
+        // Only Add lives in the navigation bar. With more buttons iOS folds some into a "more" (•••)
+        // menu, so the list's other actions are in a row at the top of the list instead
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                Haptics.tap()
+                viewModel.showPopup = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Theme.accentGradient)
+            }
+            .accessibilityLabel("Add Movie")
+        }
+    }
+
+    // Pick for Me, watched status and sharing, always visible above the films
+    var listActions: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if viewModel.movies.count > 1 {
+                    Button {
+                        Haptics.tap()
+                        // The recommendation card is hidden while searching or filtering
+                        viewModel.searchText = ""
+                        viewModel.selectedGenres = []
+                        withAnimation(Theme.spring) { viewModel.recommendMovie() }
+                        recommendationScrollRequest += 1
+                    } label: {
+                        actionChip("Pick for Me", systemImage: "dice.fill")
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.92))
+                    .accessibilityLabel("Recommend Movie")
+                }
+                Menu {
+                    Button {
+                        pendingBulkWatched = true
+                    } label: {
+                        Label("Mark All as Watched", systemImage: "eye")
+                    }
+                    .disabled(viewModel.watchedCount == viewModel.movies.count)
+                    Button {
+                        pendingBulkWatched = false
+                    } label: {
+                        Label("Mark All as Unwatched", systemImage: "eye.slash")
+                    }
+                    .disabled(viewModel.watchedCount == 0)
+                } label: {
+                    actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
+                }
+                .accessibilityLabel("Watched Options")
                 Menu {
                     Button {
                         shareImage()
@@ -260,60 +309,24 @@ private extension ListView {
                         Label("Export List (ZIP)", systemImage: "doc.zipper")
                     }
                 } label: {
-                    if isPreparingShare {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "square.and.arrow.up")
-                    }
+                    actionChip(isPreparingShare ? "Preparing…" : "Share", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isPreparingShare)
                 .accessibilityLabel("Share List")
             }
+            .padding(.horizontal, 16)
         }
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            if viewModel.movies.count > 1 {
-                Button {
-                    Haptics.tap()
-                    // The recommendation card is hidden while searching or filtering
-                    viewModel.searchText = ""
-                    viewModel.selectedGenres = []
-                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
-                    recommendationScrollRequest += 1
-                } label: {
-                    Image(systemName: "dice.fill")
-                }
-                .accessibilityLabel("Recommend Movie")
-            }
-            if !viewModel.movies.isEmpty {
-                Menu {
-                    Section("\(viewModel.watchedCount) of \(viewModel.movies.count) watched") {
-                        Button {
-                            pendingBulkWatched = true
-                        } label: {
-                            Label("Mark All as Watched", systemImage: "eye")
-                        }
-                        .disabled(viewModel.watchedCount == viewModel.movies.count)
-                        Button {
-                            pendingBulkWatched = false
-                        } label: {
-                            Label("Mark All as Unwatched", systemImage: "eye.slash")
-                        }
-                        .disabled(viewModel.watchedCount == 0)
-                    }
-                } label: {
-                    Image(systemName: "checklist")
-                }
-                .accessibilityLabel("Watched Options")
-            }
-            Button {
-                Haptics.tap()
-                viewModel.showPopup = true
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Theme.accentGradient)
-            }
-            .accessibilityLabel("Add Movie")
-        }
+    }
+
+    func actionChip(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(Theme.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Theme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
     }
 
     // Horizontally scrolling genre chips with counts. Tapping chips narrows the list to films that
