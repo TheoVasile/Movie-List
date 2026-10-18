@@ -45,8 +45,10 @@ struct TasteProfile: Codable {
     private(set) var recentLiked: [RecentFilm] = []
     private(set) var recentPassed: [RecentFilm] = []
     private(set) var swipeCount = 0
+    private(set) var likeCount = 0
 
-    private static let recentLimit = 50
+    // Plenty for the AI to learn from: about 10 tokens a film
+    private static let recentLimit = 500
 
     init() {}
 
@@ -58,6 +60,7 @@ struct TasteProfile: Codable {
         recentLiked = try container.decodeIfPresent([RecentFilm].self, forKey: .recentLiked) ?? []
         recentPassed = try container.decodeIfPresent([RecentFilm].self, forKey: .recentPassed) ?? []
         swipeCount = try container.decode(Int.self, forKey: .swipeCount)
+        likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount) ?? 0
     }
 
     static let genreNames: [Int: String] = [
@@ -87,6 +90,9 @@ struct TasteProfile: Codable {
             recentPassed = Array(([film] + recentPassed).prefix(Self.recentLimit))
         }
         swipeCount += 1
+        if liked {
+            likeCount += 1
+        }
     }
 
     var favoriteGenres: [Int] {
@@ -95,6 +101,12 @@ struct TasteProfile: Codable {
 
     var avoidedGenres: [Int] {
         genreScores.filter { $0.value <= -1.5 }.sorted { $0.value < $1.value }.prefix(3).map(\.key)
+    }
+
+    /// Every genre with a clear lean either way, strongest first, for the AI
+    var genreLeanings: (towards: [Int], awayFrom: [Int]) {
+        let sorted = genreScores.sorted { $0.value > $1.value }
+        return (sorted.filter { $0.value >= 1 }.map(\.key), sorted.reversed().filter { $0.value <= -1 }.map(\.key))
     }
 
     /// How well a film's genres match the profile; 0 when nothing is known yet
@@ -125,7 +137,7 @@ class DiscoverViewModel: ObservableObject {
     private var passedIDs: Set<Int64>
     // Whether to ask the AI for the next batch. Turned off for the session if the server says AI isn't
     // set up, the daily limit is reached, a request fails, or it keeps suggesting films already seen
-    private var aiAvailable = true
+    @Published private(set) var aiAvailable = true
     private var aiEmptyBatches = 0
     // Titles the AI has suggested this session, so it doesn't suggest them again
     private var aiSuggestedTitles: [String] = []
@@ -215,6 +227,17 @@ class DiscoverViewModel: ObservableObject {
         loadMore()
     }
 
+    /// Starts the deck over after switching between AI picks and TMDb recommendations
+    func sourceChanged() {
+        usedSeeds = []
+        resetAI()
+        page = 1
+        isExhausted = false
+        loadFailed = false
+        deck = []
+        loadMore()
+    }
+
     /// Forgets everything learned from swipes and starts the deck over
     func resetProfile() {
         usedSeeds = []
@@ -298,15 +321,20 @@ class DiscoverViewModel: ObservableObject {
         isLoading = true
         let film = { (recent: TasteProfile.RecentFilm) in AIDiscoverRequest.Film(title: recent.title, year: recent.year) }
         let genreName = { (id: Int) in TasteProfile.genreNames[id] }
+        let leanings = profile.genreLeanings
         let request = AIDiscoverRequest(
             liked: profile.recentLiked.map(film),
             passed: profile.recentPassed.map(film),
-            favorite_genres: profile.favoriteGenres.compactMap(genreName),
-            avoided_genres: profile.avoidedGenres.compactMap(genreName),
+            favorite_genres: leanings.towards.compactMap(genreName),
+            avoided_genres: leanings.awayFrom.compactMap(genreName),
+            swipe_count: profile.swipeCount,
+            like_count: profile.likeCount,
+            region: Locale.current.region?.identifier,
+            language: Locale.current.language.languageCode?.identifier,
             age_range: Personalization.value(for: Personalization.ageRangeKey),
             gender: Personalization.value(for: Personalization.genderKey),
-            already_suggested: Array(aiSuggestedTitles.suffix(150)),
-            exclude_ids: Array(passedIDs.union(shownIDs).prefix(2000)),
+            already_suggested: Array(aiSuggestedTitles.suffix(400)),
+            exclude_ids: Array(passedIDs.union(shownIDs).prefix(5000)),
             count: 20
         )
         APIService.shared.aiDiscoverMovies(request) { result in

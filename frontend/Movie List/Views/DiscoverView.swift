@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @EnvironmentObject var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @StateObject private var viewModel = DiscoverViewModel()
+    @AppStorage(Personalization.useAIKey) private var useAI = true
 
     @State private var dragOffset: CGSize = .zero
     @State private var showDetails = false
@@ -70,6 +71,12 @@ struct DiscoverView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Section(sourceDescription) {
+                            Picker("Recommendations", selection: $useAI) {
+                                Label("AI Picks", systemImage: "sparkles").tag(true)
+                                Label("Classic (TMDb)", systemImage: "film.stack").tag(false)
+                            }
+                        }
                         Section(profileDescription) {
                             Button {
                                 withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
@@ -93,6 +100,9 @@ struct DiscoverView: View {
             listPicker
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .onChange(of: useAI) { _ in
+            withAnimation(Theme.spring) { viewModel.sourceChanged() }
         }
         .onAppear(perform: syncWithLists)
         .onChange(of: listedIDs) { _ in syncWithLists() }
@@ -130,6 +140,13 @@ private extension DiscoverView {
 
     var favoriteGenreNames: [String] {
         viewModel.profile.favoriteGenres.compactMap { TasteProfile.genreNames[$0] }
+    }
+
+    var sourceDescription: String {
+        if !useAI {
+            return "Recommended by TMDb from your lists"
+        }
+        return viewModel.aiAvailable ? "Picked by Claude from your lists and swipes" : "AI picks unavailable, using TMDb for now"
     }
 
     var profileDescription: String {

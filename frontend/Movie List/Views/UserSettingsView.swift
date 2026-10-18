@@ -94,7 +94,7 @@ struct UserSettingsView : View {
                     Text("Discover")
                 } footer: {
                     Text(useAI
-                         ? "Discover asks Claude, Anthropic's AI, to pick films from the titles in your lists and your recent swipes. Age range and gender are optional; they stay on this iPhone and are sent only with those requests, to help when your lists are empty. Your name and email are never sent."
+                         ? "Discover asks Claude, Anthropic's AI, to pick films from every title in your lists, your Discover swipes and genre leanings, and your iPhone's country and language. Age range and gender are optional; they stay on this iPhone and are sent only with those requests. Your name and email are never sent. Turn this off for Classic recommendations from TMDb."
                          : "Discover uses TMDb's recommendations for films in your lists. Nothing is sent to an AI.")
                 }
                 .listRowBackground(Theme.surface)

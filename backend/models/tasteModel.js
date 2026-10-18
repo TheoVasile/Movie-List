@@ -4,7 +4,7 @@ const pool = require("../config/db");
 // whether the user has marked it watched. Used to describe the user's taste to the AI
 async function fetchListsForTaste(user_id) {
     const result = await pool.query(
-        `SELECT l.id AS list_id, l.name AS list_name, m.title, m.release_date, lm.rank,
+        `SELECT l.id AS list_id, l.name AS list_name, m.title, m.release_date, m.original_language, lm.rank,
                 (w.movie_id IS NOT NULL) AS watched
          FROM lists l
          JOIN list_movies lm ON lm.list_id = l.id
@@ -22,6 +22,7 @@ async function fetchListsForTaste(user_id) {
         lists.get(row.list_id).films.push({
             title: row.title,
             year: String(row.release_date ?? "").slice(0, 4),
+            language: row.original_language ?? "",
             watched: row.watched,
         });
     }

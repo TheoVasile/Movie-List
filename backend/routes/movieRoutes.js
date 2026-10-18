@@ -212,19 +212,24 @@ router.post("/ai-discover", async (req, res) => {
     try {
         const body = req.body ?? {};
         const signals = {
-            liked: cleanFilms(body.liked, 50),
-            passed: cleanFilms(body.passed, 50),
-            favoriteGenres: cleanStrings(body.favorite_genres, 5),
-            avoidedGenres: cleanStrings(body.avoided_genres, 5),
+            liked: cleanFilms(body.liked, 500),
+            passed: cleanFilms(body.passed, 500),
+            favoriteGenres: cleanStrings(body.favorite_genres, 10),
+            avoidedGenres: cleanStrings(body.avoided_genres, 10),
             ageRange: cleanText(body.age_range, 20),
             gender: cleanText(body.gender, 30),
-            alreadySuggested: cleanStrings(body.already_suggested, 150),
+            region: cleanText(body.region, 10),
+            language: cleanText(body.language, 10),
+            swipeCount: Math.max(parseInt(body.swipe_count, 10) || 0, 0),
+            likeCount: Math.max(parseInt(body.like_count, 10) || 0, 0),
+            alreadySuggested: cleanStrings(body.already_suggested, 400),
         };
         const count = Math.min(Math.max(parseInt(body.count, 10) || 20, 1), 30);
-        const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 2000));
+        const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
         const [lists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
-        const picks = await recommendFilms(req.user.uid, lists, signals, count);
+        // Ask for a few extra, since some picks turn out to be films the user already has or can't be found
+        const picks = await recommendFilms(req.user.uid, lists, signals, count + 10);
 
         const found = await mapWithConcurrency(picks, async (pick) => {
             try {
@@ -235,7 +240,8 @@ router.post("/ai-discover", async (req, res) => {
             }
         });
         const seen = new Set();
-        res.json(found.filter((movie) => movie && !listedIds.has(movie.id) && !exclude.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id)));
+        const fresh = found.filter((movie) => movie && !listedIds.has(movie.id) && !exclude.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
+        res.json(fresh.slice(0, count));
     } catch (error) {
         if (error instanceof AIUnavailableError) {
             return res.status(503).json({ error: "AI recommendations aren't set up." });
