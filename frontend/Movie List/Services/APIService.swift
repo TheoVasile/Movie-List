@@ -132,19 +132,31 @@ class APIService {
     /// Sends a request to the backend as the signed-in Firebase user. The backend identifies
     /// the caller from this ID token, so every request has to go through here
     private func send(_ request: URLRequest, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        authorize(request) { result in
+            switch result {
+            case .success(let request):
+                URLSession.shared.dataTask(with: request, completionHandler: completion).resume()
+            case .failure(let error):
+                completion(nil, nil, error)
+            }
+        }
+    }
+
+    /// Adds the signed-in user's Firebase ID token to a request
+    private func authorize(_ request: URLRequest, completion: @escaping (Result<URLRequest, Error>) -> Void) {
         guard let user = Auth.auth().currentUser else {
-            completion(nil, nil, NSError(domain: "Not signed in", code: 401, userInfo: nil))
+            completion(.failure(NSError(domain: "Not signed in", code: 401, userInfo: nil)))
             return
         }
         // Firebase caches the token and only refreshes it when it is close to expiring
         user.getIDToken { token, error in
             guard let token = token else {
-                completion(nil, nil, error ?? NSError(domain: "Not signed in", code: 401, userInfo: nil))
+                completion(.failure(error ?? NSError(domain: "Not signed in", code: 401, userInfo: nil)))
                 return
             }
             var request = request
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            URLSession.shared.dataTask(with: request, completionHandler: completion).resume()
+            completion(.success(request))
         }
     }
     
@@ -376,24 +388,45 @@ class APIService {
 
     /// Films picked by AI from the user's lists, swipes and anything they chose to share. Fails with
     /// code 503 when AI isn't set up on the server and 429 at the daily limit
-    func aiDiscoverMovies(_ body: AIDiscoverRequest, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// AI picks, streamed: onMovie gets each film as soon as the server has it, then completion gets how many
+    /// arrived. Fails (with the HTTP status as the error code) before any film if AI isn't available.
+    /// Both callbacks run on the main thread
+    func aiDiscoverStream(_ body: AIDiscoverRequest, onMovie: @escaping (Movie) -> Void, completion: @escaping (Result<Int, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/ai-discover") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Choosing films takes the AI a few seconds
-        request.timeoutInterval = 60
+        request.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
+        // The AI thinks for a few seconds before the first film, then streams the rest
+        request.timeoutInterval = 90
         request.httpBody = try? JSONEncoder().encode(body)
 
-        send(request) { data, response, error in
-            let result: Result<[Movie], Error>
-            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
-               let movies = try? JSONDecoder().decode([Movie].self, from: data) {
-                result = .success(movies)
-            } else {
-                result = .failure(error ?? NSError(domain: "AI discover failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+        authorize(request) { result in
+            guard case .success(let request) = result else {
+                if case .failure(let error) = result { DispatchQueue.main.async { completion(.failure(error)) } }
+                return
             }
-            DispatchQueue.main.async { completion(result) }
+            Task {
+                var count = 0
+                do {
+                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    guard (200...299).contains(status) else {
+                        throw NSError(domain: "AI discover failed", code: status, userInfo: nil)
+                    }
+                    // One film per line
+                    for try await line in bytes.lines {
+                        guard let data = line.data(using: .utf8), let movie = try? JSONDecoder().decode(Movie.self, from: data) else { continue }
+                        count += 1
+                        await MainActor.run { onMovie(movie) }
+                    }
+                    await MainActor.run { completion(.success(count)) }
+                } catch {
+                    // A stream that breaks after some films still delivered them; report what arrived
+                    let finalCount = count
+                    await MainActor.run { completion(finalCount > 0 ? .success(finalCount) : .failure(error)) }
+                }
+            }
         }
     }
 
