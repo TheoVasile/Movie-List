@@ -719,11 +719,11 @@ private struct DiscoverCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 if let rating = movie.vote_average, rating > 0 {
-                    MetaChip(icon: "star.fill", text: String(format: "%.1f", rating))
+                    MetaChip(icon: "star.fill", text: String(format: "%.1f", rating), onPoster: true)
                 }
-                MetaChip(icon: "calendar", text: Theme.year(from: movie.release_date))
+                MetaChip(icon: "calendar", text: Theme.year(from: movie.release_date), onPoster: true)
                 if !movie.original_language.isEmpty {
-                    MetaChip(icon: "globe", text: movie.original_language.uppercased())
+                    MetaChip(icon: "globe", text: movie.original_language.uppercased(), onPoster: true)
                 }
             }
             Text(movie.title)
