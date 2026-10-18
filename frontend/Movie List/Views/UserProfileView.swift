@@ -57,7 +57,7 @@ struct UserProfileView: View {
             VStack(spacing: 4) {
                 Text(viewModel.user?.displayName ?? "No Name")
                     .font(.title2.weight(.heavy))
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Text(viewModel.user?.email ?? "No Email")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
@@ -83,7 +83,7 @@ struct UserProfileView: View {
                 .foregroundStyle(Theme.accentGradient)
             Text(value)
                 .font(.title3.weight(.heavy))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(label)
@@ -109,7 +109,7 @@ struct UserProfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Your Lists")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
             if movieLists.isEmpty {
                 Text("No lists yet. Create one from the Lists tab.")
                     .font(.subheadline)
@@ -141,7 +141,7 @@ struct UserProfileView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(movieList.name ?? "No Name")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(Theme.textPrimary)
                 Text(top.map { "#1 · \($0.title ?? "")" } ?? "No films yet")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)

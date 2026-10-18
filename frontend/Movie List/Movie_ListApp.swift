@@ -16,6 +16,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     FirebaseApp.configure()
+    Personalization.migrateGenderToPronouns()
         
     let providerFactory = AppCheckDebugProviderFactory()
     AppCheck.setAppCheckProviderFactory(providerFactory)
@@ -46,8 +47,9 @@ struct Movie_ListApp: App {
                     .environmentObject(db)
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
             }
-            .preferredColorScheme(.dark)
             .tint(Theme.accent)
+            // Light or dark is set on the window, so pop-ups and sheets follow it too
+            .onAppear { AppearanceSettings.shared.apply() }
         }
     }
 }
@@ -83,7 +85,7 @@ struct WelcomeView: View {
 
             Text("CineList")
                 .font(.system(size: 44, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.textPrimary)
                 .appearAnimation(delay: 0.1)
             Text("Rank every film you love.\nHead to head, one pick at a time.")
                 .font(.body)

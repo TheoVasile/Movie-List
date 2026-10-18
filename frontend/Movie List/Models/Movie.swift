@@ -18,4 +18,6 @@ struct Movie: Identifiable, Decodable {
     // Only sent by the discover endpoint
     var vote_average: Double?
     var genre_ids: [Int]?
+    // Only sent by the AI discover endpoint: why this film was picked for the user
+    var reason: String?
 }
