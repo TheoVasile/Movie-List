@@ -100,6 +100,9 @@ function describeLists(lists) {
 function describeRequest(signals, count) {
     const parts = [];
     const titles = (films) => films.map(filmLabel).join("; ");
+    if (signals.requiredGenres?.length) {
+        parts.push(`The user chose to see only these genres right now: ${signals.requiredGenres.join(", ")}. Every film you recommend must belong to at least one of them. This overrides their usual leanings.`);
+    }
     if (signals.liked.length) parts.push(`Liked in Discover, most recent first: ${titles(signals.liked)}`);
     if (signals.disliked.length) parts.push(`Marked "not for me" in Discover: ${titles(signals.disliked)}`);
     if (signals.passed.length) parts.push(`Skipped in Discover (not now, not a dislike): ${titles(signals.passed)}`);

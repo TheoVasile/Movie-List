@@ -103,6 +103,8 @@ struct AIDiscoverRequest: Encodable {
     let disliked: [Film]
     let favorite_genres: [String]
     let avoided_genres: [String]
+    // Genres the user picked themselves; every pick must have one of them. Empty when Discover is automatic
+    let required_genres: [String]
     let swipe_count: Int
     let like_count: Int
     let region: String?
@@ -360,14 +362,15 @@ class APIService {
         }
     }
     /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
-    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// onlyGenres: the user picked these genres themselves, so every film returned has one of them
+    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
             URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "page", value: String(page)),
-        ]
+        ] + (onlyGenres ? [URLQueryItem(name: "only_genres", value: "1")] : [])
         guard let url = components?.url else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
             return
