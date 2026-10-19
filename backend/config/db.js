@@ -16,7 +16,8 @@ function getPool() {
             },
             max: 20, // Maximum number of clients in the pool
             idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-            connectionTimeoutMillis: 2000, // How long to wait for a connection
+            // Supabase can take a few seconds to open a new connection, especially from a host like Render
+            connectionTimeoutMillis: 10000,
         });
 
         // Add error handling
