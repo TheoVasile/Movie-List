@@ -251,6 +251,8 @@ class APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // The free server can take most of a minute to wake up before it starts on the request
+        request.timeoutInterval = 90
         
         send(request) { data, response, error in
             if let error = error {
