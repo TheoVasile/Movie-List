@@ -74,9 +74,10 @@ function shares(films, groupOf, limit) {
         .join(", ");
 }
 
-// The lists change rarely, so they go first and are cached; everything that changes per request comes after
-function describeLists(lists) {
-    let remaining = MAX_LIST_FILMS;
+// The lists change rarely, so they go first and are cached; everything that changes per request comes after.
+// `who` names whose lists they are, for prompts that describe two people
+function describeLists(lists, who = "The user", maxFilms = MAX_LIST_FILMS) {
+    let remaining = maxFilms;
     const sections = [];
     for (const list of lists) {
         if (remaining <= 0) break;
@@ -85,7 +86,7 @@ function describeLists(lists) {
         const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}${film.watched ? " ✓" : ""}`);
         sections.push(`List "${list.name}" (${list.films.length} films, best first):\n${lines.join("\n")}`);
     }
-    if (!sections.length) return "The user has no films in their lists yet.";
+    if (!sections.length) return `${who} has no films in their lists yet.`;
 
     const all = lists.flatMap((list) => list.films);
     const watched = all.filter((film) => film.watched).length;
@@ -94,7 +95,7 @@ function describeLists(lists) {
         `Eras: ${shares(all, (film) => (film.year ? `${film.year.slice(0, 3)}0s` : ""), 6)}.`,
         `Original languages: ${shares(all, (film) => film.language, 6)}.`,
     ].join(" ");
-    return `The user's lists:\n\n${sections.join("\n\n")}\n\nAt a glance: ${summary}`;
+    return `${who}'s lists:\n\n${sections.join("\n\n")}\n\nAt a glance: ${summary}`;
 }
 
 function describeRequest(signals, count) {
@@ -198,4 +199,48 @@ async function recommendFilms(user_id, lists, signals, count, onPick = () => {})
     return picks;
 }
 
-module.exports = { recommendFilms, AIUnavailableError, AILimitError };
+const MOVIE_NIGHT_PROMPT = `You pick films for two friends to watch together on a movie night, using their film-ranking lists (films in rank order, best first, where ✓ marks films they've watched).
+
+Find films both of them are likely to enjoy: look for overlaps in their tastes (directors, eras, countries, tone, themes, genres) and weigh highly ranked films most. Where their tastes differ, pick films that bridge them rather than ones only one of them would like.
+
+Recommend real, released feature films. Never recommend a film that's in either person's lists, so it's new to both of them. Always return the full number of films asked for, and mix safe crowd-pleasers with a few bolder picks.
+
+For each film give its exact original release title as listed on TMDb, its release year, and one short sentence (under 25 words) on why it suits both of them, naming something each of them ranks when you can.`;
+
+// Each person's lists are cut to this many films, so a movie night costs about half a cent
+const MOVIE_NIGHT_FILMS_EACH = 2000;
+
+/// Asks Claude for films two friends would both enjoy and neither has in their lists.
+/// Returns [{ title, year, reason }]. Counts against the asking user's daily limit
+async function recommendForTwo(user_id, myLists, friendLists, friendName, count) {
+    const anthropic = getClient();
+    takeDailyRequest(user_id);
+
+    const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 4000,
+        system: MOVIE_NIGHT_PROMPT,
+        output_config: {
+            effort: "low",
+            format: { type: "json_schema", schema: OUTPUT_SCHEMA },
+        },
+        messages: [{
+            role: "user",
+            content: [
+                { type: "text", text: describeLists(myLists, "The first person (\"you\")", MOVIE_NIGHT_FILMS_EACH) },
+                { type: "text", text: describeLists(friendLists, `Their friend ${friendName}`, MOVIE_NIGHT_FILMS_EACH) },
+                { type: "text", text: `Recommend ${count} films for the two of them to watch together. In each reason, call the first person "you" and the friend ${friendName}.` },
+            ],
+        }],
+    });
+
+    const { usage: tokens } = response;
+    console.log(`AI movie night: ${tokens.input_tokens} input, ${tokens.output_tokens} output tokens`);
+    if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") {
+        throw new Error(`Movie night recommendations stopped early (${response.stop_reason})`);
+    }
+    const text = response.content.find((block) => block.type === "text")?.text ?? "";
+    return JSON.parse(text).recommendations ?? [];
+}
+
+module.exports = { recommendFilms, recommendForTwo, AIUnavailableError, AILimitError };
