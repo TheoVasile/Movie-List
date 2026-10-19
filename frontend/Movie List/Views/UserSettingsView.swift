@@ -114,7 +114,12 @@ struct UserSettingsView : View {
                 Section {
                     Button {
                         Haptics.tap()
-                        authenticationViewModel.signOut()
+                        // Close Settings first, then sign out once it has slid away, so it can't be
+                        // left showing over the sign-in screen
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            authenticationViewModel.signOut()
+                        }
                     } label: {
                         Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                             .foregroundColor(Theme.textPrimary)
@@ -146,7 +151,9 @@ struct UserSettingsView : View {
                         switch result {
                         case .success:
                             Task {
-                                await authenticationViewModel.deleteAccount()
+                                if await authenticationViewModel.deleteAccount() {
+                                    dismiss()
+                                }
                             }
                         case .failure(let error):
                             print(error)
