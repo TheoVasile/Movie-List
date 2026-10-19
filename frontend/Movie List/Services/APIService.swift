@@ -152,6 +152,9 @@ struct UserProfile: Decodable {
     let following: Int
     // People waiting for the user to accept their follow request
     let requests: Int?
+    // Which push notifications the user wants
+    let notify_requests: Bool?
+    let notify_activity: Bool?
 }
 
 /// Follow requests waiting on the user, and the @usernames the user has asked to follow
@@ -460,6 +463,34 @@ class APIService {
 
     func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {
         sendJSON("GET", "/users/me/requests", completion: completion)
+    }
+
+    private struct Registered: Decodable { let registered: Bool }
+
+    /// Tells the server to send this account's notifications to this device
+    func registerDevice(token: String) {
+        sendJSON("PUT", "/users/me/devices", body: ["token": token]) { (result: Result<Registered, Error>) in
+            if case .failure(let error) = result { print("Couldn't register for notifications:", error) }
+        }
+    }
+
+    func unregisterDevice(token: String) {
+        guard let url = URL(string: "\(baseURL)/users/me/devices/\(token.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? token)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        send(request) { _, _, _ in }
+    }
+
+    private struct NotificationPreferences: Decodable { let requests: Bool?; let activity: Bool? }
+
+    /// Saves which push notifications the user wants; nil leaves that one unchanged
+    func setNotificationPreferences(requests: Bool? = nil, activity: Bool? = nil, completion: @escaping (Bool) -> Void) {
+        var body: [String: Any] = [:]
+        if let requests { body["requests"] = requests }
+        if let activity { body["activity"] = activity }
+        sendJSON("PUT", "/users/me/notifications", body: body) { (result: Result<NotificationPreferences, Error>) in
+            completion((try? result.get()) != nil)
+        }
     }
 
     private struct RequestAnswer: Decodable { let accepted: Bool }
