@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import WidgetKit
 
 struct PersistenceController {
     
@@ -62,6 +63,35 @@ struct PersistenceController {
         } catch {
             print("Failed to save synced lists", error)
         }
+        updateWidgets()
+    }
+
+    /// Saves what the Home Screen widgets show and asks them to redraw: the top 3 of the biggest list,
+    /// and unwatched films from the watchlist (any list with "watch" in its name), or from every list
+    func updateWidgets() {
+        let lists = (try? container.viewContext.fetch(CDMovieList.fetchRequest())) ?? []
+        let film = { (movie: CDMovie) in
+            WidgetSnapshot.Film(tmdbID: Int64(movie.tmdb_id), title: movie.title ?? "", year: Theme.year(from: movie.release_date),
+                                posterPath: movie.poster_path, rank: Int(movie.rank))
+        }
+        guard let biggest = lists.max(by: { $0.movies.count < $1.movies.count }), !biggest.movies.isEmpty else {
+            WidgetSnapshot.remove()
+            WidgetCenter.shared.reloadAllTimelines()
+            return
+        }
+        let watchlists = lists.filter { ($0.name ?? "").localizedCaseInsensitiveContains("watch") }
+        let unwatched = (watchlists.isEmpty ? lists : watchlists)
+            .flatMap(\.movies)
+            .filter { !$0.watched }
+            .sorted { $0.rank < $1.rank }
+        var seen = Set<Int32>()
+        let tonight = unwatched.filter { seen.insert($0.tmdb_id).inserted }.prefix(60).map(film)
+
+        WidgetSnapshot(listName: biggest.name ?? "Your List",
+                       top: biggest.movies.sorted { $0.rank < $1.rank }.prefix(3).map(film),
+                       tonight: Array(tonight),
+                       updated: Date()).save()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private static func update(_ list: CDMovieList, from response: ListDetailsResponse, in context: NSManagedObjectContext) {

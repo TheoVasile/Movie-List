@@ -91,6 +91,10 @@ struct Home: View {
             }
         }
         .onChange(of: scenePhase) { phase in
+            // Films added or reranked since the last sync show on the widgets once the user leaves the app
+            if phase == .background {
+                PersistenceController.shared.updateWidgets()
+            }
             if phase == .active, let last = sync.lastSynced, Date().timeIntervalSince(last) > 10 * 60 {
                 startSync()
             }
