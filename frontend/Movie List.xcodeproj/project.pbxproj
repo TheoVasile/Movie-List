@@ -14,6 +14,7 @@
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
 		FA7E5A012F00000000000012 /* ListSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000011 /* ListSharing.swift */; };
 		FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000016 /* ListPickerSheet.swift */; };
+		EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516C04920FFE5E41C8B08A86 /* DiaryView.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
 		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
 		FA7E5A012F00000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000001 /* Theme.swift */; };
@@ -87,6 +88,7 @@
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000011 /* ListSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSharing.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000016 /* ListPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListPickerSheet.swift; sourceTree = "<group>"; };
+		516C04920FFE5E41C8B08A86 /* DiaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FA7E5A112F00000000000001 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
@@ -249,6 +251,7 @@
 				FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */,
 				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
 				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
+				516C04920FFE5E41C8B08A86 /* DiaryView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
 				FA7E5A012F00000000000014 /* FriendsView.swift */,
@@ -381,6 +384,7 @@
 				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
 				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
 				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
+				EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,
 				FA7E5A012F00000000000015 /* FriendsView.swift in Sources */,

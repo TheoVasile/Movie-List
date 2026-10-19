@@ -4,7 +4,7 @@ const { setMovieNote } = require("../models/notesModel");
 const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
 const requireListOwner = require("../middleware/listOwnership");
-const { setMovieWatched } = require("../models/watchedModel");
+const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
 const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
@@ -450,6 +450,57 @@ router.put("/watched", async (req, res) => {
             return res.status(404).json({ error: "Movie not found." });
         }
         console.error("Error updating watched status:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The signed-in user's watches, newest first; ?movie_id= limits it to one film
+router.get("/diary", async (req, res) => {
+    try {
+        const movieId = req.query.movie_id === undefined ? null : Number(req.query.movie_id);
+        if (movieId !== null && !Number.isInteger(movieId)) {
+            return res.status(400).json({ error: "movie_id must be a number." });
+        }
+        res.json(await fetchDiary(req.user.uid, movieId));
+    } catch (error) {
+        console.error("Error fetching diary:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Logs a watch of a film, e.g. { "movie_id": 12, "watched_on": "2026-10-18" } (defaults to today).
+// The first watch marks the film watched; later ones are rewatches
+router.post("/watch", async (req, res) => {
+    try {
+        const movieId = Number(req.body.movie_id);
+        const day = req.body.watched_on ?? new Date().toISOString().slice(0, 10);
+        if (!Number.isInteger(movieId) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day))) {
+            return res.status(400).json({ error: "movie_id and a YYYY-MM-DD watched_on are required." });
+        }
+        const kind = await logWatch(req.user.uid, movieId, day);
+        res.status(201).json({ movie_id: movieId, watched_on: day, kind });
+    } catch (error) {
+        if (error.code === "23503") {
+            return res.status(404).json({ error: "Movie not found." });
+        }
+        console.error("Error logging watch:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Removes one rewatch from the diary
+router.delete("/watch/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id)) {
+            return res.status(400).json({ error: "A rewatch id is required." });
+        }
+        if (!(await deleteRewatch(req.user.uid, id))) {
+            return res.status(404).json({ error: "Rewatch not found." });
+        }
+        res.status(204).end();
+    } catch (error) {
+        console.error("Error deleting rewatch:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

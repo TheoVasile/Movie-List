@@ -72,6 +72,16 @@ const createTables = async () => {
                 PRIMARY KEY (user_id, movie_id)
             );
 
+            -- Watches after the first, for the diary. The first watch is the row in watched_movies
+            CREATE TABLE IF NOT EXISTS watch_log (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                movie_id INT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+                watched_on DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS watch_log_user ON watch_log (user_id, watched_on);
+
             -- A user's note on a film, shared across their lists like watched and visible to their followers
             CREATE TABLE IF NOT EXISTS movie_notes (
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,

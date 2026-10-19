@@ -347,6 +347,12 @@ struct MovieDetailView: View {
                     .appearAnimation(delay: 0.26)
             }
 
+            // Only for the user's own films, which are the ones that can be marked watched
+            if onToggleWatched != nil {
+                WatchHistoryCard(movie: movie)
+                    .appearAnimation(delay: 0.28)
+            }
+
             if onSaveNote != nil {
                 notesCard
                     .appearAnimation(delay: 0.3)
