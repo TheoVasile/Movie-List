@@ -128,6 +128,7 @@ extension AuthenticationViewModel {
     func signOut() {
     do {
         PersistenceController.shared.deleteAllCoreDataObjects()
+        SyncStatus.shared.reset()
       try Auth.auth().signOut()
     }
     catch {
