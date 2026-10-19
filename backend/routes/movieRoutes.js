@@ -231,7 +231,14 @@ router.post("/movie-night", async (req, res) => {
             return res.status(404).json({ error: "User not found." });
         }
         if (!friend.following) {
-            return res.status(403).json({ error: "Follow them to plan a movie night together." });
+            return res.status(403).json({ error: "Follow them to plan a movie night together.", reason: "not_following" });
+        }
+        // Both people's lists go to the AI, so both have to have allowed it
+        if (!friend.my_ai_allowed) {
+            return res.status(403).json({ error: "Turn on AI features in Settings to plan a movie night.", reason: "ai_off_self" });
+        }
+        if (!friend.ai_allowed) {
+            return res.status(403).json({ error: "They haven't turned on AI features.", reason: "ai_off_friend" });
         }
 
         const [myLists, friendLists, myIds, friendIds] = await Promise.all([

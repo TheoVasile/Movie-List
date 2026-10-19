@@ -13,13 +13,17 @@ function isValidHandle(handle) {
 // The signed-in user's @username (null until they pick one), display name and follow counts
 async function getProfile(user_id) {
     const result = await pool.query(
-        `SELECT u.handle, u.username AS display_name,
+        `SELECT u.handle, u.username AS display_name, u.ai_allowed,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid)::int AS following
          FROM users u WHERE u.firebase_uid = $1`,
         [user_id]
     );
     return result.rows[0] ?? null;
+}
+
+async function setAIAllowed(user_id, allowed) {
+    await pool.query("UPDATE users SET ai_allowed = $2 WHERE firebase_uid = $1", [user_id, allowed]);
 }
 
 async function setHandle(user_id, handle) {
@@ -83,7 +87,7 @@ async function fetchFollowing(user_id) {
 // user doesn't follow them
 async function fetchUserLists(user_id, handle) {
     const target = await pool.query(
-        `SELECT u.firebase_uid, u.handle, u.username AS display_name,
+        `SELECT u.firebase_uid, u.handle, u.username AS display_name, u.ai_allowed,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following
          FROM users u WHERE u.handle = $2`,
         [user_id, handle]
@@ -91,6 +95,8 @@ async function fetchUserLists(user_id, handle) {
     const person = target.rows[0];
     if (!person) return null;
     const profile = { handle: person.handle, display_name: person.display_name, following: person.following, lists: [] };
+    // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
+    if (person.following) profile.ai_allowed = person.ai_allowed;
     if (!person.following) return profile;
 
     const rows = await pool.query(
@@ -146,4 +152,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };

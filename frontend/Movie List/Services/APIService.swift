@@ -183,6 +183,8 @@ struct FriendLists: Decodable {
     let handle: String
     let display_name: String
     var following: Bool
+    // Whether they allow AI features; only sent to people who follow them
+    let ai_allowed: Bool?
     let lists: [List]
 }
 
@@ -435,8 +437,18 @@ class APIService {
         sendJSON("GET", "/users/me/following/films/\(tmdbID)", completion: completion)
     }
 
+    private struct AIAllowedResponse: Decodable { let allowed: Bool }
+
+    /// Saves whether the user allows AI features on the server
+    func setAIAllowed(_ allowed: Bool, completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/users/me/ai", body: ["allowed": allowed]) { (result: Result<AIAllowedResponse, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
     /// Films the user and a friend they follow would both enjoy, picked by the AI, each with a reason.
-    /// A failure's code is the HTTP status: 403 not following, 429 daily limit, 503 AI not set up
+    /// A failure's code is the HTTP status (403 not following or AI not allowed by one of them, 429 daily
+    /// limit, 503 AI not set up), and its description is the server's explanation when there is one
     func movieNight(with handle: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
         request.httpMethod = "POST"
@@ -450,7 +462,9 @@ class APIService {
             if let data, status == 200, let movies = try? JSONDecoder().decode([Movie].self, from: data) {
                 result = .success(movies)
             } else {
-                result = .failure(error ?? NSError(domain: "Movie night failed", code: status, userInfo: nil))
+                let message = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                result = .failure(error ?? NSError(domain: "Movie night failed", code: status,
+                                                   userInfo: message.map { [NSLocalizedDescriptionKey: $0] }))
             }
             DispatchQueue.main.async { completion(result) }
         }
