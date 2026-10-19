@@ -20,6 +20,7 @@ struct MovieDetailView: View {
     var onSaveNote: ((String, @escaping (Bool) -> Void) -> Void)? = nil
 
     @State private var revealed = false
+    @State private var overviewExpanded = false
     @State private var editingNote = false
     @State private var friendTakes: [FriendTake] = []
     @State private var imdbID: String? = nil
@@ -214,16 +215,85 @@ struct MovieDetailView: View {
     private var hero: some View {
         ZStack(alignment: .bottom) {
             PosterBackdrop(path: movie.poster_path)
-                .frame(height: 460)
+                .frame(height: 380)
             PosterImage(path: movie.poster_path, cornerRadius: 18, size: .xlarge)
-                .frame(width: 200, height: 300)
+                .frame(width: 170, height: 255)
                 .shadow(color: Theme.shadow.opacity(0.6), radius: 30, y: 16)
                 .scaleEffect(revealed ? 1 : 0.85)
                 .opacity(revealed ? 1 : 0)
                 .rotation3DEffect(.degrees(revealed ? 0 : 12), axis: (x: 1, y: 0, z: 0))
                 .padding(.bottom, 10)
         }
-        .frame(height: 460)
+        .frame(height: 380)
+    }
+
+    private func overviewSection(_ overview: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(overview)
+                .font(.body)
+                .foregroundColor(Theme.textSecondary)
+                .lineSpacing(4)
+                .lineLimit(overviewExpanded ? nil : 4)
+                .fixedSize(horizontal: false, vertical: true)
+            // Only offered when the overview is long enough to have been cut short
+            if overview.count > 220 {
+                Button(overviewExpanded ? "Less" : "More") {
+                    Haptics.tap()
+                    withAnimation(Theme.spring) { overviewExpanded.toggle() }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Theme.accent)
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var hasActions: Bool {
+        onCompare != nil || onSetRank != nil || onToggleWatched != nil || onAddToLists != nil
+    }
+
+    // Compare, Set Rank, Watched and Add to Lists side by side, instead of a full-width button each
+    private var actionTiles: some View {
+        HStack(spacing: 10) {
+            if let onCompare {
+                actionTile("Compare", icon: "arrow.left.arrow.right", highlighted: true, action: onCompare)
+            }
+            if let onSetRank {
+                actionTile("Set Rank", icon: "number", action: onSetRank)
+            }
+            if let onToggleWatched {
+                actionTile(movie.watched ? "Watched" : "Unwatched", icon: movie.watched ? "eye.fill" : "eye",
+                           highlighted: movie.watched, action: onToggleWatched)
+                    .accessibilityLabel(movie.watched ? "Mark as Unwatched" : "Mark as Watched")
+            }
+            if let onAddToLists {
+                actionTile("Add to Lists", icon: "text.badge.plus", action: onAddToLists)
+            }
+        }
+    }
+
+    private func actionTile(_ title: String, icon: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(highlighted ? AnyShapeStyle(Theme.onAccent) : AnyShapeStyle(Theme.accentGradient))
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(highlighted ? Theme.onAccent : Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(highlighted ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(highlighted ? Color.clear : Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.94))
     }
 
     private var details: some View {
@@ -261,65 +331,29 @@ struct MovieDetailView: View {
             }
             .appearAnimation(delay: 0.18)
 
-            if onCompare != nil || onSetRank != nil {
-                HStack(spacing: 12) {
-                    if let onCompare {
-                        Button {
-                            Haptics.tap()
-                            onCompare()
-                        } label: {
-                            Label("Compare", systemImage: "arrow.left.arrow.right")
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                    }
-                    if let onSetRank {
-                        Button {
-                            Haptics.tap()
-                            onSetRank()
-                        } label: {
-                            Label("Set Rank", systemImage: "number")
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                    }
-                }
-                .appearAnimation(delay: 0.26)
-            }
-
-            if let onAddToLists {
-                Button {
-                    Haptics.tap()
-                    onAddToLists()
-                } label: {
-                    Label("Add to Other Lists", systemImage: "text.badge.plus")
-                }
-                .buttonStyle(SecondaryButtonStyle())
-                .appearAnimation(delay: 0.28)
-            }
-
-            if let onToggleWatched {
-                Button {
-                    Haptics.tap()
-                    onToggleWatched()
-                } label: {
-                    Label(movie.watched ? "Mark as Unwatched" : "Mark as Watched",
-                          systemImage: movie.watched ? "eye.slash" : "eye")
-                }
-                .buttonStyle(SecondaryButtonStyle())
-                .appearAnimation(delay: 0.3)
-            }
-
-            if onSaveNote != nil {
-                notesCard
-                    .appearAnimation(delay: 0.31)
-            }
-
-            if !friendTakes.isEmpty {
-                FriendTakesSection(takes: friendTakes)
+            // The overview comes straight after the title, so it's readable without scrolling
+            if let overview = movie.overview, !overview.isEmpty {
+                overviewSection(overview)
+                    .appearAnimation(delay: 0.22)
             }
 
             if let info, info.voteCount > 0 || !info.certification.isEmpty {
                 userScore(info)
                     .transition(.opacity)
+            }
+
+            if hasActions {
+                actionTiles
+                    .appearAnimation(delay: 0.26)
+            }
+
+            if onSaveNote != nil {
+                notesCard
+                    .appearAnimation(delay: 0.3)
+            }
+
+            if !friendTakes.isEmpty {
+                FriendTakesSection(takes: friendTakes)
             }
 
             if let providers {
@@ -329,19 +363,6 @@ struct MovieDetailView: View {
 
             imdbLink
                 .appearAnimation(delay: 0.32)
-
-            if let overview = movie.overview, !overview.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Overview")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                    Text(overview)
-                        .font(.body)
-                        .foregroundColor(Theme.textSecondary)
-                        .lineSpacing(4)
-                }
-                .appearAnimation(delay: 0.34)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
