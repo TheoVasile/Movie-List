@@ -15,6 +15,10 @@ struct ContentView: View {
     @State var showingPopup = false
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @ObservedObject private var social = SocialStore.shared
+    // Asked once; afterwards the username is set from the Profile tab or Settings
+    @AppStorage("social.usernamePromptShown") private var usernamePromptShown = false
+    @State private var showUsernameSetup = false
 
     // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
     private var discoverIcon: String {
@@ -50,6 +54,16 @@ struct ContentView: View {
                 }
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
+        }
+        .onAppear { social.load() }
+        .onChange(of: social.hasLoaded) { loaded in
+            if loaded && social.profile != nil && social.profile?.handle == nil && !usernamePromptShown {
+                usernamePromptShown = true
+                showUsernameSetup = true
+            }
+        }
+        .sheet(isPresented: $showUsernameSetup) {
+            UsernameSetupView()
         }
     }
 }

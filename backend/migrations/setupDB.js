@@ -20,6 +20,20 @@ const createTables = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            -- The @username people search for to follow each other. Picked by the user, always lowercase;
+            -- null until they choose one. username stays the display name
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS handle VARCHAR(20) UNIQUE;
+
+            -- One-way follows, no approval needed: following someone lets you see their lists, rankings and
+            -- watched films (never their notes)
+            CREATE TABLE IF NOT EXISTS follows (
+                follower_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                followee_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (follower_id, followee_id),
+                CHECK (follower_id <> followee_id)
+            );
+
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,
                 tmdb_id VARCHAR(20) UNIQUE,
@@ -58,7 +72,7 @@ const createTables = async () => {
                 PRIMARY KEY (user_id, movie_id)
             );
 
-            -- A user's private note on a film, shared across their lists like watched
+            -- A user's note on a film, shared across their lists like watched and visible to their followers
             CREATE TABLE IF NOT EXISTS movie_notes (
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
                 movie_id INT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,

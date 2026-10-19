@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
-// A user's private note on a film. Like watched, it's per user rather than per list, so the same note
-// shows in every list the film is in. An empty note deletes it
+// A user's note on a film, visible to them and to people who follow them. Like watched, it's per user
+// rather than per list, so the same note shows in every list the film is in. An empty note deletes it
 async function setMovieNote(user_id, movie_id, note) {
     if (!note.trim()) {
         await pool.query("DELETE FROM movie_notes WHERE user_id = $1 AND movie_id = $2", [user_id, movie_id]);

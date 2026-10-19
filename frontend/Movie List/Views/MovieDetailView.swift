@@ -19,6 +19,7 @@ struct MovieDetailView: View {
 
     @State private var revealed = false
     @State private var editingNote = false
+    @State private var friendTakes: [FriendTake] = []
     @State private var imdbID: String? = nil
     @State private var info: MovieInfo? = nil
     @State private var providers: WatchProviders? = nil
@@ -46,6 +47,13 @@ struct MovieDetailView: View {
             }
             loadIMDbID()
             loadInfo()
+            if movie.tmdb_id > 0 {
+                APIService.shared.fetchFriendTakes(tmdbID: Int64(movie.tmdb_id)) { result in
+                    if case .success(let takes) = result {
+                        withAnimation(Theme.spring) { friendTakes = takes }
+                    }
+                }
+            }
             WatchProvidersStore.shared.load(tmdbID: Int64(movie.tmdb_id)) { loaded in
                 withAnimation(Theme.spring) { providers = loaded }
             }
@@ -159,7 +167,7 @@ struct MovieDetailView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(Theme.accent)
                 }
-                Text(movie.note ?? "What did you think? Only you can see your notes.")
+                Text(movie.note ?? "What did you think? People who follow you can see your notes.")
                     .font(.subheadline)
                     .foregroundColor(movie.note == nil ? Theme.textTertiary : Theme.textSecondary)
                     .multilineTextAlignment(.leading)
@@ -290,6 +298,10 @@ struct MovieDetailView: View {
             if onSaveNote != nil {
                 notesCard
                     .appearAnimation(delay: 0.31)
+            }
+
+            if !friendTakes.isEmpty {
+                FriendTakesSection(takes: friendTakes)
             }
 
             if let info, info.voteCount > 0 || !info.certification.isEmpty {
@@ -469,7 +481,7 @@ private struct NoteEditor: View {
                         }
                     }
                 HStack {
-                    Text("Only you can see this.")
+                    Text("People who follow you can see this.")
                     Spacer()
                     Text("\(text.count)/\(Self.maxLength)")
                         .monospacedDigit()
