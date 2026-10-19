@@ -1,10 +1,10 @@
 const express = require("express");
 const axios = require("axios");
+const { setMovieNote } = require("../models/notesModel");
 const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched } = require("../models/watchedModel");
-const { setMovieNote } = require("../models/notesModel");
 const { mapWithConcurrency } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
 const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
