@@ -23,6 +23,10 @@ struct DiscoverView: View {
     @State private var pendingMovie: Movie? = nil
     @State private var showListPicker = false
     @State private var choseList = false
+    // Lists ticked in the picker; the film goes into all of them
+    @State private var selectedLists: [CDMovieList] = []
+    // Lists still waiting for the film to be placed with Compare, after the current one
+    @State private var rankingQueue: [(list: CDMovieList, movie: CDMovie)] = []
     @State private var toast: String? = nil
     // Creating a new list from the list picker
     @State private var showNewListField = false
@@ -529,22 +533,39 @@ private extension DiscoverView {
         }
     }
 
-    func choose(_ list: CDMovieList) {
-        guard let movie = pendingMovie else { return }
+    func toggle(_ list: CDMovieList) {
+        Haptics.tap()
+        if let index = selectedLists.firstIndex(of: list) {
+            selectedLists.remove(at: index)
+        } else {
+            selectedLists.append(list)
+        }
+    }
+
+    func addToSelectedLists() {
+        guard let movie = pendingMovie, !selectedLists.isEmpty else { return }
+        let lists = selectedLists
         Haptics.success()
         choseList = true
         showListPicker = false
         withAnimation(Theme.spring) {
-            viewModel.add(movie, to: list, context: context) { newMovie in
-                if let newMovie {
-                    // New films land at the bottom, so ask where it belongs, unless it's the only film
-                    if list.movies.count > 1 {
-                        startRanking(newMovie, in: list)
-                    } else {
-                        showToast("Added to \(list.name ?? "your list") at #\(newMovie.rank)")
-                    }
-                } else {
+            viewModel.add(movie, to: lists, context: context) { added in
+                guard !added.isEmpty else {
                     showToast("Couldn't add \(movie.title). Try again.")
+                    return
+                }
+                if added.count < lists.count {
+                    showToast("Added to \(added.count) of \(lists.count) lists. Try the rest again.")
+                } else if added.count > 1 {
+                    showToast("Added to \(added.count) lists")
+                }
+                // New films land at the bottom, so ask where it belongs in each list that has other films
+                rankingQueue = added.filter { $0.list.movies.count > 1 }
+                if let first = rankingQueue.first {
+                    rankingQueue.removeFirst()
+                    startRanking(first.movie, in: first.list)
+                } else if added.count == 1, let only = added.first {
+                    showToast("Added to \(only.list.name ?? "your list") at #\(only.movie.rank)")
                 }
             }
             dragOffset = .zero
@@ -560,8 +581,12 @@ private extension DiscoverView {
         }
     }
 
+    // Moves on to placing the film in the next chosen list, if there is one
     func endRanking() {
         withAnimation(Theme.spring) { ranking = nil }
+        guard let next = rankingQueue.first else { return }
+        rankingQueue.removeFirst()
+        startRanking(next.movie, in: next.list)
     }
 
     func rankingOverlay(model: ListViewModel, movie: CDMovie) -> some View {
@@ -589,6 +614,7 @@ private extension DiscoverView {
             }
         }
         choseList = false
+        selectedLists = []
         pendingMovie = nil
         showNewListField = false
         newListName = ""
@@ -636,7 +662,7 @@ private extension DiscoverView {
                                 PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
                                     .frame(width: 54, height: 81)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("ADD TO A LIST")
+                                    Text("ADD TO LISTS")
                                         .font(.caption.weight(.heavy))
                                         .tracking(2)
                                         .foregroundStyle(Theme.accentGradient)
@@ -651,7 +677,7 @@ private extension DiscoverView {
                         newListSection
                         ForEach(Array(listsByLastAdded.enumerated()), id: \.element) { index, list in
                             Button {
-                                choose(list)
+                                toggle(list)
                             } label: {
                                 listRow(list)
                             }
@@ -660,9 +686,26 @@ private extension DiscoverView {
                         }
                     }
                     .padding(20)
+                    .padding(.bottom, 80)
+                }
+                if !movieLists.isEmpty {
+                    VStack {
+                        Spacer()
+                        Button {
+                            addToSelectedLists()
+                        } label: {
+                            Text(selectedLists.isEmpty ? "Choose Lists" : selectedLists.count == 1 ? "Add to \(selectedLists[0].name ?? "List")" : "Add to \(selectedLists.count) Lists")
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(selectedLists.isEmpty)
+                        .opacity(selectedLists.isEmpty ? 0.5 : 1)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                    }
                 }
             }
-            .navigationTitle("Choose a List")
+            .navigationTitle("Choose Lists")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -701,7 +744,7 @@ private extension DiscoverView {
                         if isCreatingList {
                             ProgressView().tint(Theme.onAccent)
                         }
-                        Text(isCreatingList ? "Creating…" : "Create List & Add")
+                        Text(isCreatingList ? "Creating…" : "Create List")
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -760,7 +803,13 @@ private extension DiscoverView {
                 } catch {
                     print("Error saving new list:", error)
                 }
-                choose(list)
+                // The new list is ticked along with any others, then Add puts the film in all of them
+                withAnimation(Theme.spring) {
+                    selectedLists.append(list)
+                    showNewListField = false
+                    newListName = ""
+                }
+                Haptics.success()
             case .failure(let error):
                 print("Error creating list:", error.localizedDescription)
                 Haptics.tap()
@@ -776,6 +825,7 @@ private extension DiscoverView {
 
     func listRow(_ list: CDMovieList) -> some View {
         let top = list.movies.sorted { $0.rank < $1.rank }.first
+        let isSelected = selectedLists.contains(list)
         return HStack(spacing: 14) {
             PosterImage(path: top?.poster_path, cornerRadius: 8, size: .small)
                 .frame(width: 40, height: 60)
@@ -788,13 +838,18 @@ private extension DiscoverView {
                     .foregroundColor(Theme.textSecondary)
             }
             Spacer()
-            Image(systemName: "plus.circle.fill")
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .font(.title2)
-                .foregroundStyle(Theme.accentGradient)
+                .foregroundStyle(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
         }
         .padding(12)
         .background(Theme.surfaceRaised)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(isSelected ? Theme.accent.opacity(0.6) : .clear, lineWidth: 1.5)
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
