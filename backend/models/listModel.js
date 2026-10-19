@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { fetchNotes } = require("./notesModel");
 
 async function createList(user_id, name, overview, is_ranked) {
     const result = await pool.query(
@@ -16,6 +17,7 @@ async function fetchLists(user_id) {
     const lists = result.rows;
     const watched = await pool.query("SELECT movie_id FROM watched_movies WHERE user_id = $1", [user_id]);
     const watchedIDs = new Set(watched.rows.map((row) => row.movie_id));
+    const notes = await fetchNotes(user_id);
 
     for (const list of lists) {
         list.movies = [];
@@ -31,6 +33,7 @@ async function fetchLists(user_id) {
             const movieDetailsResult = movieDetails.rows[0];
             movieDetailsResult.rank = movie.rank;
             movieDetailsResult.watched = watchedIDs.has(movie.movie_id);
+            movieDetailsResult.note = notes.get(movie.movie_id) ?? null;
             list.movies.push(movieDetailsResult);
         }
     }

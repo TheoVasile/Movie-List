@@ -57,6 +57,15 @@ const createTables = async () => {
                 watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, movie_id)
             );
+
+            -- A user's private note on a film, shared across their lists like watched
+            CREATE TABLE IF NOT EXISTS movie_notes (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                movie_id INT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+                note TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, movie_id)
+            );
         `);
 
         console.log("Tables created successfully");

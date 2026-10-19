@@ -64,6 +64,7 @@ struct PersistenceController {
             do {
                 let curMovie = try CDMovie(id: movieResponse.id, tmdb_id: Int32(movieResponse.tmdb_id)!, title: movieResponse.title, release_date: movieResponse.release_date, overview: movieResponse.overview, rank: Int32(movieResponse.rank), poster_path: movieResponse.poster_path, original_language: movieResponse.original_language, popularity: movieResponse.popularity, context: context)
                 curMovie.watched = movieResponse.watched ?? false
+                curMovie.note = movieResponse.note
                 curList.addToMovies_(curMovie)
             } catch {
                 print("Failed to create CD Movie", error)
