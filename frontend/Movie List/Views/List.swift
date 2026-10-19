@@ -241,7 +241,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie)) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), onAddToLists: { addingToLists = movie }) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())
@@ -250,13 +250,6 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                         .overlay { highlightRing(for: movie) }
-                        .contextMenu {
-                            Button {
-                                addingToLists = movie
-                            } label: {
-                                Label("Add to Other Lists", systemImage: "text.badge.plus")
-                            }
-                        }
                         // Rows with custom swipe actions lose the built-in swipe to delete, so it's added back here
                         .swipeActions(edge: .leading) {
                             Button {
