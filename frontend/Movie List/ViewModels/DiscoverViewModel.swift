@@ -262,19 +262,32 @@ class DiscoverViewModel: ObservableObject {
     }
 
     /// Removes the card straight away; if saving fails, the card comes back on top
-    func add(_ movie: Movie, to list: CDMovieList, context: NSManagedObjectContext, completion: @escaping (CDMovie?) -> Void) {
+    /// Adds the film to every chosen list at once. It counts as one like, however many lists it goes in.
+    /// Calls back with the lists it was added to and the new copy in each, in the order given; if every
+    /// add fails, the card comes back on top
+    func add(_ movie: Movie, to lists: [CDMovieList], context: NSManagedObjectContext, completion: @escaping ([(list: CDMovieList, movie: CDMovie)]) -> Void) {
         deck.removeAll { $0.id == movie.id }
         listedIDs.insert(movie.id)
         learn(from: movie, .liked)
         refillIfNeeded()
-        list.addMovie(movie, context: context) { newMovie in
-            if newMovie == nil {
+
+        var added: [Int: CDMovie] = [:]
+        let group = DispatchGroup()
+        for (index, list) in lists.enumerated() {
+            group.enter()
+            list.addMovie(movie, context: context) { newMovie in
+                added[index] = newMovie
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            if added.isEmpty {
                 withAnimation(Theme.spring) {
                     self.listedIDs.remove(movie.id)
                     self.deck.insert(movie, at: 0)
                 }
             }
-            completion(newMovie)
+            completion(lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } })
         }
     }
 
