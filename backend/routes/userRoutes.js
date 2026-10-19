@@ -1,5 +1,5 @@
 const express = require("express");
-const { isValidHandle, getProfile, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -12,6 +12,21 @@ router.get("/me", async (req, res) => {
         res.json(profile);
     } catch (error) {
         console.error("Error fetching profile:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Turns AI features on or off for the user, e.g. { "allowed": true }. The app sends this whenever the
+// setting changes, and Movie Night checks it for both people
+router.put("/me/ai", async (req, res) => {
+    if (typeof req.body.allowed !== "boolean") {
+        return res.status(400).json({ error: "A true/false allowed is required." });
+    }
+    try {
+        await setAIAllowed(req.user.uid, req.body.allowed);
+        res.json({ allowed: req.body.allowed });
+    } catch (error) {
+        console.error("Error saving AI setting:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

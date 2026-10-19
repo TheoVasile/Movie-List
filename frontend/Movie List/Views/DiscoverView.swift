@@ -13,6 +13,7 @@ struct DiscoverView: View {
     @EnvironmentObject var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @StateObject private var viewModel = DiscoverViewModel()
+    @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -72,11 +73,12 @@ struct DiscoverView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Section(sourceDescription) {
-                            Picker("Recommendations", selection: $useAI) {
+                            // Only offered once AI is allowed in Settings; until then it shows Classic
+                            Picker("Recommendations", selection: Binding(get: { canUseAI && useAI }, set: { useAI = $0 })) {
                                 Label("AI Picks", systemImage: "brain").tag(true)
                                 Label("Classic (TMDb)", systemImage: "film.stack").tag(false)
                             }
-                            .disabled(isUnder18)
+                            .disabled(!canUseAI)
                         }
                         Section(profileDescription) {
                             Button {
@@ -115,11 +117,7 @@ struct DiscoverView: View {
                 .presentationDetents([.medium])
                 .interactiveDismissDisabled()
         }
-        .onChange(of: useAI) { _ in
-            aiConsentAsked = true
-            withAnimation(Theme.spring) { viewModel.sourceChanged() }
-        }
-        .onChange(of: ageRange) { _ in
+        .onChange(of: showingAIPicks) { _ in
             withAnimation(Theme.spring) { viewModel.sourceChanged() }
         }
         .onAppear(perform: syncWithLists)
@@ -164,9 +162,14 @@ private extension DiscoverView {
         ageRange == Personalization.under18
     }
 
+    // AI Picks can be chosen only while AI features are allowed in Settings
+    var canUseAI: Bool {
+        aiAllowed && !isUnder18
+    }
+
     // Asked once, the first time Discover opens, before anything is sent to the AI
     var askForAIConsent: Binding<Bool> {
-        Binding(get: { !aiConsentAsked && !isUnder18 }, set: { _ in })
+        Binding(get: { !aiConsentAsked && !aiAllowed && !isUnder18 }, set: { _ in })
     }
 
     var aiConsentSheet: some View {
@@ -174,28 +177,28 @@ private extension DiscoverView {
             Image(systemName: "brain")
                 .font(.system(size: 40))
                 .foregroundStyle(Theme.accentGradient)
-            Text("Try AI Picks?")
+            Text("Allow AI Features?")
                 .font(.title2.bold())
                 .foregroundColor(Theme.textPrimary)
-            Text("Discover can send the titles in your lists, your Discover swipes, and your iPhone's country and language to Claude, Anthropic's AI, to pick films for you. Your name and email are never sent. You can change this any time in Settings.")
+            Text("AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes, and your iPhone's country and language to Claude, Anthropic's AI. Your name and email are never sent. You can change this any time in Settings.")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
             Button {
                 Haptics.tap()
                 aiConsentAsked = true
+                aiAllowed = true
                 useAI = true
             } label: {
-                Text("Allow AI Picks")
+                Text("Allow AI Features")
                     .font(.headline)
                     .foregroundColor(Theme.onAccent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Theme.accentGradient, in: Capsule())
             }
-            Button("Use Classic Recommendations") {
+            Button("Not Now") {
                 aiConsentAsked = true
-                useAI = false
             }
             .foregroundColor(Theme.accent)
         }
@@ -208,6 +211,9 @@ private extension DiscoverView {
         if isUnder18 {
             return "Recommended by TMDb from your lists"
         }
+        if !aiAllowed {
+            return "Allow AI features in Settings to use AI Picks"
+        }
         if !useAI {
             return "Recommended by TMDb from your lists"
         }
@@ -216,7 +222,7 @@ private extension DiscoverView {
 
     // Sparkles mark AI recommendations, so they only appear while AI Picks is the chosen source
     var showingAIPicks: Bool {
-        useAI && !isUnder18
+        canUseAI && useAI
     }
 
     var profileDescription: String {

@@ -138,7 +138,8 @@ struct MovieNightView: View {
                 }
             case .failure(let error):
                 switch (error as NSError).code {
-                case 403: errorMessage = "Follow \(person.display_name) to plan a movie night together."
+                case 403: errorMessage = (error as NSError).userInfo[NSLocalizedDescriptionKey] as? String
+                    ?? "You both need to allow AI features to plan a movie night."
                 case 429: errorMessage = "You've used today's AI picks. Try again tomorrow."
                 case 503: errorMessage = "AI picks aren't available right now."
                 default: errorMessage = "Something went wrong. Check your connection and try again."

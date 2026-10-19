@@ -9,11 +9,17 @@ import Foundation
 import SwiftUI
 import CoreData
 
-/// Optional details the user can share to personalise AI picks in Discover. Kept on this device and
-/// only sent along with AI Discover requests. AI picks are off until the user agrees to them
+/// The user's AI settings, and optional details they can share to personalise AI picks in Discover.
+/// One setting, "Allow AI features", decides whether anything is sent to the AI; Discover then lets the
+/// user choose AI Picks or Classic recommendations, but only while AI is allowed. Everything here stays on
+/// this device and is only sent along with AI requests, apart from the allowed setting itself, which the
+/// server keeps so a friend's Movie Night can check both people agreed
 enum Personalization {
+    // Whether the user allows AI features at all
+    static let aiAllowedKey = "ai.allowed"
+    // Which source Discover uses while AI is allowed: AI Picks (true) or Classic (false)
     static let useAIKey = "discover.useAI"
-    // Whether the user has been asked about AI picks yet
+    // Whether the user has been asked about AI yet
     static let aiConsentAskedKey = "discover.aiConsentAsked"
     static let under18 = "Under 18"
     static let ageRangeKey = "personalization.ageRange"
@@ -22,8 +28,28 @@ enum Personalization {
     static let ageRanges = [notShared, under18, "18–24", "25–34", "35–44", "45–54", "55–64", "65+"]
     static let pronouns = [notShared, "She/Her", "He/Him", "They/Them", "She/They", "He/They", "Xe/Xem", "Ze/Hir", "It/Its"]
 
+    /// Whether AI features may be used. Never for under-18s
+    static var aiAllowed: Bool {
+        UserDefaults.standard.bool(forKey: aiAllowedKey) && !isUnder18
+    }
+
+    /// Whether Discover uses AI Picks right now
     static var useAI: Bool {
-        UserDefaults.standard.bool(forKey: useAIKey) && !isUnder18
+        aiAllowed && UserDefaults.standard.bool(forKey: useAIKey)
+    }
+
+    /// Earlier builds had one switch, "AI Picks in Discover", that was both the user's agreement to AI and
+    /// Discover's source. Anyone who turned it on had agreed, so AI stays allowed for them
+    static func migrateAIConsent() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: aiAllowedKey) == nil, defaults.bool(forKey: useAIKey) {
+            defaults.set(true, forKey: aiAllowedKey)
+        }
+    }
+
+    /// Tells the server whether the user allows AI, so friends' Movie Nights can check it
+    static func syncAIAllowed() {
+        APIService.shared.setAIAllowed(aiAllowed) { _ in }
     }
 
     /// AI picks are never used for under-18s

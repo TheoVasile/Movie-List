@@ -24,6 +24,10 @@ const createTables = async () => {
             -- null until they choose one. username stays the display name
             ALTER TABLE users ADD COLUMN IF NOT EXISTS handle VARCHAR(20) UNIQUE;
 
+            -- Whether the user allows AI features. Kept on the server so a friend's Movie Night can check
+            -- that both people agreed before either person's lists go to the AI
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_allowed BOOLEAN NOT NULL DEFAULT false;
+
             -- One-way follows, no approval needed: following someone lets you see their lists, rankings and
             -- watched films (never their notes)
             CREATE TABLE IF NOT EXISTS follows (

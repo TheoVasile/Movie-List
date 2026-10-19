@@ -13,6 +13,7 @@ struct ContentView: View {
     @EnvironmentObject var db: DatabaseService
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @State var showingPopup = false
+    @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
     @ObservedObject private var social = SocialStore.shared
@@ -24,7 +25,7 @@ struct ContentView: View {
 
     // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
     private var discoverIcon: String {
-        useAI && ageRange != Personalization.under18 ? "sparkles" : "rectangle.on.rectangle.angled"
+        aiAllowed && useAI && ageRange != Personalization.under18 ? "sparkles" : "rectangle.on.rectangle.angled"
     }
     
     var body: some View {
@@ -57,7 +58,14 @@ struct ContentView: View {
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
         }
-        .onAppear { social.load() }
+        .onAppear {
+            social.load()
+            // The server keeps whether AI is allowed, for friends' Movie Nights. Sent at launch too, so it's
+            // right for settings chosen before the server kept it
+            Personalization.syncAIAllowed()
+        }
+        .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
+        .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
         .onChange(of: social.hasLoaded) { loaded in
             if loaded && social.profile != nil && social.profile?.handle == nil && !usernamePromptShown {
                 usernamePromptShown = true
