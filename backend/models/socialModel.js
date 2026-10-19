@@ -22,6 +22,18 @@ async function getProfile(user_id) {
     return result.rows[0] ?? null;
 }
 
+// Changes the user's display name. It has to be unique, so a name someone else already has gets part of the
+// account id added, the same way as at sign-up. Returns the name that was saved
+async function setDisplayName(user_id, name) {
+    const update = (value) => pool.query("UPDATE users SET username = $2 WHERE firebase_uid = $1 RETURNING username", [user_id, value]);
+    try {
+        return (await update(name)).rows[0]?.username ?? null;
+    } catch (error) {
+        if (error.code !== "23505" || error.constraint !== "users_username_key") throw error;
+        return (await update(`${name} ${user_id.slice(0, 6)}`.slice(0, 50))).rows[0]?.username ?? null;
+    }
+}
+
 async function setAIAllowed(user_id, allowed) {
     await pool.query("UPDATE users SET ai_allowed = $2 WHERE firebase_uid = $1", [user_id, allowed]);
 }
@@ -152,4 +164,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };

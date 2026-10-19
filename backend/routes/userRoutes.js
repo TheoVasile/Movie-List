@@ -1,5 +1,5 @@
 const express = require("express");
-const { isValidHandle, getProfile, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -12,6 +12,22 @@ router.get("/me", async (req, res) => {
         res.json(profile);
     } catch (error) {
         console.error("Error fetching profile:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Changes the name shown to friends, e.g. { "name": "Jess Wilk" }
+router.put("/me/name", async (req, res) => {
+    const name = typeof req.body.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
+    if (!name || name.length > 40) {
+        return res.status(400).json({ error: "Names are 1 to 40 characters." });
+    }
+    try {
+        const saved = await setDisplayName(req.user.uid, name);
+        if (!saved) return res.status(404).json({ error: "Account not found." });
+        res.json({ name: saved });
+    } catch (error) {
+        console.error("Error saving name:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

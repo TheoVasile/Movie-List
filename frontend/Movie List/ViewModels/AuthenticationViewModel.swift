@@ -101,13 +101,21 @@ extension AuthenticationViewModel {
     }
   }
 
-    func signUpWithEmailPassword() async -> Bool {
+    func signUpWithEmailPassword(name: String) async -> Bool {
         authenticationState = .authenticating
         do  {
             let result = try await Auth.auth().createUser(withEmail: email, password: password)
             let firebaseUser = result.user
+            // The name typed at sign-up is the one shown on Home, Profile and to friends
+            let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fallback = (firebaseUser.email ?? "").components(separatedBy: "@").first ?? ""
+            let displayName = name.isEmpty ? fallback : name
+            let change = firebaseUser.createProfileChangeRequest()
+            change.displayName = displayName
+            try? await change.commitChanges()
+            self.user = Auth.auth().currentUser
             
-            APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
+            APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: displayName) { result in
                 switch result {
                 case .success( _):
                     print("created user")
@@ -160,6 +168,29 @@ extension AuthenticationViewModel {
       default:
         // Unknown accounts aren't reported, so nobody can use this to find out who has an account
         return nil
+      }
+    }
+  }
+
+  /// Changes the user's name on their account and on the server. Returns nil once saved, or a message to show
+  func updateName(_ name: String) async -> String? {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty, name.count <= 40 else { return "Names are 1 to 40 characters." }
+    guard let current = Auth.auth().currentUser else { return "You're not signed in." }
+    do {
+      let change = current.createProfileChangeRequest()
+      change.displayName = name
+      try await change.commitChanges()
+      try await current.reload()
+    } catch {
+      return "Couldn't save your name. Try again."
+    }
+    // Firebase updates the same User object, so publish it again for screens showing the name
+    user = Auth.auth().currentUser
+    objectWillChange.send()
+    return await withCheckedContinuation { continuation in
+      APIService.shared.setDisplayName(name) { saved in
+        continuation.resume(returning: saved ? nil : "Saved on this account, but friends may still see your old name. Try again later.")
       }
     }
   }

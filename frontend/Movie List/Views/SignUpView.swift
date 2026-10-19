@@ -19,7 +19,7 @@ struct SignUpView: View {
     
     private func signUpWithEmail() {
         Task {
-            if await authenticationViewModel.signUpWithEmailPassword() == true {
+            if await authenticationViewModel.signUpWithEmailPassword(name: name) == true {
                 dismiss()
             } else {
                 invalidCredentials = true
@@ -67,6 +67,7 @@ struct SignUpView: View {
                         signUpWithEmail()
                     }
                     .buttonStyle(PrimaryButtonStyle())
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                     .padding(.top, 8)
                     .appearAnimation(delay: 0.25)
 
