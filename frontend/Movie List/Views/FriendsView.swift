@@ -521,13 +521,14 @@ struct FriendProfileView: View {
         .navigationTitle("@\(person.handle)")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMovieNight) {
-            MovieNightView(person: person)
+            MovieNightView(person: person, canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))
         }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }
     }
 
-    // Both people's lists go to the AI, so both of them have to allow AI features
+    // Always available to people who follow each other. AI Picks need both of them to allow AI features;
+    // otherwise it uses Classic recommendations
     @ViewBuilder
     private func movieNightButton(friendAllowsAI: Bool) -> some View {
         let iAllowAI = aiAllowed && ageRange != Personalization.under18
@@ -539,14 +540,12 @@ struct FriendProfileView: View {
                 Label("Plan a Movie Night", systemImage: "ticket.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(!iAllowAI || !friendAllowsAI)
-            .opacity(iAllowAI && friendAllowsAI ? 1 : 0.5)
             if !iAllowAI {
-                Text("Allow AI features in Settings to plan a movie night.")
+                Text("Uses Classic recommendations. Allow AI features in Settings for AI Picks.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
             } else if !friendAllowsAI {
-                Text("\(person.display_name) hasn't allowed AI features, so you can't plan a movie night together yet.")
+                Text("Uses Classic recommendations, since \(person.display_name) hasn't allowed AI features.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
             }

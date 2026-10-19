@@ -539,11 +539,12 @@ class APIService {
     /// Films the user and a friend they follow would both enjoy, picked by the AI, each with a reason.
     /// A failure's code is the HTTP status (403 not following or AI not allowed by one of them, 429 daily
     /// limit, 503 AI not set up), and its description is the server's explanation when there is one
-    func movieNight(with handle: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// usesAI false asks for Classic picks, from TMDb's recommendations for both people's favourites
+    func movieNight(with handle: String, usesAI: Bool, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle, "count": 10])
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle, "count": 10, "mode": usesAI ? "ai" : "classic"])
         // Reading two people's lists takes the AI a little while
         request.timeoutInterval = 90
         send(request) { data, response, error in
