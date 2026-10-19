@@ -6,7 +6,7 @@ const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = re
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
-const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend } = require("../models/tasteModel");
+const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
 const { recommendFilms, recommendForTwo, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 
 const router = express.Router();
@@ -217,8 +217,85 @@ const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": 
 // Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover.
 // With "Accept: application/x-ndjson" the films stream back one JSON object per line as Claude picks them,
 // so the first card shows in seconds; otherwise (builds from before streaming) they come as one array
-// Films the signed-in user and a friend they follow would both enjoy, e.g. { "handle": "sam", "count": 10 } ->
-// [{ ...discover movie, reason }]. Leaves out films in either person's lists
+// How many of each person's favourites seed Classic movie night picks, how many picks can come from any one
+// favourite (so one shared love doesn't fill the list), and how many TMDb votes a pick needs
+const MOVIE_NIGHT_SEEDS = 6;
+const MOVIE_NIGHT_PER_SEED = 2;
+const MOVIE_NIGHT_MIN_VOTES = 100;
+
+/// Movie night picks without AI: films on both people's watchlists first, then films TMDb recommends from
+/// both people's favourites, preferring ones recommended from each side, each with a reason naming the
+/// favourites it came from. Returns [{ ...discover movie, reason }]
+async function classicMovieNight(user_id, friend, friendName, count) {
+    const [mySeeds, friendSeeds, myIds, friendIds, myWatchlist, friendWatchlist] = await Promise.all([
+        fetchTopFilms(user_id, MOVIE_NIGHT_SEEDS),
+        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS),
+        fetchListedTmdbIds(user_id),
+        fetchListedTmdbIds(friend.firebase_uid),
+        fetchUnwatchedWatchlist(user_id),
+        fetchUnwatchedWatchlist(friend.firebase_uid),
+    ]);
+
+    // Films you both want to watch
+    const shared = [...myWatchlist.keys()].filter((id) => friendWatchlist.has(id)).slice(0, 3).map((id) => {
+        const row = myWatchlist.get(id);
+        return {
+            ...toDiscoverMovie({ ...row, id, release_date: String(row.release_date ?? "").slice(0, 10), poster_path: row.poster_path || null }),
+            reason: `On both your watchlists, and neither of you has seen it yet`,
+        };
+    }).filter((movie) => movie.id);
+
+    // Which of each person's favourites TMDb recommends each film from
+    const params = { api_key: process.env.API_KEY, language: "en-US", page: 1 };
+    const seeds = [...mySeeds.map((seed) => ({ ...seed, mine: true })), ...friendSeeds.map((seed) => ({ ...seed, mine: false }))];
+    const outcomes = await Promise.allSettled(
+        seeds.map((seed) => axios.get(`https://api.themoviedb.org/3/movie/${seed.tmdb_id}/recommendations`, { params, timeout: 15000 }))
+    );
+    const candidates = new Map();
+    outcomes.forEach((outcome, i) => {
+        if (outcome.status !== "fulfilled") return;
+        for (const result of outcome.value.data.results ?? []) {
+            const movie = toDiscoverMovie(result);
+            if (!movie || (result.vote_count ?? 0) < MOVIE_NIGHT_MIN_VOTES || myIds.has(movie.id) || friendIds.has(movie.id)) continue;
+            const entry = candidates.get(movie.id) ?? { movie, mine: [], theirs: [] };
+            (seeds[i].mine ? entry.mine : entry.theirs).push(seeds[i].title);
+            candidates.set(movie.id, entry);
+        }
+    });
+
+    const score = (entry) => (entry.mine.length && entry.theirs.length ? 100 : 0) + (entry.mine.length + entry.theirs.length) * 10 + entry.movie.vote_average;
+    const ranked = [...candidates.values()].sort((a, b) => score(b) - score(a));
+    // Too few films come from both sides, so the rest alternate between each person's favourites
+    const both = ranked.filter((entry) => entry.mine.length && entry.theirs.length);
+    const mineOnly = ranked.filter((entry) => !entry.theirs.length);
+    const theirsOnly = ranked.filter((entry) => !entry.mine.length);
+    const ordered = [...both];
+    for (let i = 0; i < Math.max(mineOnly.length, theirsOnly.length); i++) {
+        if (theirsOnly[i]) ordered.push(theirsOnly[i]);
+        if (mineOnly[i]) ordered.push(mineOnly[i]);
+    }
+
+    const reasonFor = (entry) => entry.mine.length && entry.theirs.length
+        ? `Recommended from your ${entry.mine[0]} and ${friendName}'s ${entry.theirs[0]}`
+        : entry.mine.length
+            ? `For fans of ${entry.mine[0]}, one of your favourites`
+            : `For fans of ${entry.theirs[0]}, one of ${friendName}'s favourites`;
+    // Each favourite leads to at most a couple of picks, so the list covers more of both people's tastes
+    const perSeed = new Map();
+    const picks = [];
+    for (const entry of ordered) {
+        const sources = [...entry.mine.slice(0, 1), ...entry.theirs.slice(0, 1)];
+        if (sources.some((title) => (perSeed.get(title) ?? 0) >= MOVIE_NIGHT_PER_SEED)) continue;
+        sources.forEach((title) => perSeed.set(title, (perSeed.get(title) ?? 0) + 1));
+        picks.push({ ...entry.movie, reason: reasonFor(entry) });
+    }
+    const seen = new Set();
+    return [...shared, ...picks].filter((movie) => !seen.has(movie.id) && seen.add(movie.id)).slice(0, count);
+}
+
+// Films the signed-in user and a friend they follow would both enjoy, e.g. { "handle": "sam", "count": 10,
+// "mode": "ai" } -> [{ ...discover movie, reason }]. "ai" (the default) asks Claude and needs both people to allow
+// AI; "classic" uses TMDb's recommendations from both people's favourites and needs nothing more than following
 router.post("/movie-night", async (req, res) => {
     try {
         const handle = cleanText(req.body?.handle, 40).replace(/^@/, "").toLowerCase();
@@ -232,6 +309,10 @@ router.post("/movie-night", async (req, res) => {
         }
         if (!friend.following) {
             return res.status(403).json({ error: "Follow them to plan a movie night together.", reason: "not_following" });
+        }
+        const friendName = friend.display_name || `@${friend.handle}`;
+        if (req.body?.mode === "classic") {
+            return res.json(await classicMovieNight(req.user.uid, friend, friendName, count));
         }
         // Both people's lists go to the AI, so both have to have allowed it
         if (!friend.my_ai_allowed) {
@@ -247,7 +328,6 @@ router.post("/movie-night", async (req, res) => {
             fetchListedTmdbIds(req.user.uid),
             fetchListedTmdbIds(friend.firebase_uid),
         ]);
-        const friendName = friend.display_name || `@${friend.handle}`;
         // A few extra, since some picks turn out to be in someone's lists or can't be found
         const picks = await recommendForTwo(req.user.uid, myLists, friendLists, friendName, count + 5);
 
