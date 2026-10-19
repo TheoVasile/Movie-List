@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import GoogleSignInSwift
 
 struct SignInView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
@@ -77,9 +76,18 @@ struct SignInView: View {
                         }
                         .padding(.vertical, 6)
 
-                        GoogleSignInButton(scheme: .dark, style: .wide, action: signInWithGoogle)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .appearAnimation(delay: 0.24)
+                        // Styled like the app's other buttons; Google's own button is square and
+                        // clipping its corners cut into the logo
+                        Button(action: signInWithGoogle) {
+                            HStack(spacing: 10) {
+                                Image("GoogleLogo")
+                                    .resizable()
+                                    .frame(width: 20, height: 20)
+                                Text("Sign in with Google")
+                            }
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .appearAnimation(delay: 0.24)
 
                         HStack{
                             Text("Don't have an account?")
