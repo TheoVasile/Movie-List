@@ -4,6 +4,7 @@ const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = re
 
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched } = require("../models/watchedModel");
+const { setMovieNote } = require("../models/notesModel");
 const { mapWithConcurrency } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
 const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
@@ -408,6 +409,30 @@ router.put("/watched", async (req, res) => {
             return res.status(404).json({ error: "Movie not found." });
         }
         console.error("Error updating watched status:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Saves the signed-in user's note on a film, e.g. { "movie_id": 12, "note": "Rewatch with Sam" }.
+// An empty note deletes it
+router.put("/note", async (req, res) => {
+    try {
+        const movieId = Number(req.body.movie_id);
+        const { note } = req.body;
+        if (!Number.isInteger(movieId) || typeof note !== "string") {
+            return res.status(400).json({ error: "movie_id and a note are required." });
+        }
+        if (note.length > 5000) {
+            return res.status(400).json({ error: "A note can be at most 5000 characters." });
+        }
+        await setMovieNote(req.user.uid, movieId, note);
+        res.status(200).json({ movie_id: movieId, note: note.trim() ? note : null });
+    } catch (error) {
+        // 23503: the film doesn't exist
+        if (error.code === "23503") {
+            return res.status(404).json({ error: "Movie not found." });
+        }
+        console.error("Error saving note:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

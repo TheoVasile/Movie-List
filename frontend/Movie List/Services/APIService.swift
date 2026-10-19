@@ -74,6 +74,8 @@ struct MovieDetailsResponse: Codable {
     let rank: Int
     // Optional so responses from before watched tracking still decode
     let watched: Bool?
+    // The user's private note on the film; nil when they haven't written one
+    let note: String?
 }
 
 struct ListDetailsResponse: Codable {
@@ -572,6 +574,32 @@ class APIService {
                 result = .success(())
             } else {
                 result = .failure(NSError(domain: "Watched update failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// Saves the user's note on a film; an empty note deletes it. Calls back on the main thread
+    func setMovieNote(movie_id: Int64, note: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/note") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["movie_id": movie_id, "note": note], options: [])
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        send(request) { _, response, error in
+            let result: Result<Void, Error>
+            if let error = error {
+                result = .failure(error)
+            } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                result = .success(())
+            } else {
+                result = .failure(NSError(domain: "Note save failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }

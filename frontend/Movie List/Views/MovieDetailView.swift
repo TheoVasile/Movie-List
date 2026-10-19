@@ -14,8 +14,11 @@ struct MovieDetailView: View {
     var onCompare: (() -> Void)? = nil
     var onSetRank: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
+    // Saves the user's note; calls back with whether it was saved. Notes are only offered when this is set
+    var onSaveNote: ((String, @escaping (Bool) -> Void) -> Void)? = nil
 
     @State private var revealed = false
+    @State private var editingNote = false
     @State private var imdbID: String? = nil
     @State private var info: MovieInfo? = nil
     @State private var providers: WatchProviders? = nil
@@ -140,6 +143,40 @@ struct MovieDetailView: View {
         }
     }
 
+    // The user's own words about the film, or a prompt to write some
+    private var notesCard: some View {
+        Button {
+            Haptics.tap()
+            editingNote = true
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Your Notes", systemImage: "note.text")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Spacer()
+                    Text(movie.note == nil ? "Add" : "Edit")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Theme.accent)
+                }
+                Text(movie.note ?? "What did you think? Only you can see your notes.")
+                    .font(.subheadline)
+                    .foregroundColor(movie.note == nil ? Theme.textTertiary : Theme.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .cardStyle()
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
+        .sheet(isPresented: $editingNote) {
+            NoteEditor(title: movie.title ?? "Notes", initialText: movie.note ?? "") { text, done in
+                onSaveNote?(text, done)
+            }
+        }
+    }
+
     private var imdbLink: some View {
         Link(destination: imdbURL ?? URL(string: "https://www.imdb.com")!) {
             HStack(spacing: 10) {
@@ -248,6 +285,11 @@ struct MovieDetailView: View {
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 .appearAnimation(delay: 0.3)
+            }
+
+            if onSaveNote != nil {
+                notesCard
+                    .appearAnimation(delay: 0.31)
             }
 
             if let info, info.voteCount > 0 || !info.certification.isEmpty {
@@ -390,6 +432,94 @@ struct ProviderLogo: View {
         .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
         .accessibilityLabel(provider.name)
+    }
+}
+
+// MARK: - Note editor
+
+private struct NoteEditor: View {
+    let title: String
+    let initialText: String
+    let onSave: (String, @escaping (Bool) -> Void) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+    @State private var saveFailed = false
+    @FocusState private var focused: Bool
+
+    private static let maxLength = 5000
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 8) {
+                TextEditor(text: $text)
+                    .focused($focused)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .background(Theme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text("What did you think? Who should you watch it with?")
+                                .foregroundColor(Theme.textTertiary)
+                                .padding(.horizontal, 15)
+                                .padding(.vertical, 18)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                HStack {
+                    Text("Only you can see this.")
+                    Spacer()
+                    Text("\(text.count)/\(Self.maxLength)")
+                        .monospacedDigit()
+                        .foregroundColor(text.count > Self.maxLength ? Theme.accentSecondary : Theme.textTertiary)
+                }
+                .font(.caption)
+                .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") { save() }
+                            .bold()
+                            .disabled(text == initialText || text.count > Self.maxLength)
+                    }
+                }
+            }
+            .alert("Couldn't save your note", isPresented: $saveFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Check your connection and try again. Your note is still here.")
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .onAppear {
+            text = initialText
+            focused = true
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        onSave(text) { saved in
+            isSaving = false
+            if saved {
+                Haptics.success()
+                dismiss()
+            } else {
+                saveFailed = true
+            }
+        }
     }
 }
 

@@ -147,7 +147,8 @@ struct ListView: View {
                     listName: viewModel.movieList.name,
                     onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
                     onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } },
-                    onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) }
+                    onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) },
+                    onSaveNote: { note, done in viewModel.setNote(detailMovie, note, completion: done) }
                 )
             }
         }
