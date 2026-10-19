@@ -164,6 +164,30 @@ struct UserSummary: Decodable, Identifiable, Hashable {
 }
 
 /// A followed person's lists, read-only. lists is empty when the user doesn't follow them
+/// One watch of a film. A film's first watch is its watched mark; later ones are rewatches, which
+/// have an id so they can be removed
+struct DiaryEntry: Decodable {
+    let id: Int?
+    let kind: String
+    let movie_id: Int64
+    let tmdb_id: Int64
+    let title: String
+    let poster_path: String?
+    let release_date: String
+    let watched_at: String
+    // Saved along with many other films at once, by an import or marking a whole list, so the date
+    // is when it was recorded rather than when it was seen
+    let bulk: Bool
+
+    var isRewatch: Bool { kind == "rewatch" }
+    var entryID: String { id.map { "r\($0)" } ?? "f\(movie_id)" }
+    var date: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: watched_at) ?? ISO8601DateFormatter().date(from: watched_at)
+    }
+}
+
 struct FriendLists: Decodable {
     struct Film: Decodable, Identifiable {
         var id: Int64 { tmdb_id }
@@ -747,6 +771,41 @@ class APIService {
     func setListWatched(list_id: Int64, watched: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/\(list_id)/watched") else { return }
         putWatched(url: url, body: ["watched": watched], completion: completion)
+    }
+
+    /// Every watch, newest first, or only one film's when movieID is given
+    func fetchDiary(movieID: Int64? = nil, completion: @escaping (Result<[DiaryEntry], Error>) -> Void) {
+        sendJSON("GET", "/movies/diary", query: movieID.map { [URLQueryItem(name: "movie_id", value: String($0))] } ?? [], completion: completion)
+    }
+
+    /// Logs a watch on the given day. The first watch marks the film watched; later ones are rewatches
+    func logWatch(movieID: Int64, on day: Date, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/watch") else { return }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        sendVoid(url: url, method: "POST", body: ["movie_id": movieID, "watched_on": formatter.string(from: day)], completion: completion)
+    }
+
+    func deleteRewatch(id: Int, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/movies/watch/\(id)") else { return }
+        sendVoid(url: url, method: "DELETE", body: nil, completion: completion)
+    }
+
+    private func sendVoid(url: URL, method: String, body: [String: Any]?, completion: @escaping (Result<Void, Error>) -> Void) {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
+        }
+        send(request) { _, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result: Result<Void, Error> = (200...299).contains(status)
+                ? .success(())
+                : .failure(error ?? NSError(domain: "Request failed", code: status, userInfo: nil))
+            DispatchQueue.main.async { completion(result) }
+        }
     }
 
     private func putWatched(url: URL, body: [String: Any], completion: @escaping (Result<Void, Error>) -> Void) {

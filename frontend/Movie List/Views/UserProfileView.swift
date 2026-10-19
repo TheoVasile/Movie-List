@@ -23,6 +23,7 @@ struct UserProfileView: View {
                         profileHeader
                         stats
                         statsLink
+                        diaryLink
                         FollowingSection()
                             .appearAnimation(delay: 0.18)
                         listsSection
@@ -113,6 +114,35 @@ struct UserProfileView: View {
         }
         .buttonStyle(PressableButtonStyle())
         .appearAnimation(delay: 0.16)
+    }
+
+    private var diaryLink: some View {
+        NavigationLink {
+            DiaryView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "book.closed.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Diary")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Every film you've watched, by month, with rewatches")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .cardStyle(cornerRadius: 18)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .appearAnimation(delay: 0.17)
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {
