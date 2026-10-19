@@ -28,7 +28,7 @@ const createTables = async () => {
             -- that both people agreed before either person's lists go to the AI
             ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_allowed BOOLEAN NOT NULL DEFAULT false;
 
-            -- One-way follows, no approval needed: following someone lets you see their lists, rankings and
+            -- One-way follows: once accepted, following someone lets you see their lists, rankings and
             -- watched films (never their notes)
             CREATE TABLE IF NOT EXISTS follows (
                 follower_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
@@ -37,6 +37,10 @@ const createTables = async () => {
                 PRIMARY KEY (follower_id, followee_id),
                 CHECK (follower_id <> followee_id)
             );
+            -- Follows are requests until the person being followed accepts. Follows from before requests
+            -- existed were already approved in effect, so they start accepted; new ones start pending
+            ALTER TABLE follows ADD COLUMN IF NOT EXISTS accepted BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE follows ALTER COLUMN accepted SET DEFAULT false;
 
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,

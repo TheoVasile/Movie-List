@@ -150,6 +150,14 @@ struct UserProfile: Decodable {
     let display_name: String
     let followers: Int
     let following: Int
+    // People waiting for the user to accept their follow request
+    let requests: Int?
+}
+
+/// Follow requests waiting on the user, and the @usernames the user has asked to follow
+struct FollowRequests: Decodable {
+    let incoming: [UserSummary]
+    let outgoing: [String]
 }
 
 /// Someone to follow, from search or the user's following list
@@ -207,6 +215,8 @@ struct FriendLists: Decodable {
     let handle: String
     let display_name: String
     var following: Bool
+    // The user has asked to follow them and is waiting for them to accept
+    let requested: Bool?
     // Whether they allow AI features; only sent to people who follow them
     let ai_allowed: Bool?
     let lists: [List]
@@ -446,6 +456,20 @@ class APIService {
 
     func fetchFollowing(completion: @escaping (Result<[UserSummary], Error>) -> Void) {
         sendJSON("GET", "/users/me/following", completion: completion)
+    }
+
+    func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {
+        sendJSON("GET", "/users/me/requests", completion: completion)
+    }
+
+    private struct RequestAnswer: Decodable { let accepted: Bool }
+
+    /// Accepts or declines someone's request to follow the user
+    func answerFollowRequest(_ handle: String, accept: Bool, completion: @escaping (Bool) -> Void) {
+        let escaped = handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle
+        sendJSON(accept ? "POST" : "DELETE", accept ? "/users/me/requests/\(escaped)/accept" : "/users/me/requests/\(escaped)") { (result: Result<RequestAnswer, Error>) in
+            completion((try? result.get()) != nil)
+        }
     }
 
     func setFollowing(_ handle: String, _ following: Bool, completion: @escaping (Result<Bool, Error>) -> Void) {
