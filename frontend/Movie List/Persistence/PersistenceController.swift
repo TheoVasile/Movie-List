@@ -64,6 +64,25 @@ struct PersistenceController {
             print("Failed to save synced lists", error)
         }
         updateWidgets()
+        NotificationManager.shared.scheduleSuggestions()
+    }
+
+    /// Unwatched films to suggest: from the watchlist (any list with "watch" in its name) if it has any, otherwise
+    /// from every list, best ranked first and each film once
+    func suggestionCandidates() -> [(tmdbID: Int64, label: String, fromWatchlist: Bool)] {
+        let lists = (try? container.viewContext.fetch(CDMovieList.fetchRequest())) ?? []
+        let unwatched = { (lists: [CDMovieList]) in lists.flatMap(\.movies).filter { !$0.watched }.sorted { $0.rank < $1.rank } }
+        let watchlistFilms = unwatched(lists.filter { ($0.name ?? "").localizedCaseInsensitiveContains("watch") })
+        let fromWatchlist = !watchlistFilms.isEmpty
+        var seen = Set<Int32>()
+        return (fromWatchlist ? watchlistFilms : unwatched(lists))
+            .filter { seen.insert($0.tmdb_id).inserted }
+            .prefix(60)
+            .map { movie in
+                let year = Theme.year(from: movie.release_date)
+                let title = movie.title ?? ""
+                return (Int64(movie.tmdb_id), year.isEmpty ? title : "\(title) (\(year))", fromWatchlist)
+            }
     }
 
     /// Saves what the Home Screen widgets show and asks them to redraw: the top 3 of the biggest list,

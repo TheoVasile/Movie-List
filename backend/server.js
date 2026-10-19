@@ -8,6 +8,7 @@ const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
 const pool = require("./config/db");
+const { sendDailyDigests } = require("./services/digestService");
 
 const app = express();
 // Letterboxd imports can carry thousands of films in one request
@@ -18,6 +19,20 @@ createTables();
 
 // For the host's health checks, so it needs no sign-in
 app.get("/health", (req, res) => res.send("ok"));
+
+// Sends the daily friends digest. Called once a day by a scheduled GitHub Action, since the free host
+// sleeps and can't keep its own timer. Needs the DIGEST_SECRET shared with that workflow
+app.post("/internal/digest", async (req, res) => {
+    const secret = process.env.DIGEST_SECRET;
+    if (!secret) return res.status(503).json({ error: "The digest isn't set up." });
+    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        res.json(await sendDailyDigests());
+    } catch (error) {
+        console.error("Error sending digests:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 app.use("/auth", authRoutes);
 // Everything except account setup needs a signed-in user; /auth checks tokens per route

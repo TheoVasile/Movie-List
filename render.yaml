@@ -25,5 +25,8 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Shared with the Daily friends digest GitHub Action, which calls /internal/digest
+      - key: DIGEST_SECRET
+        generateValue: true
       - key: AI_DAILY_LIMIT
         value: "40"

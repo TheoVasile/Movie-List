@@ -1,0 +1,24 @@
+# Sends the daily friends digest notification. The backend's free host sleeps when idle and can't run a
+# timer, so this wakes it once a day. Needs the repository secret DIGEST_SECRET, matching the backend's
+name: Daily friends digest
+
+on:
+  schedule:
+    # 23:00 UTC, early evening in North America
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake the backend
+        # The first request after a sleep can take most of a minute
+        run: curl --silent --retry 5 --retry-delay 10 --max-time 90 https://movie-list-backend-dgct.onrender.com/health
+      - name: Send digests
+        env:
+          DIGEST_SECRET: ${{ secrets.DIGEST_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 -X POST \
+            -H "x-digest-secret: $DIGEST_SECRET" \
+            https://movie-list-backend-dgct.onrender.com/internal/digest
