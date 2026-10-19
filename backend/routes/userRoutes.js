@@ -1,4 +1,5 @@
 const express = require("express");
+const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
@@ -28,6 +29,47 @@ router.put("/me/name", async (req, res) => {
         res.json({ name: saved });
     } catch (error) {
         console.error("Error saving name:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Registers this device for push notifications, e.g. { "token": "<FCM token>" }
+router.put("/me/devices", async (req, res) => {
+    const token = typeof req.body.token === "string" ? req.body.token.trim() : "";
+    if (!token || token.length > 4096) {
+        return res.status(400).json({ error: "A device token is required." });
+    }
+    try {
+        await saveDeviceToken(req.user.uid, token);
+        res.json({ registered: true });
+    } catch (error) {
+        console.error("Error saving device token:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Stops notifications to this device, when the user signs out on it
+router.delete("/me/devices/:token", async (req, res) => {
+    try {
+        await removeDeviceToken(req.user.uid, req.params.token);
+        res.status(204).end();
+    } catch (error) {
+        console.error("Error removing device token:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Which notifications the user wants, e.g. { "requests": true, "activity": false }
+router.put("/me/notifications", async (req, res) => {
+    const { requests, activity } = req.body ?? {};
+    if (typeof requests !== "boolean" && typeof activity !== "boolean") {
+        return res.status(400).json({ error: "requests and/or activity must be true or false." });
+    }
+    try {
+        await setNotificationPreferences(req.user.uid, { requests, activity });
+        res.json({ requests, activity });
+    } catch (error) {
+        console.error("Error saving notification settings:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
@@ -82,6 +124,14 @@ async function respond(req, res, accept) {
     try {
         const requester = await respondToFollowRequest(req.user.uid, req.params.handle.toLowerCase(), accept);
         if (!requester) return res.status(404).json({ error: "Request not found." });
+        if (accept) {
+            const me = await getProfile(req.user.uid);
+            notifyUser(requester, "follow_accepted", {
+                title: "Follow request accepted",
+                body: `${me?.display_name ?? "Someone"} accepted your request. You can now see their lists.`,
+                data: { handle: me?.handle ?? "" },
+            });
+        }
         res.json({ handle: req.params.handle.toLowerCase(), accepted: accept });
     } catch (error) {
         console.error("Error answering follow request:", error);
@@ -134,6 +184,14 @@ async function follow(req, res, follow) {
     try {
         const result = await setFollowing(req.user.uid, req.params.handle.toLowerCase(), follow);
         if (!result) return res.status(404).json({ error: "User not found." });
+        if (result.isNewRequest) {
+            const me = await getProfile(req.user.uid);
+            notifyUser(result.followee_id, "follow_request", {
+                title: "New follow request",
+                body: `${me?.display_name ?? "Someone"}${me?.handle ? ` (@${me.handle})` : ""} wants to follow you`,
+                data: { handle: me?.handle ?? "" },
+            });
+        }
         res.json({ handle: req.params.handle.toLowerCase(), following: result.following, requested: result.requested });
     } catch (error) {
         console.error("Error updating follow:", error);

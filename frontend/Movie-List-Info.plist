@@ -24,6 +24,11 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Lets Firebase deliver notification data and refresh its token in the background -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- The backend on the Mac is plain http, which iOS only allows for local network addresses -->

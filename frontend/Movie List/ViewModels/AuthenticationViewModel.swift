@@ -136,6 +136,8 @@ extension AuthenticationViewModel {
 
     func signOut() {
     do {
+        // Before signing out, while the request can still be signed in
+        NotificationManager.shared.unregisterDevice()
         PersistenceController.shared.deleteAllCoreDataObjects()
         SyncStatus.shared.reset()
         // The next person to sign in shouldn't see this account's films on the Home Screen

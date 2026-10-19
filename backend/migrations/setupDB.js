@@ -28,6 +28,18 @@ const createTables = async () => {
             -- that both people agreed before either person's lists go to the AI
             ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_allowed BOOLEAN NOT NULL DEFAULT false;
 
+            -- Which push notifications the user wants. The phone also has to allow notifications
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;
+
+            -- Firebase Cloud Messaging tokens: one per device the user is signed in on
+            CREATE TABLE IF NOT EXISTS device_tokens (
+                token TEXT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS device_tokens_user ON device_tokens (user_id);
+
             -- One-way follows: once accepted, following someone lets you see their lists, rankings and
             -- watched films (never their notes)
             CREATE TABLE IF NOT EXISTS follows (

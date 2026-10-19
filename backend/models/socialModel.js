@@ -13,7 +13,7 @@ function isValidHandle(handle) {
 // The signed-in user's @username (null until they pick one), display name and follow counts
 async function getProfile(user_id) {
     const result = await pool.query(
-        `SELECT u.handle, u.username AS display_name, u.ai_allowed,
+        `SELECT u.handle, u.username AS display_name, u.ai_allowed, u.notify_requests, u.notify_activity,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests

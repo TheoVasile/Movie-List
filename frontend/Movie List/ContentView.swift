@@ -20,6 +20,10 @@ struct ContentView: View {
     // Asked once; afterwards the username is set from the Profile tab or Settings
     @AppStorage("social.usernamePromptShown") private var usernamePromptShown = false
     @State private var showUsernameSetup = false
+    @State private var tab = Tab.lists
+    @ObservedObject private var notifications = NotificationManager.shared
+
+    enum Tab { case lists, discover, profile }
     // A film opened from a Home Screen widget
     @State private var linkedMovie: CDMovie? = nil
 
@@ -29,7 +33,7 @@ struct ContentView: View {
     }
     
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             Home()
                 .environmentObject(viewModel)
                 .environmentObject(network)
@@ -38,6 +42,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Lists", systemImage: "film.stack")
                 }
+                .tag(Tab.lists)
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
             DiscoverView()
@@ -46,6 +51,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Discover", systemImage: discoverIcon)
                 }
+                .tag(Tab.discover)
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
             UserProfileView()
@@ -57,11 +63,21 @@ struct ContentView: View {
                 }
                 // Follow requests waiting to be answered
                 .badge(social.requests.count)
+                .tag(Tab.profile)
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
         }
         .onAppear {
             social.load()
+            notifications.registerDevice()
+            // Asked once, shortly after the user first gets into the app
+            if notifications.authorization == .notDetermined {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if notifications.authorization == .notDetermined {
+                        notifications.requestPermission()
+                    }
+                }
+            }
             // The server keeps whether AI is allowed, for friends' Movie Nights. Sent at launch too, so it's
             // right for settings chosen before the server kept it
             Personalization.syncAIAllowed()
@@ -81,6 +97,17 @@ struct ContentView: View {
             MovieDetailView(movie: movie)
         }
         .onOpenURL(perform: openLink)
+        .onChange(of: notifications.destination) { destination in
+            switch destination {
+            case .profile:
+                tab = .profile
+            case .film(let tmdbID):
+                if let url = URL(string: "cinelist://film/\(tmdbID)") { openLink(url) }
+            case nil:
+                break
+            }
+            notifications.destination = nil
+        }
     }
 
     /// Handles cinelist://film/<TMDb id> from the widgets by opening that film's info screen

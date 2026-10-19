@@ -11,6 +11,7 @@ import FirebaseCore
 import GoogleSignIn
 import GoogleSignInSwift
 import FirebaseAppCheck
+import FirebaseMessaging
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
@@ -22,7 +23,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     let providerFactory = AppCheckDebugProviderFactory()
     AppCheck.setAppCheckProviderFactory(providerFactory)
 
+    NotificationManager.shared.configure(application)
     return true
+    }
+
+    // Firebase needs Apple's push token to turn it into its own
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Messaging.messaging().apnsToken = deviceToken
     }
     func application(_ app: UIApplication,
                      open url: URL,

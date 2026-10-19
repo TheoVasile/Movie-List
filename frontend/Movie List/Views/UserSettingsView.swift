@@ -21,6 +21,8 @@ struct UserSettingsView : View {
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
+    @ObservedObject private var notifications = NotificationManager.shared
+    @State private var notifyRequests = true
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -100,6 +102,45 @@ struct UserSettingsView : View {
                 .listRowBackground(Theme.surface)
 
                 Section {
+                    switch notifications.authorization {
+                    case .notDetermined:
+                        Button {
+                            notifications.requestPermission()
+                        } label: {
+                            Label("Turn On Notifications", systemImage: "bell.badge")
+                                .foregroundColor(Theme.accent)
+                        }
+                    case .denied:
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Label("Notifications Are Off · Open Settings", systemImage: "bell.slash")
+                                .foregroundColor(Theme.accent)
+                        }
+                    default:
+                        Toggle(isOn: $notifyRequests) {
+                            Label("Follow Requests", systemImage: "person.badge.plus")
+                        }
+                        .tint(Theme.accent)
+                        .onChange(of: notifyRequests) { wanted in
+                            guard wanted != (social.profile?.notify_requests ?? true) else { return }
+                            APIService.shared.setNotificationPreferences(requests: wanted) { saved in
+                                if saved { social.load() } else { notifyRequests = !wanted }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text(notifications.authorization == .denied
+                         ? "Notifications for CineList are turned off in your iPhone's Settings."
+                         : "Get a notification when someone asks to follow you, or accepts your request.")
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
                     Toggle(isOn: $aiAllowed) {
                         Label("Allow AI Features", systemImage: "brain")
                     }
@@ -151,7 +192,11 @@ struct UserSettingsView : View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
-            .onAppear { name = savedName }
+            .onAppear {
+                name = savedName
+                notifyRequests = social.profile?.notify_requests ?? true
+                notifications.refreshAuthorization()
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
