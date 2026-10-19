@@ -205,7 +205,7 @@ class APIService {
     static let shared = APIService()
     #if !DEBUG
     // Release builds, including TestFlight, use the backend hosted on Render (see render.yaml)
-    let baseURL = "https://movie-list-backend.onrender.com"
+    let baseURL = "https://movie-list-backend-dgct.onrender.com"
     #elseif targetEnvironment(simulator)
     let baseURL = "http://localhost:3000"
     #else
