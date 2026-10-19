@@ -13,6 +13,8 @@ struct Home: View {
     @Environment(\.managedObjectContext) var context
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @EnvironmentObject var network: NetworkService
+    @ObservedObject private var sync = SyncStatus.shared
+    @Environment(\.scenePhase) private var scenePhase
     // The export ZIP waiting to go to the share sheet
     @State private var exportItem: ShareItem? = nil
     @State var showPopup: Bool = false
@@ -35,6 +37,9 @@ struct Home: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 32)
+                }
+                .refreshable {
+                    await refresh()
                 }
             }
             .navigationTitle("Your Lists")
@@ -79,6 +84,21 @@ struct Home: View {
                 ExcelFilePickerView(showFileSelector: $showFileSelector)
             }
         }
+        .task {
+            // Signed in from an earlier launch: the lists on this phone may be out of date
+            if sync.lastSynced == nil {
+                startSync()
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            // Films added or reranked since the last sync show on the widgets once the user leaves the app
+            if phase == .background {
+                PersistenceController.shared.updateWidgets()
+            }
+            if phase == .active, let last = sync.lastSynced, Date().timeIntervalSince(last) > 10 * 60 {
+                startSync()
+            }
+        }
         .sheet(isPresented: $showPopup) {
             newListSheet
                 .presentationDetents([.height(280)])
@@ -97,6 +117,20 @@ struct Home: View {
 }
 
 private extension Home {
+    func startSync(completion: (() -> Void)? = nil) {
+        guard let uid = viewModel.user?.uid else {
+            completion?()
+            return
+        }
+        sync.sync(firebaseID: uid, completion: completion)
+    }
+
+    func refresh() async {
+        await withCheckedContinuation { continuation in
+            startSync { continuation.resume() }
+        }
+    }
+
     var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(greeting.uppercased())
@@ -108,8 +142,26 @@ private extension Home {
                  : "\(movieLists.count) \(movieLists.count == 1 ? "list" : "lists") · \(totalMovies) films ranked")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
+            if let error = sync.lastError, !movieLists.isEmpty, !sync.isSyncing {
+                // Cached lists are still usable, so this stays small
+                Button {
+                    Haptics.tap()
+                    startSync()
+                } label: {
+                    Label("\(error) Showing saved lists · Retry", systemImage: "wifi.exclamationmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Theme.surfaceRaised, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                }
+                .padding(.top, 8)
+                .transition(.opacity)
+            }
         }
         .padding(.top, 4)
+        .animation(Theme.spring, value: sync.lastError)
         .appearAnimation()
     }
 
@@ -128,7 +180,27 @@ private extension Home {
 
     var movieListsView: some View {
         Group {
-            if movieLists.isEmpty {
+            if movieLists.isEmpty && sync.isSyncing {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .tint(Theme.accent)
+                    Text("Loading your lists…")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 100)
+            } else if movieLists.isEmpty, let error = sync.lastError {
+                EmptyStateView(
+                    icon: "wifi.exclamationmark",
+                    title: "Couldn't load your lists",
+                    message: "\(error) Your lists are safe on the server.",
+                    actionTitle: "Retry"
+                ) {
+                    startSync()
+                }
+                .padding(.top, 60)
+            } else if movieLists.isEmpty {
                 EmptyStateView(
                     icon: "film.stack",
                     title: "No lists yet",

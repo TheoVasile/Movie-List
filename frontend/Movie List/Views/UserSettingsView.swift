@@ -18,7 +18,8 @@ struct UserSettingsView : View {
     @State private var showUsernameSetup = false
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
-    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
+    @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
     @AppStorage(Personalization.pronounsKey) private var pronouns = Personalization.notShared
@@ -89,25 +90,31 @@ struct UserSettingsView : View {
                 .listRowBackground(Theme.surface)
 
                 Section {
-                    Toggle(isOn: $useAI) {
-                        Label("AI Picks in Discover", systemImage: "brain")
+                    Toggle(isOn: $aiAllowed) {
+                        Label("Allow AI Features", systemImage: "brain")
                     }
                     .tint(Theme.accent)
                     .disabled(isUnder18)
-                    .onChange(of: useAI) { _ in aiConsentAsked = true }
-                    if useAI || isUnder18 {
+                    .onChange(of: aiAllowed) { allowed in
+                        aiConsentAsked = true
+                        // Turning AI on is a request to use it, so Discover switches to AI Picks
+                        if allowed {
+                            discoverUsesAI = true
+                        }
+                    }
+                    if aiAllowed || isUnder18 {
                         Picker("Age Range", selection: $ageRange) {
                             ForEach(Personalization.ageRanges, id: \.self) { Text($0).tag($0) }
                         }
                     }
                 } header: {
-                    Text("Discover")
+                    Text("AI")
                 } footer: {
                     Text(isUnder18
-                         ? "AI Picks aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
-                         : useAI
-                         ? "Discover asks Claude, Anthropic's AI, to pick films from every title in your lists, your Discover swipes and genre leanings, and your iPhone's country and language. Your age range and pronouns (set under Profile) are optional; they stay on this iPhone and are sent only with those requests. Your name and email are never sent. Turn this off for Classic recommendations from TMDb."
-                         : "Discover uses TMDb's recommendations for films in your lists. Nothing is sent to an AI.")
+                         ? "AI features aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
+                         : aiAllowed
+                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to Claude, Anthropic's AI. Your age range and pronouns are optional and only go with Discover requests. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
+                         : "Nothing is sent to an AI. Discover uses TMDb's recommendations for films in your lists, and friends can't plan a Movie Night with you.")
                 }
                 .listRowBackground(Theme.surface)
 

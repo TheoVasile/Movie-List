@@ -42,4 +42,18 @@ async function fetchListedTmdbIds(user_id) {
     return new Set(result.rows.map((row) => Number(row.tmdb_id)));
 }
 
-module.exports = { fetchListsForTaste, fetchListedTmdbIds };
+// The account behind a @handle, whether user_id follows it, and whether both of them allow AI features.
+// Following is what lets a user see someone's lists, and both allowing AI is what lets their lists go to
+// the AI together, so these decide whether they can plan a movie night. Null if no one has the handle
+async function fetchFriend(user_id, handle) {
+    const result = await pool.query(
+        `SELECT u.firebase_uid, u.handle, u.username AS display_name, u.ai_allowed,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following,
+                COALESCE((SELECT me.ai_allowed FROM users me WHERE me.firebase_uid = $1), false) AS my_ai_allowed
+         FROM users u WHERE u.handle = $2`,
+        [user_id, handle]
+    );
+    return result.rows[0] ?? null;
+}
+
+module.exports = { fetchListsForTaste, fetchListedTmdbIds, fetchFriend };

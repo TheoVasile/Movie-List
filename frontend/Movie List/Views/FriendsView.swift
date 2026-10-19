@@ -373,6 +373,9 @@ struct FriendProfileView: View {
     let person: UserSummary
     @State private var lists: FriendLists? = nil
     @State private var loadFailed = false
+    @State private var showMovieNight = false
+    @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
 
     var body: some View {
         ScrollView {
@@ -396,6 +399,7 @@ struct FriendProfileView: View {
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {
+                    movieNightButton(friendAllowsAI: lists.ai_allowed ?? false)
                     if lists.lists.isEmpty {
                         Text("No lists yet.")
                             .font(.subheadline)
@@ -424,8 +428,37 @@ struct FriendProfileView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("@\(person.handle)")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showMovieNight) {
+            MovieNightView(person: person)
+        }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }
+    }
+
+    // Both people's lists go to the AI, so both of them have to allow AI features
+    @ViewBuilder
+    private func movieNightButton(friendAllowsAI: Bool) -> some View {
+        let iAllowAI = aiAllowed && ageRange != Personalization.under18
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                Haptics.tap()
+                showMovieNight = true
+            } label: {
+                Label("Plan a Movie Night", systemImage: "ticket.fill")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(!iAllowAI || !friendAllowsAI)
+            .opacity(iAllowAI && friendAllowsAI ? 1 : 0.5)
+            if !iAllowAI {
+                Text("Allow AI features in Settings to plan a movie night.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            } else if !friendAllowsAI {
+                Text("\(person.display_name) hasn't allowed AI features, so you can't plan a movie night together yet.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
     }
 
     private func load() {
