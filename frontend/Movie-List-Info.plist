@@ -14,6 +14,15 @@
 				<string>com.googleusercontent.apps.263609300559-cun073mb085m1ppuj49tko388c9fmi85</string>
 			</array>
 		</dict>
+		<dict>
+			<!-- cinelist://film/<TMDb id>, used by the Home Screen widgets to open a film -->
+			<key>CFBundleURLName</key>
+			<string>Theodor-Vasile.Movie-List.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cinelist</string>
+			</array>
+		</dict>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

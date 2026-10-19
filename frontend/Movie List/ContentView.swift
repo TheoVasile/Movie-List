@@ -20,6 +20,8 @@ struct ContentView: View {
     // Asked once; afterwards the username is set from the Profile tab or Settings
     @AppStorage("social.usernamePromptShown") private var usernamePromptShown = false
     @State private var showUsernameSetup = false
+    // A film opened from a Home Screen widget
+    @State private var linkedMovie: CDMovie? = nil
 
     // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
     private var discoverIcon: String {
@@ -73,6 +75,19 @@ struct ContentView: View {
         .sheet(isPresented: $showUsernameSetup) {
             UsernameSetupView()
         }
+        .sheet(item: $linkedMovie) { movie in
+            MovieDetailView(movie: movie)
+        }
+        .onOpenURL(perform: openLink)
+    }
+
+    /// Handles cinelist://film/<TMDb id> from the widgets by opening that film's info screen
+    private func openLink(_ url: URL) {
+        guard url.scheme == "cinelist", url.host == "film", let tmdbID = Int32(url.lastPathComponent) else { return }
+        let request = CDMovie.fetchRequest()
+        request.predicate = NSPredicate(format: "tmdb_id == %d", tmdbID)
+        request.fetchLimit = 1
+        linkedMovie = try? PersistenceController.shared.container.viewContext.fetch(request).first
     }
 }
 
