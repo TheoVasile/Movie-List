@@ -1,6 +1,6 @@
 const express = require("express");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -16,6 +16,53 @@ router.get("/me", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
+// Profile pictures are small JPEGs the app has already cropped and shrunk; anything bigger is refused
+const MAX_AVATAR_BYTES = 300 * 1024;
+
+// Sets the user's profile picture: the body is the JPEG itself (Content-Type: image/jpeg)
+router.put("/me/avatar", express.raw({ type: "image/jpeg", limit: "1mb" }), async (req, res) => {
+    const jpeg = req.body;
+    // JPEG files start with FF D8 FF
+    if (!Buffer.isBuffer(jpeg) || jpeg.length < 3 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8 || jpeg[2] !== 0xff) {
+        return res.status(400).json({ error: "Send the picture as a JPEG." });
+    }
+    if (jpeg.length > MAX_AVATAR_BYTES) {
+        return res.status(413).json({ error: "That picture is too large." });
+    }
+    try {
+        await setAvatar(req.user.uid, jpeg);
+        const profile = await getProfile(req.user.uid);
+        res.json({ avatar_version: profile?.avatar_version ?? null });
+    } catch (error) {
+        console.error("Error saving profile picture:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/me/avatar", async (req, res) => {
+    try {
+        await setAvatar(req.user.uid, null);
+        res.status(204).end();
+    } catch (error) {
+        console.error("Error removing profile picture:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Profile pictures. The app asks for them with ?v=<avatar_version>, so a cached copy is only reused until it changes
+async function sendAvatar(res, who) {
+    try {
+        const jpeg = await fetchAvatar(who);
+        if (!jpeg) return res.status(404).json({ error: "No profile picture." });
+        res.set({ "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=31536000" }).send(jpeg);
+    } catch (error) {
+        console.error("Error fetching profile picture:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+router.get("/me/avatar", (req, res) => sendAvatar(res, { user_id: req.user.uid }));
+router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase() }));
 
 // Changes the name shown to friends, e.g. { "name": "Jess Wilk" }
 router.put("/me/name", async (req, res) => {

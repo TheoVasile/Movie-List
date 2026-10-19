@@ -28,6 +28,11 @@ const createTables = async () => {
             -- that both people agreed before either person's lists go to the AI
             ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_allowed BOOLEAN NOT NULL DEFAULT false;
 
+            -- Profile picture: a small JPEG (256x256) cropped and compressed by the app, and when it changed,
+            -- which the app uses to know when to fetch it again
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar BYTEA;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMP;
+
             -- Which push notifications the user wants. The phone also has to allow notifications
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;

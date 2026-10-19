@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 import CoreData
 import FirebaseAuth
 
@@ -152,6 +153,8 @@ struct UserProfile: Decodable {
     let following: Int
     // People waiting for the user to accept their follow request
     let requests: Int?
+    // When the user's profile picture last changed; nil when they don't have one
+    let avatar_version: Double?
     // Which push notifications the user wants
     let notify_requests: Bool?
     let notify_activity: Bool?
@@ -172,6 +175,8 @@ struct UserSummary: Decodable, Identifiable, Hashable {
     // Only in the following list
     let list_count: Int?
     let film_count: Int?
+    // When their profile picture last changed; nil when they don't have one
+    let avatar_version: Double?
 }
 
 /// A followed person's lists, read-only. lists is empty when the user doesn't follow them
@@ -217,6 +222,7 @@ struct FriendLists: Decodable {
     }
     let handle: String
     let display_name: String
+    let avatar_version: Double?
     var following: Bool
     // The user has asked to follow them and is waiting for them to accept
     let requested: Bool?
@@ -235,6 +241,7 @@ struct FriendTake: Decodable, Identifiable {
     var id: String { handle }
     let handle: String
     let display_name: String
+    let avatar_version: Double?
     let watched: Bool
     let note: String?
     let ranking: Ranking?
@@ -463,6 +470,43 @@ class APIService {
 
     func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {
         sendJSON("GET", "/users/me/requests", completion: completion)
+    }
+
+    private struct AvatarResponse: Decodable { let avatar_version: Double? }
+
+    /// Uploads a JPEG as the user's profile picture. Calls back with its new version, or nil if it failed
+    func uploadAvatar(_ jpeg: Data, completion: @escaping (Double?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/me/avatar") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jpeg
+        send(request) { data, response, _ in
+            let ok = (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            let version = ok ? data.flatMap { try? JSONDecoder().decode(AvatarResponse.self, from: $0) }?.avatar_version : nil
+            DispatchQueue.main.async { completion(version) }
+        }
+    }
+
+    func deleteAvatar(completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/me/avatar") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        send(request) { _, response, _ in
+            let ok = (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { completion(ok) }
+        }
+    }
+
+    /// Someone's profile picture, or the user's own when handle is nil
+    func fetchAvatar(handle: String?, version: Double, completion: @escaping (UIImage?) -> Void) {
+        let who = handle.map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 } ?? "me"
+        guard let url = URL(string: "\(baseURL)/users/\(who)/avatar?v=\(Int64(version))") else { return }
+        send(URLRequest(url: url)) { data, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+            let image = ok ? data.flatMap(UIImage.init(data:)) : nil
+            DispatchQueue.main.async { completion(image) }
+        }
     }
 
     private struct Registered: Decodable { let registered: Bool }

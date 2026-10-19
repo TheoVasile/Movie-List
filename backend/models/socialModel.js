@@ -13,7 +13,7 @@ function isValidHandle(handle) {
 // The signed-in user's @username (null until they pick one), display name and follow counts
 async function getProfile(user_id) {
     const result = await pool.query(
-        `SELECT u.handle, u.username AS display_name, u.ai_allowed, u.notify_requests, u.notify_activity,
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.notify_requests, u.notify_activity,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests
@@ -35,6 +35,22 @@ async function setDisplayName(user_id, name) {
     }
 }
 
+// The user's profile picture: a small JPEG the app has already cropped and shrunk. null removes it
+async function setAvatar(user_id, jpeg) {
+    await pool.query(
+        "UPDATE users SET avatar = $2, avatar_updated_at = CASE WHEN $2::bytea IS NULL THEN NULL ELSE NOW() END WHERE firebase_uid = $1",
+        [user_id, jpeg]
+    );
+}
+
+// The profile picture of the user, or of whoever has @handle. null when there isn't one
+async function fetchAvatar({ user_id, handle }) {
+    const result = user_id
+        ? await pool.query("SELECT avatar FROM users WHERE firebase_uid = $1", [user_id])
+        : await pool.query("SELECT avatar FROM users WHERE handle = $1", [handle]);
+    return result.rows[0]?.avatar ?? null;
+}
+
 async function setAIAllowed(user_id, allowed) {
     await pool.query("UPDATE users SET ai_allowed = $2 WHERE firebase_uid = $1", [user_id, allowed]);
 }
@@ -54,7 +70,7 @@ async function searchUsers(user_id, query) {
     // "_" is a LIKE wildcard, so it's escaped to match only itself
     const prefix = query.replace(/_/g, "\\_");
     const result = await pool.query(
-        `SELECT u.handle, u.username AS display_name,
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u
@@ -90,7 +106,7 @@ async function setFollowing(user_id, handle, follow) {
 // People asking to follow the user (newest first), and the @usernames of people the user has asked to follow
 async function fetchFollowRequests(user_id) {
     const incoming = await pool.query(
-        `SELECT u.handle, u.username AS display_name, false AS following
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, false AS following
          FROM follows f JOIN users u ON u.firebase_uid = f.follower_id
          WHERE f.followee_id = $1 AND NOT f.accepted AND u.handle IS NOT NULL
          ORDER BY f.created_at DESC`,
@@ -119,7 +135,7 @@ async function respondToFollowRequest(user_id, handle, accept) {
 // Everyone the user follows, newest first, with how many lists and films each has
 async function fetchFollowing(user_id) {
     const result = await pool.query(
-        `SELECT u.handle, u.username AS display_name, TRUE AS following,
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, TRUE AS following,
                 (SELECT COUNT(*) FROM lists l WHERE l.user_id = u.firebase_uid)::int AS list_count,
                 (SELECT COUNT(*) FROM lists l JOIN list_movies lm ON lm.list_id = l.id WHERE l.user_id = u.firebase_uid)::int AS film_count
          FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
@@ -135,7 +151,7 @@ async function fetchFollowing(user_id) {
 // user doesn't follow them
 async function fetchUserLists(user_id, handle) {
     const target = await pool.query(
-        `SELECT u.firebase_uid, u.handle, u.username AS display_name, u.ai_allowed,
+        `SELECT u.firebase_uid, u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u WHERE u.handle = $2`,
@@ -143,7 +159,7 @@ async function fetchUserLists(user_id, handle) {
     );
     const person = target.rows[0];
     if (!person) return null;
-    const profile = { handle: person.handle, display_name: person.display_name, following: person.following, requested: person.requested, lists: [] };
+    const profile = { handle: person.handle, display_name: person.display_name, avatar_version: person.avatar_version, following: person.following, requested: person.requested, lists: [] };
     // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
     if (person.following) profile.ai_allowed = person.ai_allowed;
     if (!person.following) return profile;
@@ -185,7 +201,7 @@ async function fetchUserLists(user_id, handle) {
 async function fetchFriendsOnFilm(user_id, tmdb_id) {
     const result = await pool.query(
         `WITH film AS (SELECT id FROM movies WHERE tmdb_id = $2::text)
-         SELECT u.handle, u.username AS display_name,
+         SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version,
                 EXISTS (SELECT 1 FROM watched_movies w WHERE w.user_id = u.firebase_uid AND w.movie_id IN (SELECT id FROM film)) AS watched,
                 (SELECT n.note FROM movie_notes n WHERE n.user_id = u.firebase_uid AND n.movie_id IN (SELECT id FROM film)) AS note,
                 (SELECT json_build_object('list_name', l.name, 'rank', lm.rank, 'list_size', (SELECT COUNT(*) FROM list_movies c WHERE c.list_id = l.id))
@@ -201,4 +217,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
