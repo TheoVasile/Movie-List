@@ -465,6 +465,15 @@ class APIService {
 
     private struct AIAllowedResponse: Decodable { let allowed: Bool }
 
+    private struct NameResponse: Decodable { let name: String }
+
+    /// Saves the name friends see on the server
+    func setDisplayName(_ name: String, completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/users/me/name", body: ["name": name]) { (result: Result<NameResponse, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
     /// Saves whether the user allows AI features on the server
     func setAIAllowed(_ allowed: Bool, completion: @escaping (Bool) -> Void) {
         sendJSON("PUT", "/users/me/ai", body: ["allowed": allowed]) { (result: Result<AIAllowedResponse, Error>) in

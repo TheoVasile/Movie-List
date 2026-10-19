@@ -11,8 +11,10 @@ import SwiftUI
 struct UserSettingsView : View {
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
     @Environment(\.managedObjectContext) var context
-    @State var firstName: String = "Theo"
-    @State var lastName: String = "Vasile"
+    // The account's name, as typed in the field below; saved when the user taps Save
+    @State private var name: String = ""
+    @State private var savingName = false
+    @State private var nameMessage: String? = nil
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var social = SocialStore.shared
     @State private var showUsernameSetup = false
@@ -40,18 +42,26 @@ struct UserSettingsView : View {
                         }
                     }
                     HStack {
-                        Text("First Name")
+                        Text("Name")
                         Spacer()
-                        TextField("type here", text: $firstName)
+                        TextField("Your name", text: $name)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(Theme.textSecondary)
+                            .textContentType(.name)
+                            .submitLabel(.done)
+                            .onSubmit(saveName)
+                        if nameChanged {
+                            Button(savingName ? "Saving…" : "Save", action: saveName)
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(Theme.accent)
+                                .disabled(savingName)
+                                .buttonStyle(.borderless)
+                        }
                     }
-                    HStack {
-                        Text("Last Name")
-                        Spacer()
-                        TextField("type here", text: $lastName)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundColor(Theme.textSecondary)
+                    if let nameMessage {
+                        Text(nameMessage)
+                            .font(.footnote)
+                            .foregroundColor(Theme.accentSecondary)
                     }
                     Picker("Pronouns", selection: $pronouns) {
                         ForEach(Personalization.pronouns, id: \.self) { option in
@@ -141,6 +151,7 @@ struct UserSettingsView : View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
+            .onAppear { name = savedName }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -175,6 +186,27 @@ struct UserSettingsView : View {
 }
 
 extension UserSettingsView {
+    private var savedName: String {
+        authenticationViewModel.user?.displayName ?? ""
+    }
+
+    private var nameChanged: Bool {
+        let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !typed.isEmpty && typed != savedName
+    }
+
+    private func saveName() {
+        guard nameChanged else { return }
+        Haptics.tap()
+        savingName = true
+        nameMessage = nil
+        Task {
+            nameMessage = await authenticationViewModel.updateName(name)
+            savingName = false
+            name = savedName
+        }
+    }
+
     private var isUnder18: Bool {
         ageRange == Personalization.under18
     }
