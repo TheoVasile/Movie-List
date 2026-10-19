@@ -23,17 +23,10 @@ struct DiscoverView: View {
     @State private var pendingMovie: Movie? = nil
     @State private var showListPicker = false
     @State private var choseList = false
-    // Lists ticked in the picker; the film goes into all of them
-    @State private var selectedLists: [CDMovieList] = []
     // Lists still waiting for the film to be placed with Compare, after the current one
     @State private var rankingQueue: [(list: CDMovieList, movie: CDMovie)] = []
     @State private var toast: String? = nil
     // Creating a new list from the list picker
-    @State private var showNewListField = false
-    @State private var newListName = ""
-    @State private var isCreatingList = false
-    @State private var createListFailed = false
-    @FocusState private var newListFocused: Bool
     // Placing a film just added from Discover within its list, using the same head-to-head Compare
     @State private var ranking: (model: ListViewModel, movie: CDMovie)? = nil
     @State private var showGenrePicker = false
@@ -105,7 +98,10 @@ struct DiscoverView: View {
             }
         }
         .sheet(isPresented: $showListPicker, onDismiss: listPickerDismissed) {
-            listPicker
+            ListPickerSheet(title: pendingMovie?.title ?? "", posterPath: pendingMovie?.poster_path) { lists in
+                addToSelectedLists(lists)
+            }
+            .environmentObject(authViewModel)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -533,21 +529,9 @@ private extension DiscoverView {
         }
     }
 
-    func toggle(_ list: CDMovieList) {
-        Haptics.tap()
-        if let index = selectedLists.firstIndex(of: list) {
-            selectedLists.remove(at: index)
-        } else {
-            selectedLists.append(list)
-        }
-    }
-
-    func addToSelectedLists() {
-        guard let movie = pendingMovie, !selectedLists.isEmpty else { return }
-        let lists = selectedLists
-        Haptics.success()
+    func addToSelectedLists(_ lists: [CDMovieList]) {
+        guard let movie = pendingMovie, !lists.isEmpty else { return }
         choseList = true
-        showListPicker = false
         withAnimation(Theme.spring) {
             viewModel.add(movie, to: lists, context: context) { added in
                 guard !added.isEmpty else {
@@ -614,11 +598,7 @@ private extension DiscoverView {
             }
         }
         choseList = false
-        selectedLists = []
         pendingMovie = nil
-        showNewListField = false
-        newListName = ""
-        createListFailed = false
     }
 
     func showToast(_ message: String) {
@@ -646,210 +626,6 @@ private extension DiscoverView {
                 .padding(.top, 8)
                 .transition(.move(edge: .top).combined(with: .opacity))
         }
-    }
-}
-
-// MARK: - List picker
-private extension DiscoverView {
-    var listPicker: some View {
-        NavigationStack {
-            ZStack {
-                Theme.surface.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let movie = pendingMovie {
-                            HStack(spacing: 14) {
-                                PosterImage(path: movie.poster_path, cornerRadius: 10, size: .small)
-                                    .frame(width: 54, height: 81)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("ADD TO LISTS")
-                                        .font(.caption.weight(.heavy))
-                                        .tracking(2)
-                                        .foregroundStyle(Theme.accentGradient)
-                                    Text(movie.title)
-                                        .font(.headline)
-                                        .foregroundColor(Theme.textPrimary)
-                                        .lineLimit(2)
-                                }
-                            }
-                            .padding(.bottom, 8)
-                        }
-                        newListSection
-                        ForEach(Array(listsByLastAdded.enumerated()), id: \.element) { index, list in
-                            Button {
-                                toggle(list)
-                            } label: {
-                                listRow(list)
-                            }
-                            .buttonStyle(PressableButtonStyle(scale: 0.98))
-                            .appearAnimation(delay: Double(min(index, 8)) * 0.04)
-                        }
-                    }
-                    .padding(20)
-                    .padding(.bottom, 80)
-                }
-                if !movieLists.isEmpty {
-                    VStack {
-                        Spacer()
-                        Button {
-                            addToSelectedLists()
-                        } label: {
-                            Text(selectedLists.isEmpty ? "Choose Lists" : selectedLists.count == 1 ? "Add to \(selectedLists[0].name ?? "List")" : "Add to \(selectedLists.count) Lists")
-                                .lineLimit(1)
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(selectedLists.isEmpty)
-                        .opacity(selectedLists.isEmpty ? 0.5 : 1)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
-                    }
-                }
-            }
-            .navigationTitle("Choose Lists")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { showListPicker = false }
-                }
-            }
-        }
-    }
-
-    // A "New List" button that opens into a name field. With no lists yet, the field shows straight away
-    @ViewBuilder
-    var newListSection: some View {
-        if showNewListField || movieLists.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: "list.star")
-                        .foregroundStyle(Theme.accentGradient)
-                    TextField("New list name", text: $newListName)
-                        .focused($newListFocused)
-                        .disableAutocorrection(true)
-                        .submitLabel(.done)
-                        .onSubmit(createListAndAdd)
-                        .disabled(isCreatingList)
-                }
-                .padding(14)
-                .background(Theme.surfaceRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                if createListFailed {
-                    Label("Couldn't create the list. Try again.", systemImage: "exclamationmark.circle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundColor(Theme.accentSecondary)
-                        .transition(.opacity)
-                }
-                Button(action: createListAndAdd) {
-                    HStack(spacing: 8) {
-                        if isCreatingList {
-                            ProgressView().tint(Theme.onAccent)
-                        }
-                        Text(isCreatingList ? "Creating…" : "Create List")
-                    }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(trimmedNewListName.isEmpty || isCreatingList)
-                .opacity(trimmedNewListName.isEmpty ? 0.5 : 1)
-            }
-            .padding(.bottom, 8)
-            .transition(.opacity.combined(with: .move(edge: .top)))
-            .onAppear { newListFocused = true }
-        } else {
-            Button {
-                Haptics.tap()
-                withAnimation(Theme.spring) { showNewListField = true }
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "plus")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(Theme.accentGradient)
-                        .frame(width: 40, height: 60)
-                        .background(Theme.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    Text("New List")
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                    Spacer()
-                }
-                .padding(12)
-                .background(Theme.surfaceRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Theme.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-                )
-            }
-            .buttonStyle(PressableButtonStyle(scale: 0.98))
-        }
-    }
-
-    var trimmedNewListName: String {
-        newListName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    // The film can only be added once the backend has given the list its id, so create the list first
-    func createListAndAdd() {
-        let name = trimmedNewListName
-        guard !name.isEmpty, !isCreatingList, let userID = authViewModel.user?.uid else { return }
-        isCreatingList = true
-        withAnimation { createListFailed = false }
-        APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: true) { result in
-            isCreatingList = false
-            switch result {
-            case .success(let serverList):
-                let list = CDMovieList(id: serverList.id, name: serverList.name, overview: serverList.overview, context: context)
-                do {
-                    try context.save()
-                } catch {
-                    print("Error saving new list:", error)
-                }
-                // The new list is ticked along with any others, then Add puts the film in all of them
-                withAnimation(Theme.spring) {
-                    selectedLists.append(list)
-                    showNewListField = false
-                    newListName = ""
-                }
-                Haptics.success()
-            case .failure(let error):
-                print("Error creating list:", error.localizedDescription)
-                Haptics.tap()
-                withAnimation { createListFailed = true }
-            }
-        }
-    }
-
-    // The list a film was most recently added to comes first, since it's the likeliest pick again
-    var listsByLastAdded: [CDMovieList] {
-        movieLists.sorted { ($0.date_modified ?? .distantPast) > ($1.date_modified ?? .distantPast) }
-    }
-
-    func listRow(_ list: CDMovieList) -> some View {
-        let top = list.movies.sorted { $0.rank < $1.rank }.first
-        let isSelected = selectedLists.contains(list)
-        return HStack(spacing: 14) {
-            PosterImage(path: top?.poster_path, cornerRadius: 8, size: .small)
-                .frame(width: 40, height: 60)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(list.name ?? "No Name")
-                    .font(.headline)
-                    .foregroundColor(Theme.textPrimary)
-                Text("\(list.movies.count) \(list.movies.count == 1 ? "film" : "films")")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
-            }
-            Spacer()
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.title2)
-                .foregroundStyle(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-        }
-        .padding(12)
-        .background(Theme.surfaceRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(isSelected ? Theme.accent.opacity(0.6) : .clear, lineWidth: 1.5)
-        )
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

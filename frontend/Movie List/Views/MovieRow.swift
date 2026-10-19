@@ -14,6 +14,7 @@ struct MovieRow: View {
     @Binding var selectedMovie: CDMovie?
     @Binding var showSetRank: Bool
     var info: MovieInfo? = nil
+    var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
     
     var body: some View {
@@ -63,6 +64,14 @@ struct MovieRow: View {
                     present { showCompareMovieView = true }
                 } label: {
                     Label("Compare", systemImage: "arrow.left.arrow.right")
+                }
+                if let onAddToLists {
+                    Button {
+                        Haptics.tap()
+                        onAddToLists()
+                    } label: {
+                        Label("Add to Other Lists", systemImage: "text.badge.plus")
+                    }
                 }
                 if let onToggleWatched {
                     Button {
