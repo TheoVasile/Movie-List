@@ -309,6 +309,14 @@ final class WatchProvidersStore {
 
 struct WatchProvidersSection: View {
     let providers: WatchProviders
+    // Collapsed, the card shows a single row of services; expanding shows every way to watch
+    @State private var expanded = false
+
+    // Stream (including free), Rent and Buy, leaving out the empty ones
+    private var groups: [(title: String, items: [WatchProvider])] {
+        [("Stream", providers.stream + providers.free), ("Rent", providers.rent), ("Buy", providers.buy)]
+            .filter { !$0.items.isEmpty }
+    }
 
     private var countryName: String {
         Locale.current.localizedString(forRegionCode: providers.region) ?? providers.region
@@ -330,9 +338,22 @@ struct WatchProvidersSection: View {
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
             } else {
-                group("Stream", providers.stream + providers.free)
-                group("Rent", providers.rent)
-                group("Buy", providers.buy)
+                ForEach(Array((expanded ? groups : Array(groups.prefix(1))).enumerated()), id: \.element.title) { _, group in
+                    self.group(group.title, group.items)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                if groups.count > 1 {
+                    Button {
+                        Haptics.tap()
+                        withAnimation(Theme.spring) { expanded.toggle() }
+                    } label: {
+                        Label(expanded ? "Show less" : "Show " + groups.dropFirst().map { $0.title.lowercased() }.joined(separator: " & "),
+                              systemImage: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             HStack {
                 // TMDb's terms ask apps to credit JustWatch for this data
