@@ -76,6 +76,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA7E5A012F00000000000013 /* Movie 3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Movie 3.xcdatamodel"; sourceTree = "<group>"; };
 		FA7E5A012F00000000000010 /* Movie 2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Movie 2.xcdatamodel"; sourceTree = "<group>"; };
 		FA7E5A012F0000000000000E /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
 		FA7E5A012F0000000000000C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
@@ -726,8 +727,9 @@
 			children = (
 				FA01249B2BDE150800A1C13C /* Movie.xcdatamodel */,
 				FA7E5A012F00000000000010 /* Movie 2.xcdatamodel */,
+				FA7E5A012F00000000000013 /* Movie 3.xcdatamodel */,
 			);
-			currentVersion = FA7E5A012F00000000000010 /* Movie 2.xcdatamodel */;
+			currentVersion = FA7E5A012F00000000000013 /* Movie 3.xcdatamodel */;
 			path = MovieListModel.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
