@@ -142,6 +142,65 @@ struct WatchProviders: Decodable {
     var isEmpty: Bool { stream.isEmpty && free.isEmpty && rent.isEmpty && buy.isEmpty }
 }
 
+// MARK: - Friends
+
+/// The signed-in user's @username (nil until they pick one), display name and follow counts
+struct UserProfile: Decodable {
+    let handle: String?
+    let display_name: String
+    let followers: Int
+    let following: Int
+}
+
+/// Someone to follow, from search or the user's following list
+struct UserSummary: Decodable, Identifiable, Hashable {
+    var id: String { handle }
+    let handle: String
+    let display_name: String
+    var following: Bool
+    // Only in the following list
+    let list_count: Int?
+    let film_count: Int?
+}
+
+/// A followed person's lists, read-only. lists is empty when the user doesn't follow them
+struct FriendLists: Decodable {
+    struct Film: Decodable, Identifiable {
+        var id: Int64 { tmdb_id }
+        let tmdb_id: Int64
+        let title: String
+        let release_date: String
+        let poster_path: String?
+        let rank: Int
+        let watched: Bool
+    }
+    struct List: Decodable, Identifiable {
+        let id: Int64
+        let name: String
+        let overview: String
+        let movies: [Film]
+    }
+    let handle: String
+    let display_name: String
+    var following: Bool
+    let lists: [List]
+}
+
+/// What one person the user follows thinks of a film
+struct FriendTake: Decodable, Identifiable {
+    struct Ranking: Decodable {
+        let list_name: String
+        let rank: Int
+        let list_size: Int
+    }
+    var id: String { handle }
+    let handle: String
+    let display_name: String
+    let watched: Bool
+    let note: String?
+    let ranking: Ranking?
+}
+
 class APIService {
     static let shared = APIService()
     #if !DEBUG
@@ -299,6 +358,71 @@ class APIService {
         
     }
     
+    // MARK: Friends
+
+    /// Sends a request and decodes the JSON reply; the error's code is the HTTP status. Calls back on the main thread
+    private func sendJSON<T: Decodable>(_ method: String, _ path: String, query: [URLQueryItem] = [], body: [String: Any]? = nil, completion: @escaping (Result<T, Error>) -> Void) {
+        var components = URLComponents(string: baseURL + path)
+        if !query.isEmpty { components?.queryItems = query }
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
+        }
+        send(request) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result: Result<T, Error>
+            if let data, (200...299).contains(status), let decoded = try? JSONDecoder().decode(T.self, from: data) {
+                result = .success(decoded)
+            } else {
+                result = .failure(error ?? NSError(domain: "Request failed", code: status, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    private struct HandleResponse: Decodable { let handle: String }
+    private struct FollowResponse: Decodable { let following: Bool }
+
+    func fetchMyProfile(completion: @escaping (Result<UserProfile, Error>) -> Void) {
+        sendJSON("GET", "/users/me", completion: completion)
+    }
+
+    /// Fails with code 409 when the username is taken, 400 when it isn't allowed
+    func setHandle(_ handle: String, completion: @escaping (Result<String, Error>) -> Void) {
+        sendJSON("PUT", "/users/me/handle", body: ["handle": handle]) { (result: Result<HandleResponse, Error>) in
+            completion(result.map(\.handle))
+        }
+    }
+
+    func searchUsers(_ query: String, completion: @escaping (Result<[UserSummary], Error>) -> Void) {
+        sendJSON("GET", "/users/search", query: [URLQueryItem(name: "q", value: query)], completion: completion)
+    }
+
+    func fetchFollowing(completion: @escaping (Result<[UserSummary], Error>) -> Void) {
+        sendJSON("GET", "/users/me/following", completion: completion)
+    }
+
+    func setFollowing(_ handle: String, _ following: Bool, completion: @escaping (Result<Bool, Error>) -> Void) {
+        let path = "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/follow"
+        sendJSON(following ? "POST" : "DELETE", path) { (result: Result<FollowResponse, Error>) in
+            completion(result.map(\.following))
+        }
+    }
+
+    func fetchFriendLists(_ handle: String, completion: @escaping (Result<FriendLists, Error>) -> Void) {
+        sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/lists", completion: completion)
+    }
+
+    func fetchFriendTakes(tmdbID: Int64, completion: @escaping (Result<[FriendTake], Error>) -> Void) {
+        sendJSON("GET", "/users/me/following/films/\(tmdbID)", completion: completion)
+    }
+
     func deleteUser(firebase_id: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/delete/\(firebase_id)") else { return }
         

@@ -13,6 +13,7 @@ struct UserProfileView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @State var showSettings: Bool = false
+    @ObservedObject private var social = SocialStore.shared
     var body: some View {
         NavigationStack {
             ZStack{
@@ -21,6 +22,8 @@ struct UserProfileView: View {
                     VStack(spacing: 24) {
                         profileHeader
                         stats
+                        FollowingSection()
+                            .appearAnimation(delay: 0.18)
                         listsSection
                     }
                     .padding(.horizontal, 16)
@@ -58,9 +61,14 @@ struct UserProfileView: View {
                 Text(viewModel.user?.displayName ?? "No Name")
                     .font(.title2.weight(.heavy))
                     .foregroundColor(Theme.textPrimary)
-                Text(viewModel.user?.email ?? "No Email")
+                Text(social.profile?.handle.map { "@\($0)" } ?? viewModel.user?.email ?? "No Email")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
+                if let profile = social.profile, profile.handle != nil {
+                    Text("\(profile.following) following · \(profile.followers) \(profile.followers == 1 ? "follower" : "followers")")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.textTertiary)
+                }
             }
             .appearAnimation(delay: 0.08)
         }
