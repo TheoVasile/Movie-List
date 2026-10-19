@@ -373,6 +373,9 @@ struct FriendProfileView: View {
     let person: UserSummary
     @State private var lists: FriendLists? = nil
     @State private var loadFailed = false
+    @State private var showMovieNight = false
+    @AppStorage(Personalization.useAIKey) private var useAI = false
+    @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
 
     var body: some View {
         ScrollView {
@@ -396,6 +399,16 @@ struct FriendProfileView: View {
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {
+                    // Uses the AI, so only offered when the user has turned AI Picks on
+                    if useAI && ageRange != Personalization.under18 {
+                        Button {
+                            Haptics.tap()
+                            showMovieNight = true
+                        } label: {
+                            Label("Plan a Movie Night", systemImage: "ticket.fill")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
                     if lists.lists.isEmpty {
                         Text("No lists yet.")
                             .font(.subheadline)
@@ -424,6 +437,9 @@ struct FriendProfileView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("@\(person.handle)")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showMovieNight) {
+            MovieNightView(person: person)
+        }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }
     }

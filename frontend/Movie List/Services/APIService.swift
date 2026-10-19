@@ -435,6 +435,27 @@ class APIService {
         sendJSON("GET", "/users/me/following/films/\(tmdbID)", completion: completion)
     }
 
+    /// Films the user and a friend they follow would both enjoy, picked by the AI, each with a reason.
+    /// A failure's code is the HTTP status: 403 not following, 429 daily limit, 503 AI not set up
+    func movieNight(with handle: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
+        var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle, "count": 10])
+        // Reading two people's lists takes the AI a little while
+        request.timeoutInterval = 90
+        send(request) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result: Result<[Movie], Error>
+            if let data, status == 200, let movies = try? JSONDecoder().decode([Movie].self, from: data) {
+                result = .success(movies)
+            } else {
+                result = .failure(error ?? NSError(domain: "Movie night failed", code: status, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
     func deleteUser(firebase_id: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/delete/\(firebase_id)") else { return }
         

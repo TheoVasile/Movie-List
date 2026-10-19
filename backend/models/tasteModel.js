@@ -42,4 +42,16 @@ async function fetchListedTmdbIds(user_id) {
     return new Set(result.rows.map((row) => Number(row.tmdb_id)));
 }
 
-module.exports = { fetchListsForTaste, fetchListedTmdbIds };
+// The account behind a @handle, and whether user_id follows it. Following is what lets a user see
+// someone's lists, so it's also what lets them plan a movie night with them. Null if no one has the handle
+async function fetchFriend(user_id, handle) {
+    const result = await pool.query(
+        `SELECT u.firebase_uid, u.handle, u.username AS display_name,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following
+         FROM users u WHERE u.handle = $2`,
+        [user_id, handle]
+    );
+    return result.rows[0] ?? null;
+}
+
+module.exports = { fetchListsForTaste, fetchListedTmdbIds, fetchFriend };

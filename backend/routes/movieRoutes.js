@@ -6,8 +6,8 @@ const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = re
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
-const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
-const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend } = require("../models/tasteModel");
+const { recommendFilms, recommendForTwo, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 
 const router = express.Router();
 const ownsBodyList = requireListOwner((req) => req.body.list_id);
@@ -217,6 +217,56 @@ const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": 
 // Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover.
 // With "Accept: application/x-ndjson" the films stream back one JSON object per line as Claude picks them,
 // so the first card shows in seconds; otherwise (builds from before streaming) they come as one array
+// Films the signed-in user and a friend they follow would both enjoy, e.g. { "handle": "sam", "count": 10 } ->
+// [{ ...discover movie, reason }]. Leaves out films in either person's lists
+router.post("/movie-night", async (req, res) => {
+    try {
+        const handle = cleanText(req.body?.handle, 40).replace(/^@/, "").toLowerCase();
+        if (!handle) {
+            return res.status(400).json({ error: "A friend's @username is required." });
+        }
+        const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 10, 1), 15);
+        const friend = await fetchFriend(req.user.uid, handle);
+        if (!friend || friend.firebase_uid === req.user.uid) {
+            return res.status(404).json({ error: "User not found." });
+        }
+        if (!friend.following) {
+            return res.status(403).json({ error: "Follow them to plan a movie night together." });
+        }
+
+        const [myLists, friendLists, myIds, friendIds] = await Promise.all([
+            fetchListsForTaste(req.user.uid),
+            fetchListsForTaste(friend.firebase_uid),
+            fetchListedTmdbIds(req.user.uid),
+            fetchListedTmdbIds(friend.firebase_uid),
+        ]);
+        const friendName = friend.display_name || `@${friend.handle}`;
+        // A few extra, since some picks turn out to be in someone's lists or can't be found
+        const picks = await recommendForTwo(req.user.uid, myLists, friendLists, friendName, count + 5);
+
+        const found = await mapWithConcurrency(picks, async (pick) => {
+            try {
+                const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
+                return movie && { ...movie, reason: cleanText(pick.reason, 200) };
+            } catch (error) {
+                return null;
+            }
+        });
+        const seen = new Set();
+        const fresh = found.filter((movie) => movie && !myIds.has(movie.id) && !friendIds.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
+        res.json(fresh.slice(0, count));
+    } catch (error) {
+        if (error instanceof AIUnavailableError) {
+            return res.status(503).json({ error: "AI recommendations aren't set up." });
+        }
+        if (error instanceof AILimitError) {
+            return res.status(429).json({ error: error.message });
+        }
+        console.error("Error planning movie night:", error.message);
+        res.status(502).json({ error: "Movie night recommendations failed." });
+    }
+});
+
 router.post("/ai-discover", async (req, res) => {
     try {
         const body = req.body ?? {};
