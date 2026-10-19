@@ -136,6 +136,29 @@ extension AuthenticationViewModel {
     }
   }
 
+  /// Emails a password reset link. Returns nil once it's sent, or a message to show the user
+  func sendPasswordReset(to email: String) async -> String? {
+    let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty else { return "Enter the email you signed up with." }
+    do {
+      try await Auth.auth().sendPasswordReset(withEmail: email)
+      return nil
+    }
+    catch {
+      switch AuthErrorCode(rawValue: (error as NSError).code) {
+      case .invalidEmail:
+        return "That doesn't look like an email address."
+      case .networkError:
+        return "Couldn't reach the server. Check your connection and try again."
+      case .tooManyRequests:
+        return "Too many attempts. Wait a few minutes and try again."
+      default:
+        // Unknown accounts aren't reported, so nobody can use this to find out who has an account
+        return nil
+      }
+    }
+  }
+
   func deleteAccount() async -> Bool {
     do {
       try await user?.delete()

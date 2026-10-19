@@ -12,6 +12,7 @@ struct SignInView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @Environment(\.dismiss) var dismiss
     @State var invalidCredentials: Bool = false
+    @State private var showPasswordReset = false
     
     private func signInWithGoogle() {
         Task {
@@ -52,6 +53,14 @@ struct SignInView: View {
                         AuthField(icon: "lock.fill", placeholder: "Password", text: $viewModel.password, isSecure: true)
                             .textContentType(.password)
                             .appearAnimation(delay: 0.12)
+
+                        Button("Forgot password?") {
+                            showPasswordReset = true
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(Theme.accent)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .appearAnimation(delay: 0.14)
 
                         if invalidCredentials {
                             Label("Incorrect username or password", systemImage: "exclamationmark.circle.fill")
@@ -108,6 +117,88 @@ struct SignInView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .sheet(isPresented: $showPasswordReset) {
+            PasswordResetView(email: viewModel.email)
+                .environmentObject(viewModel)
+                .presentationDetents([.medium])
+        }
+    }
+}
+
+/// Sends a password reset link to the email the user enters, starting with whatever they typed on the
+/// sign-in screen. Firebase emails a link to a page where they choose a new password
+struct PasswordResetView: View {
+    @EnvironmentObject var viewModel: AuthenticationViewModel
+    @Environment(\.dismiss) var dismiss
+    @State var email: String
+    @State private var isSending = false
+    @State private var sentTo: String? = nil
+    @State private var errorMessage: String? = nil
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) {
+                if let sentTo {
+                    Image(systemName: "envelope.badge.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(Theme.accentGradient)
+                    Text("Check your email")
+                        .font(.title2.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("If an account exists for \(sentTo), we've sent it a link to choose a new password. It can take a minute to arrive, so check your spam folder too.")
+                        .foregroundColor(Theme.textSecondary)
+                    Button("Back to Sign In") {
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 8)
+                } else {
+                    Text("Reset your password")
+                        .font(.title2.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Enter the email you signed up with and we'll send you a link to choose a new password.")
+                        .foregroundColor(Theme.textSecondary)
+                    AuthField(icon: "envelope.fill", placeholder: "Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .onSubmit(send)
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(Theme.accentSecondary)
+                    }
+                    Button(action: send) {
+                        if isSending {
+                            ProgressView().tint(Theme.onAccent)
+                        } else {
+                            Text("Send Reset Link")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isSending)
+                    .padding(.top, 8)
+                }
+            }
+            .padding(24)
+            .animation(Theme.spring, value: sentTo)
+            .animation(Theme.spring, value: errorMessage)
+        }
+    }
+
+    private func send() {
+        Haptics.tap()
+        isSending = true
+        errorMessage = nil
+        Task {
+            let error = await viewModel.sendPasswordReset(to: email)
+            isSending = false
+            if let error {
+                errorMessage = error
+            } else {
+                sentTo = email.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
     }
 }
 
