@@ -14,6 +14,8 @@ struct UserSettingsView : View {
     @State var firstName: String = "Theo"
     @State var lastName: String = "Vasile"
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var social = SocialStore.shared
+    @State private var showUsernameSetup = false
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
     @AppStorage(Personalization.useAIKey) private var useAI = false
@@ -25,6 +27,17 @@ struct UserSettingsView : View {
         NavigationStack {
             Form {
                 Section("Profile") {
+                    Button {
+                        showUsernameSetup = true
+                    } label: {
+                        HStack {
+                            Text("Username")
+                                .foregroundColor(Theme.textPrimary)
+                            Spacer()
+                            Text(social.profile?.handle.map { "@\($0)" } ?? "Choose one")
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
                     HStack {
                         Text("First Name")
                         Spacer()
@@ -123,6 +136,9 @@ struct UserSettingsView : View {
                     Button("Done") { dismiss() }
                         .bold()
                 }
+            }
+            .sheet(isPresented: $showUsernameSetup) {
+                UsernameSetupView()
             }
             .confirmationDialog("Deactivate your account?", isPresented: $confirmDeactivate, titleVisibility: .visible) {
                 Button("Deactivate Account", role: .destructive) {

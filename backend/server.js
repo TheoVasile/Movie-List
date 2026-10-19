@@ -3,6 +3,7 @@ const authRoutes = require("./routes/authRoutes");
 const listRoutes = require("./routes/listRoutes");
 const movieRoutes = require("./routes/movieRoutes");
 const letterboxdRoutes = require("./routes/letterboxdRoutes");
+const userRoutes = require("./routes/userRoutes");
 const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
@@ -23,6 +24,7 @@ app.use("/auth", authRoutes);
 app.use("/lists", verifyToken, listRoutes);
 app.use("/movies", verifyToken, movieRoutes);
 app.use("/letterboxd", verifyToken, letterboxdRoutes);
+app.use("/users", verifyToken, userRoutes);
 
 // Hosts like Render choose the port; locally it's 3000
 const port = process.env.PORT || 3000;
