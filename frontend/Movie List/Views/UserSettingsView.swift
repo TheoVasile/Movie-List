@@ -23,6 +23,8 @@ struct UserSettingsView : View {
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @ObservedObject private var notifications = NotificationManager.shared
     @State private var notifyRequests = true
+    @State private var notifyActivity = true
+    @AppStorage(NotificationManager.suggestionsKey) private var notifySuggestions = true
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -130,13 +132,28 @@ struct UserSettingsView : View {
                                 if saved { social.load() } else { notifyRequests = !wanted }
                             }
                         }
+                        Toggle(isOn: $notifyActivity) {
+                            Label("Friend Activity", systemImage: "person.2.fill")
+                        }
+                        .tint(Theme.accent)
+                        .onChange(of: notifyActivity) { wanted in
+                            guard wanted != (social.profile?.notify_activity ?? true) else { return }
+                            APIService.shared.setNotificationPreferences(activity: wanted) { saved in
+                                if saved { social.load() } else { notifyActivity = !wanted }
+                            }
+                        }
+                        Toggle(isOn: $notifySuggestions) {
+                            Label("Film Suggestions", systemImage: "film")
+                        }
+                        .tint(Theme.accent)
+                        .onChange(of: notifySuggestions) { _ in notifications.scheduleSuggestions() }
                     }
                 } header: {
                     Text("Notifications")
                 } footer: {
                     Text(notifications.authorization == .denied
                          ? "Notifications for CineList are turned off in your iPhone's Settings."
-                         : "Get a notification when someone asks to follow you, or accepts your request.")
+                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -195,6 +212,7 @@ struct UserSettingsView : View {
             .onAppear {
                 name = savedName
                 notifyRequests = social.profile?.notify_requests ?? true
+                notifyActivity = social.profile?.notify_activity ?? true
                 notifications.refreshAuthorization()
             }
             .navigationTitle("Settings")

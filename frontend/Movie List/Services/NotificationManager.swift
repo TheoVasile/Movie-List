@@ -26,6 +26,13 @@ final class NotificationManager: NSObject, ObservableObject {
     @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
     @Published var destination: Destination? = nil
 
+    // Film suggestions are scheduled on this phone, so the switch for them is kept here too
+    static let suggestionsKey = "notify.suggestions"
+    private static let suggestionPrefix = "suggestion-"
+    // Tuesday, Friday and Sunday evenings (weekday 1 is Sunday)
+    private static let suggestionDays: [(weekday: Int, title: String)] = [(3, "Movie night?"), (6, "Friday film?"), (1, "Sunday film?")]
+    private static let suggestionHour = 19
+
     private var fcmToken: String?
 
     /// Called once at launch, after Firebase is configured
@@ -42,6 +49,51 @@ final class NotificationManager: NSObject, ObservableObject {
         }
     }
 
+    var suggestionsEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.suggestionsKey) as? Bool ?? true
+    }
+
+    /// Replaces the scheduled film suggestions with fresh ones: the next Tuesday, Friday and Sunday evening,
+    /// each a different unwatched film from the watchlist (or from any list without one). Called after each
+    /// sync, so the picks follow the lists. Scheduled on the phone, so nothing is sent anywhere
+    func scheduleSuggestions() {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { pending in
+            center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix(Self.suggestionPrefix) })
+            DispatchQueue.main.async {
+                guard self.suggestionsEnabled, [.authorized, .provisional, .ephemeral].contains(self.authorization) else { return }
+                let candidates = PersistenceController.shared.suggestionCandidates()
+                guard !candidates.isEmpty else { return }
+                let calendar = Calendar.current
+                let now = Date()
+                for (index, day) in Self.suggestionDays.enumerated() {
+                    guard let date = calendar.nextDate(after: now, matching: DateComponents(hour: Self.suggestionHour, weekday: day.weekday),
+                                                       matchingPolicy: .nextTime) else { continue }
+                    // A different film each evening, and different ones from week to week
+                    let week = calendar.component(.weekOfYear, from: date)
+                    let pick = candidates[(week * Self.suggestionDays.count + index) % candidates.count]
+                    let content = UNMutableNotificationContent()
+                    content.title = day.title
+                    content.body = pick.fromWatchlist
+                        ? "How about \(pick.label)? It's on your watchlist."
+                        : "How about \(pick.label)? You haven't watched it yet."
+                    content.sound = .default
+                    content.userInfo = ["type": "suggestion", "tmdb_id": String(pick.tmdbID)]
+                    let trigger = UNCalendarNotificationTrigger(
+                        dateMatching: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date), repeats: false)
+                    center.add(UNNotificationRequest(identifier: Self.suggestionPrefix + String(day.weekday), content: content, trigger: trigger))
+                }
+            }
+        }
+    }
+
+    func cancelSuggestions() {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { pending in
+            center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix(Self.suggestionPrefix) })
+        }
+    }
+
     /// Shows the system prompt the first time; afterwards iOS only lets the user change it in Settings
     func requestPermission(completion: ((Bool) -> Void)? = nil) {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
@@ -49,6 +101,8 @@ final class NotificationManager: NSObject, ObservableObject {
                 self.refreshAuthorization()
                 if granted {
                     UIApplication.shared.registerForRemoteNotifications()
+                    // authorization is refreshed asynchronously, so give it a moment before scheduling
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.scheduleSuggestions() }
                 }
                 completion?(granted)
             }
@@ -78,6 +132,7 @@ final class NotificationManager: NSObject, ObservableObject {
         }
         fcmToken = nil
         Messaging.messaging().deleteToken { _ in }
+        cancelSuggestions()
     }
 }
 

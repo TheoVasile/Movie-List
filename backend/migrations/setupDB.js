@@ -31,6 +31,8 @@ const createTables = async () => {
             -- Which push notifications the user wants. The phone also has to allow notifications
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;
+            -- When the user last got the daily friends digest, so they never get two in a day
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
 
             -- Firebase Cloud Messaging tokens: one per device the user is signed in on
             CREATE TABLE IF NOT EXISTS device_tokens (
@@ -83,6 +85,9 @@ const createTables = async () => {
                 rank INT,
                 UNIQUE (list_id, movie_id)
             );
+            -- When a film was added, for friends' activity. Films added before this was kept have none
+            ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_at TIMESTAMP;
+            ALTER TABLE list_movies ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP;
 
             -- Watched is per user, not per list: a film watched once shows as watched in every list
             CREATE TABLE IF NOT EXISTS watched_movies (
