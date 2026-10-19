@@ -20,6 +20,8 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
     @State private var presentingLoginScreen = false
     @State private var presentingProfileScreen = false
     @State private var isVisible = false
+    // Only leaving a signed-in session closes open sheets; a failed sign-in keeps the sign-in sheet up
+    @State private var wasSignedIn = false
 
     var unauthenticated: Unauthenticated?
     @ViewBuilder var content: () -> Content
@@ -47,6 +49,30 @@ struct AuthenticatedView<Content, Unauthenticated>: View where Content: View, Un
             }
         }
         .animation(.easeInOut(duration: 0.45), value: viewModel.authenticationState)
+        .onChange(of: viewModel.authenticationState) { state in
+            if state == .authenticated {
+                wasSignedIn = true
+            } else if wasSignedIn {
+                wasSignedIn = false
+                presentingProfileScreen = false
+                dismissPresentedScreens()
+            }
+        }
+        .onAppear {
+            wasSignedIn = viewModel.authenticationState == .authenticated
+        }
+    }
+
+    /// Closes every sheet still open over the app, such as Profile and Settings, so signing out or
+    /// deleting the account lands straight on the sign-in screen
+    private func dismissPresentedScreens() {
+        let roots = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .compactMap(\.rootViewController)
+        for root in roots where root.presentedViewController != nil {
+            root.dismiss(animated: true)
+        }
     }
 
     private var unauthenticatedScreen: some View {
