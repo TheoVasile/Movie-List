@@ -11,6 +11,8 @@ import SwiftUI
 struct MovieDetailView: View {
     @ObservedObject var movie: CDMovie
     var listName: String? = nil
+    // Opens the list picker to add this film to other lists
+    var onAddToLists: (() -> Void)? = nil
     var onCompare: (() -> Void)? = nil
     var onSetRank: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
@@ -236,6 +238,17 @@ struct MovieDetailView: View {
                     }
                 }
                 .appearAnimation(delay: 0.26)
+            }
+
+            if let onAddToLists {
+                Button {
+                    Haptics.tap()
+                    onAddToLists()
+                } label: {
+                    Label("Add to Other Lists", systemImage: "text.badge.plus")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .appearAnimation(delay: 0.28)
             }
 
             if let onToggleWatched {

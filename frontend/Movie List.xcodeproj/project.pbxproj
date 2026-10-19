@@ -11,6 +11,7 @@
 		FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000C /* DiscoverView.swift */; };
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
+		FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000016 /* ListPickerSheet.swift */; };
 		FA7E5A012F00000000000012 /* ListSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000011 /* ListSharing.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
 		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
@@ -81,6 +82,7 @@
 		FA7E5A012F0000000000000C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
+		FA7E5A012F00000000000016 /* ListPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListPickerSheet.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000011 /* ListSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSharing.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -245,6 +247,7 @@
 				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
+				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -375,6 +378,7 @@
 				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,
+				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
 				FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
 				FAE94A182D55789F00592081 /* UserProfileView.swift in Sources */,

@@ -230,6 +230,32 @@ class ListViewModel: ObservableObject {
         }
     }
 
+    /// Adds a film from this list to other lists, at the bottom of each. Calls back with the lists it was
+    /// added to and the new copy in each, in the order given
+    func addCopy(of movie: CDMovie, to lists: [CDMovieList], completion: @escaping ([(list: CDMovieList, movie: CDMovie)]) -> Void) {
+        let film = Movie(
+            id: Int64(movie.tmdb_id),
+            title: movie.title ?? "",
+            release_date: movie.get_date(),
+            overview: movie.overview ?? "",
+            poster_path: movie.poster_path,
+            original_language: movie.original_language ?? "",
+            popularity: movie.popularity
+        )
+        var added: [Int: CDMovie] = [:]
+        let group = DispatchGroup()
+        for (index, list) in lists.enumerated() {
+            group.enter()
+            list.addMovie(film, context: context) { newMovie in
+                added[index] = newMovie
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion(lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } })
+        }
+    }
+
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
             DispatchQueue.main.async {

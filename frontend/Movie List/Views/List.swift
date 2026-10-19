@@ -12,6 +12,12 @@ import CoreData
 struct ListView: View {
     @EnvironmentObject var network: NetworkService
     @StateObject var viewModel: ListViewModel
+    // The film being added to other lists, which opens the list picker
+    @State private var addingToLists: CDMovie? = nil
+    // Placing that film in each other list it went into, one list at a time, like Discover does
+    @State private var otherListRanking: (model: ListViewModel, movie: CDMovie)? = nil
+    @State private var otherListQueue: [(list: CDMovieList, movie: CDMovie)] = []
+    @State private var toast: String? = nil
     @Environment(\.colorScheme) private var colorScheme
     // The image or ZIP waiting to go to the share sheet
     @State private var shareItem: ShareItem? = nil
@@ -69,6 +75,16 @@ struct ListView: View {
                 .transition(.scale(scale: 0.92).combined(with: .opacity))
                 .zIndex(2)
             }
+            else if let otherListRanking {
+                Theme.scrim
+                    .ignoresSafeArea()
+                    .onTapGesture { finishOtherListRanking(skipped: true) }
+                    .transition(.opacity)
+                    .zIndex(1)
+                otherListCompare(model: otherListRanking.model, movie: otherListRanking.movie)
+                    .transition(.scale(scale: 0.92).combined(with: .opacity))
+                    .zIndex(2)
+            }
             else if viewModel.showSetRank, let selectedMovie = viewModel.selectedMovie {
                 SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count, showSetRank: $viewModel.showSetRank) {updatedMovie, rank in
                     withAnimation(Theme.spring) { viewModel.showSetRank = false }
@@ -76,6 +92,17 @@ struct ListView: View {
                 }
                 .transition(.opacity)
                 .zIndex(2)
+            }
+        }
+        .overlay(alignment: .top) { toastView }
+        .sheet(item: $addingToLists) { movie in
+            ListPickerSheet(
+                title: movie.title ?? "",
+                posterPath: movie.poster_path,
+                isAlreadyIn: { list in list.movies.contains { $0.tmdb_id == movie.tmdb_id } },
+                excluding: viewModel.movieList
+            ) { lists in
+                addToOtherLists(movie, lists)
             }
         }
         .searchable(text: $viewModel.searchText, prompt: "Search this list")
@@ -145,6 +172,7 @@ struct ListView: View {
                 MovieDetailView(
                     movie: detailMovie,
                     listName: viewModel.movieList.name,
+                    onAddToLists: { addingToLists = detailMovie },
                     onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
                     onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } },
                     onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) }
@@ -222,6 +250,13 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                         .overlay { highlightRing(for: movie) }
+                        .contextMenu {
+                            Button {
+                                addingToLists = movie
+                            } label: {
+                                Label("Add to Other Lists", systemImage: "text.badge.plus")
+                            }
+                        }
                         // Rows with custom swipe actions lose the built-in swipe to delete, so it's added back here
                         .swipeActions(edge: .leading) {
                             Button {
@@ -492,6 +527,89 @@ private extension ListView {
         viewModel.searchText = ""
         viewModel.selectedGenres = []
         withAnimation(Theme.spring) { editMode = .active }
+    }
+
+    func addToOtherLists(_ movie: CDMovie, _ lists: [CDMovieList]) {
+        guard !lists.isEmpty else { return }
+        viewModel.addCopy(of: movie, to: lists) { added in
+            guard !added.isEmpty else {
+                showToast("Couldn't add \(movie.title ?? "it"). Try again.")
+                return
+            }
+            if added.count < lists.count {
+                showToast("Added to \(added.count) of \(lists.count) lists. Try the rest again.")
+            } else if added.count > 1 {
+                showToast("Added to \(added.count) lists")
+            }
+            // New films land at the bottom, so ask where it belongs in each list that has other films
+            otherListQueue = added.filter { $0.list.movies.count > 1 }
+            if !startNextOtherListRanking(), added.count == 1, let only = added.first {
+                showToast("Added to \(only.list.name ?? "your list") at #\(only.movie.rank)")
+            }
+        }
+    }
+
+    /// Starts placing the film in the next list waiting for it; false when there are none left
+    @discardableResult
+    func startNextOtherListRanking() -> Bool {
+        guard let next = otherListQueue.first else { return false }
+        otherListQueue.removeFirst()
+        let model = ListViewModel(movieList: next.list, context: next.list.managedObjectContext ?? viewModel.movieList.managedObjectContext!)
+        // Give the list picker time to finish closing before Compare appears
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            withAnimation(Theme.spring) { otherListRanking = (model, next.movie) }
+        }
+        return true
+    }
+
+    func finishOtherListRanking(skipped: Bool) {
+        if skipped, let current = otherListRanking {
+            showToast("Added to \(current.model.movieList.name ?? "your list") at #\(current.movie.rank)")
+        }
+        withAnimation(Theme.spring) { otherListRanking = nil }
+        startNextOtherListRanking()
+    }
+
+    func otherListCompare(model: ListViewModel, movie: CDMovie) -> some View {
+        let listName = model.movieList.name ?? "your list"
+        return CompareMovieView(
+            movies: Binding(get: { model.movies }, set: { model.movies = $0 }),
+            movie: .constant(movie),
+            prompt: "Where does \(movie.title ?? "it") rank in \(listName)?",
+            cancelTitle: "Skip — keep it at the bottom",
+            onCancel: { finishOtherListRanking(skipped: true) }
+        ) { rankedMovie, rank in
+            model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
+            showToast("Ranked #\(rank) in \(listName)")
+            finishOtherListRanking(skipped: false)
+        }
+    }
+
+    func showToast(_ message: String) {
+        withAnimation(Theme.spring) { toast = message }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            withAnimation(Theme.spring) {
+                if toast == message { toast = nil }
+            }
+        }
+    }
+
+    @ViewBuilder
+    var toastView: some View {
+        if let toast {
+            Label(toast, systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .lineLimit(1)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                .shadow(color: Theme.shadow.opacity(0.4), radius: 16, y: 8)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 
     func dismissCompare() {
