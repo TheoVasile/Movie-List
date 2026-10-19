@@ -3,10 +3,10 @@ const axios = require("axios");
 const CONCURRENCY = 5;
 
 // Runs fn over items with a fixed number of requests in flight, preserving order
-async function mapWithConcurrency(items, fn) {
+async function mapWithConcurrency(items, fn, concurrency = CONCURRENCY) {
     const results = new Array(items.length);
     let nextIndex = 0;
-    const workers = Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
+    const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
         while (nextIndex < items.length) {
             const index = nextIndex++;
             results[index] = await fn(items[index], index);
@@ -14,6 +14,25 @@ async function mapWithConcurrency(items, fn) {
     });
     await Promise.all(workers);
     return results;
+}
+
+// For work that arrives a piece at a time: limit(fn) runs fn once fewer than `concurrency` calls are in flight
+function createLimiter(concurrency) {
+    let active = 0;
+    const waiting = [];
+    const next = () => {
+        if (active >= concurrency || !waiting.length) return;
+        active++;
+        const { fn, resolve, reject } = waiting.shift();
+        fn().then(resolve, reject).finally(() => {
+            active--;
+            next();
+        });
+    };
+    return (fn) => new Promise((resolve, reject) => {
+        waiting.push({ fn, resolve, reject });
+        next();
+    });
 }
 
 function normalizeTitle(title) {
@@ -70,4 +89,4 @@ async function resolveFilms(films) {
     };
 }
 
-module.exports = { resolveFilms, mapWithConcurrency };
+module.exports = { resolveFilms, mapWithConcurrency, createLimiter };

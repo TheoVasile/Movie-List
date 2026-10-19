@@ -7,7 +7,8 @@
 
 import Foundation
 
-struct Movie: Identifiable, Decodable {
+// Codable so Discover can save the cards still to swipe between launches
+struct Movie: Identifiable, Codable {
     var id: Int64
     var title: String
     var release_date: String

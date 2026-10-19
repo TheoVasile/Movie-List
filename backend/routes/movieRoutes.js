@@ -4,7 +4,7 @@ const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = re
 
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched } = require("../models/watchedModel");
-const { mapWithConcurrency } = require("../services/letterboxdService");
+const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds } = require("../models/tasteModel");
 const { recommendFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 
@@ -213,7 +213,9 @@ const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": 
 
 // Films for the Discover tab chosen by Claude from everything in the user's lists, plus their Discover
 // swipes and anything they chose to share (age range, pronouns) for when their lists are empty.
-// Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover
+// Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover.
+// With "Accept: application/x-ndjson" the films stream back one JSON object per line as Claude picks them,
+// so the first card shows in seconds; otherwise (builds from before streaming) they come as one array
 router.post("/ai-discover", async (req, res) => {
     try {
         const body = req.body ?? {};
@@ -237,21 +239,60 @@ router.post("/ai-discover", async (req, res) => {
         const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
         const [lists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
-        // Ask for a few extra, since some picks turn out to be films the user already has or can't be found
-        const picks = await recommendFilms(req.user.uid, lists, signals, count + 10);
+        const streaming = req.accepts(["application/json", "application/x-ndjson"]) === "application/x-ndjson";
 
-        const found = await mapWithConcurrency(picks, async (pick) => {
-            try {
-                const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
-                return movie && { ...movie, reason: cleanText(pick.reason, 200) };
-            } catch (error) {
-                return null;
-            }
-        });
+        // Each pick is looked up on TMDb as soon as Claude writes it, so lookups overlap with the rest of the
+        // answer. Films are sent in Claude's order (it balances close matches with adventurous picks): a film
+        // waits only for the lookups of the picks before it
+        const lookup = createLimiter(10);
+        const found = [];
+        const lookups = [];
         const seen = new Set();
-        const fresh = found.filter((movie) => movie && !listedIds.has(movie.id) && !exclude.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
-        res.json(fresh.slice(0, count));
+        const fresh = [];
+        let nextToSend = 0;
+        const sendReady = () => {
+            while (nextToSend < found.length && found[nextToSend] !== undefined) {
+                const movie = found[nextToSend++];
+                if (!movie || fresh.length >= count || listedIds.has(movie.id) || exclude.has(movie.id) || seen.has(movie.id)) continue;
+                seen.add(movie.id);
+                fresh.push(movie);
+                if (streaming) {
+                    if (!res.headersSent) {
+                        res.status(200).set({ "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" });
+                    }
+                    res.write(JSON.stringify(movie) + "\n");
+                }
+            }
+        };
+
+        // Ask for a few extra, since some picks turn out to be films the user already has or can't be found
+        await recommendFilms(req.user.uid, lists, signals, count + 10, (pick) => {
+            const index = found.push(undefined) - 1;
+            lookups.push(lookup(async () => {
+                try {
+                    const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
+                    found[index] = movie && { ...movie, reason: cleanText(pick.reason, 200) };
+                } catch (error) {
+                    found[index] = null;
+                }
+                sendReady();
+            }));
+        });
+        await Promise.all(lookups);
+
+        if (!streaming) {
+            return res.json(fresh);
+        }
+        if (!res.headersSent) {
+            res.status(200).set({ "Content-Type": "application/x-ndjson", "Cache-Control": "no-cache" });
+        }
+        res.end();
     } catch (error) {
+        // Once films have been streamed the status is already sent, so just end the stream
+        if (res.headersSent) {
+            console.error("AI recommendations failed partway:", error.message);
+            return res.end();
+        }
         if (error instanceof AIUnavailableError) {
             return res.status(503).json({ error: "AI recommendations aren't set up." });
         }
