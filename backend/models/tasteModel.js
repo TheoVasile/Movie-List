@@ -48,7 +48,7 @@ async function fetchListedTmdbIds(user_id) {
 async function fetchFriend(user_id, handle) {
     const result = await pool.query(
         `SELECT u.firebase_uid, u.handle, u.username AS display_name, u.ai_allowed,
-                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 COALESCE((SELECT me.ai_allowed FROM users me WHERE me.firebase_uid = $1), false) AS my_ai_allowed
          FROM users u WHERE u.handle = $2`,
         [user_id, handle]

@@ -16,6 +16,9 @@ final class SocialStore: ObservableObject {
 
     @Published private(set) var profile: UserProfile? = nil
     @Published private(set) var following: [UserSummary] = []
+    // People asking to follow the user, and the @usernames the user is waiting on
+    @Published private(set) var requests: [UserSummary] = []
+    @Published private(set) var requested: Set<String> = []
     @Published private(set) var hasLoaded = false
 
     func load() {
@@ -25,6 +28,25 @@ final class SocialStore: ObservableObject {
         }
         APIService.shared.fetchFollowing { result in
             if case .success(let people) = result { self.following = people }
+        }
+        APIService.shared.fetchFollowRequests { result in
+            if case .success(let loaded) = result {
+                self.requests = loaded.incoming
+                self.requested = Set(loaded.outgoing)
+            }
+        }
+    }
+
+    /// Accepts or declines someone's request, taking it off the list straight away
+    func answer(_ person: UserSummary, accept: Bool) {
+        let previous = requests
+        requests.removeAll { $0.handle == person.handle }
+        APIService.shared.answerFollowRequest(person.handle, accept: accept) { saved in
+            if saved {
+                self.load()
+            } else {
+                self.requests = previous
+            }
         }
     }
 
@@ -45,17 +67,15 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    /// Follows or unfollows, showing the change straight away and undoing it if the server says no
+    /// Sends a follow request, or unfollows / cancels a request, showing the change straight away and undoing
+    /// it if the server says no. Following only starts once they accept
     func setFollowing(_ person: UserSummary, _ follow: Bool, completion: @escaping (Bool) -> Void = { _ in }) {
-        let previous = following
+        let previous = (following, requested)
         if follow {
-            if !following.contains(where: { $0.handle == person.handle }) {
-                var followed = person
-                followed.following = true
-                following.insert(followed, at: 0)
-            }
+            requested.insert(person.handle)
         } else {
             following.removeAll { $0.handle == person.handle }
+            requested.remove(person.handle)
         }
         APIService.shared.setFollowing(person.handle, follow) { result in
             switch result {
@@ -64,10 +84,14 @@ final class SocialStore: ObservableObject {
                 completion(true)
             case .failure(let error):
                 print("Error updating follow:", error)
-                self.following = previous
+                (self.following, self.requested) = previous
                 completion(false)
             }
         }
+    }
+
+    func hasRequested(_ handle: String) -> Bool {
+        requested.contains(handle)
     }
 
     func isFollowing(_ handle: String) -> Bool {
@@ -213,8 +237,21 @@ struct FollowingSection: View {
                     .cardStyle(cornerRadius: 16)
                 }
                 .buttonStyle(PressableButtonStyle(scale: 0.98))
+            }
+            if !social.requests.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Follow Requests")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(Theme.textSecondary)
+                    ForEach(social.requests) { person in
+                        FollowRequestRow(person: person)
+                    }
+                }
+            }
+            if social.hasLoaded && social.profile?.handle == nil {
+                EmptyView()
             } else if social.following.isEmpty {
-                Text("Follow friends to see their lists, rankings and what they thought of each film.")
+                Text("Follow friends to see their lists, rankings and what they thought of each film. They'll get a request to accept.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
             } else {
@@ -273,25 +310,76 @@ struct PersonRow: View {
     }
 }
 
+/// Follow, Requested (tap to cancel) or Following (tap to unfollow)
 struct FollowButton: View {
     @ObservedObject private var social = SocialStore.shared
     let person: UserSummary
 
     var body: some View {
         let following = social.isFollowing(person.handle)
+        let requested = !following && social.hasRequested(person.handle)
+        let active = following || requested
         Button {
             Haptics.tap()
-            social.setFollowing(person, !following)
+            social.setFollowing(person, !active)
         } label: {
-            Text(following ? "Following" : "Follow")
+            Text(following ? "Following" : requested ? "Requested" : "Follow")
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(following ? Theme.textPrimary : Theme.onAccent)
+                .foregroundColor(active ? Theme.textPrimary : Theme.onAccent)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(following ? AnyShapeStyle(Theme.surfaceRaised) : AnyShapeStyle(Theme.accentGradient))
+                .background(active ? AnyShapeStyle(Theme.surfaceRaised) : AnyShapeStyle(Theme.accentGradient))
                 .clipShape(Capsule())
         }
         .buttonStyle(PressableButtonStyle(scale: 0.92))
+    }
+}
+
+/// Someone asking to follow the user, with Accept and Decline
+struct FollowRequestRow: View {
+    @ObservedObject private var social = SocialStore.shared
+    let person: UserSummary
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Avatar(name: person.display_name)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(person.display_name)
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                    .lineLimit(1)
+                Text("@\(person.handle) wants to follow you")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                Haptics.tap()
+                social.answer(person, accept: false)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.surfaceRaised, in: Circle())
+            }
+            .accessibilityLabel("Decline")
+            Button {
+                Haptics.tap()
+                social.answer(person, accept: true)
+            } label: {
+                Text("Accept")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(Theme.onAccent)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Theme.accentGradient, in: Capsule())
+            }
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .padding(12)
+        .cardStyle(cornerRadius: 16)
     }
 }
 
@@ -394,8 +482,12 @@ struct FriendProfileView: View {
                     FollowButton(person: person)
                 }
 
-                if !social.isFollowing(person.handle) {
-                    Text("Follow \(person.display_name) to see their lists, rankings and watched films.")
+                if social.hasRequested(person.handle) && !social.isFollowing(person.handle) {
+                    Text("Request sent. You'll see \(person.display_name)'s lists, rankings and watched films once they accept.")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                } else if !social.isFollowing(person.handle) {
+                    Text("Follow \(person.display_name) to see their lists, rankings and watched films. They'll get a request to accept.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {

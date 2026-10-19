@@ -14,8 +14,9 @@ function isValidHandle(handle) {
 async function getProfile(user_id) {
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name, u.ai_allowed,
-                (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid)::int AS followers,
-                (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid)::int AS following
+                (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
+                (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests
          FROM users u WHERE u.firebase_uid = $1`,
         [user_id]
     );
@@ -48,13 +49,14 @@ async function setHandle(user_id, handle) {
     }
 }
 
-// People whose @username starts with the query, with whether the user already follows them
+// People whose @username starts with the query, with whether the user follows them or has asked to
 async function searchUsers(user_id, query) {
     // "_" is a LIKE wildcard, so it's escaped to match only itself
     const prefix = query.replace(/_/g, "\\_");
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name,
-                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u
          WHERE u.handle LIKE $2 || '%' ESCAPE '\\' AND u.firebase_uid <> $1
          ORDER BY u.handle
@@ -64,20 +66,54 @@ async function searchUsers(user_id, query) {
     return result.rows;
 }
 
-// Returns false when there's no one with that @username (or it's the user's own)
+// Following someone sends them a request; unfollowing also cancels a request. Returns null when there's no
+// one with that @username (or it's the user's own), otherwise { followee_id, following, requested, isNewRequest }
 async function setFollowing(user_id, handle, follow) {
     const target = await pool.query("SELECT firebase_uid FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
-    if (!target.rows.length) return false;
+    if (!target.rows.length) return null;
     const followee_id = target.rows[0].firebase_uid;
-    if (follow) {
-        await pool.query(
-            "INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            [user_id, followee_id]
-        );
-    } else {
+    if (!follow) {
         await pool.query("DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2", [user_id, followee_id]);
+        return { followee_id, following: false, requested: false, isNewRequest: false };
     }
-    return true;
+    const inserted = await pool.query(
+        `INSERT INTO follows (follower_id, followee_id, accepted) VALUES ($1, $2, false)
+         ON CONFLICT DO NOTHING RETURNING accepted`,
+        [user_id, followee_id]
+    );
+    const row = inserted.rows[0] ?? (await pool.query(
+        "SELECT accepted FROM follows WHERE follower_id = $1 AND followee_id = $2", [user_id, followee_id]
+    )).rows[0];
+    return { followee_id, following: row.accepted, requested: !row.accepted, isNewRequest: inserted.rowCount > 0 };
+}
+
+// People asking to follow the user (newest first), and the @usernames of people the user has asked to follow
+async function fetchFollowRequests(user_id) {
+    const incoming = await pool.query(
+        `SELECT u.handle, u.username AS display_name, false AS following
+         FROM follows f JOIN users u ON u.firebase_uid = f.follower_id
+         WHERE f.followee_id = $1 AND NOT f.accepted AND u.handle IS NOT NULL
+         ORDER BY f.created_at DESC`,
+        [user_id]
+    );
+    const outgoing = await pool.query(
+        `SELECT u.handle FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
+         WHERE f.follower_id = $1 AND NOT f.accepted AND u.handle IS NOT NULL`,
+        [user_id]
+    );
+    return { incoming: incoming.rows, outgoing: outgoing.rows.map((row) => row.handle) };
+}
+
+// Accepts or declines @handle's request to follow the user. Returns the requester's account id, or null when
+// there's no such request
+async function respondToFollowRequest(user_id, handle, accept) {
+    const requester = await pool.query("SELECT firebase_uid FROM users WHERE handle = $1", [handle]);
+    const follower_id = requester.rows[0]?.firebase_uid;
+    if (!follower_id) return null;
+    const result = accept
+        ? await pool.query("UPDATE follows SET accepted = true WHERE follower_id = $1 AND followee_id = $2 AND NOT accepted", [follower_id, user_id])
+        : await pool.query("DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2 AND NOT accepted", [follower_id, user_id]);
+    return result.rowCount ? follower_id : null;
 }
 
 // Everyone the user follows, newest first, with how many lists and films each has
@@ -87,7 +123,7 @@ async function fetchFollowing(user_id) {
                 (SELECT COUNT(*) FROM lists l WHERE l.user_id = u.firebase_uid)::int AS list_count,
                 (SELECT COUNT(*) FROM lists l JOIN list_movies lm ON lm.list_id = l.id WHERE l.user_id = u.firebase_uid)::int AS film_count
          FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
-         WHERE f.follower_id = $1
+         WHERE f.follower_id = $1 AND f.accepted
          ORDER BY f.created_at DESC`,
         [user_id]
     );
@@ -100,13 +136,14 @@ async function fetchFollowing(user_id) {
 async function fetchUserLists(user_id, handle) {
     const target = await pool.query(
         `SELECT u.firebase_uid, u.handle, u.username AS display_name, u.ai_allowed,
-                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid) AS following
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u WHERE u.handle = $2`,
         [user_id, handle]
     );
     const person = target.rows[0];
     if (!person) return null;
-    const profile = { handle: person.handle, display_name: person.display_name, following: person.following, lists: [] };
+    const profile = { handle: person.handle, display_name: person.display_name, following: person.following, requested: person.requested, lists: [] };
     // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
     if (person.following) profile.ai_allowed = person.ai_allowed;
     if (!person.following) return profile;
@@ -156,7 +193,7 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
                  WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film)
                  ORDER BY lm.rank LIMIT 1) AS ranking
          FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
-         WHERE f.follower_id = $1`,
+         WHERE f.follower_id = $1 AND f.accepted`,
         [user_id, String(tmdb_id)]
     );
     return result.rows
@@ -164,4 +201,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };

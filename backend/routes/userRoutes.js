@@ -1,5 +1,5 @@
 const express = require("express");
-const { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -65,6 +65,30 @@ router.put("/me/handle", async (req, res) => {
     }
 });
 
+// People asking to follow the user, and the @usernames the user has asked to follow
+router.get("/me/requests", async (req, res) => {
+    try {
+        res.json(await fetchFollowRequests(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching follow requests:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.post("/me/requests/:handle/accept", (req, res) => respond(req, res, true));
+router.delete("/me/requests/:handle", (req, res) => respond(req, res, false));
+
+async function respond(req, res, accept) {
+    try {
+        const requester = await respondToFollowRequest(req.user.uid, req.params.handle.toLowerCase(), accept);
+        if (!requester) return res.status(404).json({ error: "Request not found." });
+        res.json({ handle: req.params.handle.toLowerCase(), accepted: accept });
+    } catch (error) {
+        console.error("Error answering follow request:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+
 router.get("/me/following", async (req, res) => {
     try {
         res.json(await fetchFollowing(req.user.uid));
@@ -105,11 +129,12 @@ router.get("/search", async (req, res) => {
 router.post("/:handle/follow", (req, res) => follow(req, res, true));
 router.delete("/:handle/follow", (req, res) => follow(req, res, false));
 
-async function follow(req, res, following) {
+// Following sends a request that the other person has to accept; unfollowing also cancels a request
+async function follow(req, res, follow) {
     try {
-        const found = await setFollowing(req.user.uid, req.params.handle.toLowerCase(), following);
-        if (!found) return res.status(404).json({ error: "User not found." });
-        res.json({ handle: req.params.handle.toLowerCase(), following });
+        const result = await setFollowing(req.user.uid, req.params.handle.toLowerCase(), follow);
+        if (!result) return res.status(404).json({ error: "User not found." });
+        res.json({ handle: req.params.handle.toLowerCase(), following: result.following, requested: result.requested });
     } catch (error) {
         console.error("Error updating follow:", error);
         res.status(500).json({ error: "Internal server error" });
