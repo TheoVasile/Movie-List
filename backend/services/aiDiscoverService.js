@@ -118,12 +118,57 @@ function describeRequest(signals, count) {
     return parts.join("\n\n");
 }
 
-/// Asks Claude for films this user is likely to enjoy. Returns [{ title, year, reason }]
-async function recommendFilms(user_id, lists, signals, count) {
+// Feeds on the response text as it streams in and calls onPick with each recommendation the moment
+// its closing brace arrives. The schema puts them one level inside {"recommendations": [...]} and
+// gives them no nested objects, so a depth-2 object is a whole pick. Braces inside strings are skipped
+function createPickParser(onPick) {
+    let text = "";
+    let scanned = 0;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let pickStart = -1;
+    return (chunk) => {
+        text += chunk;
+        for (; scanned < text.length; scanned++) {
+            const char = text[scanned];
+            if (inString) {
+                if (escaped) escaped = false;
+                else if (char === "\\") escaped = true;
+                else if (char === '"') inString = false;
+            } else if (char === '"') {
+                inString = true;
+            } else if (char === "{") {
+                depth++;
+                if (depth === 2) pickStart = scanned;
+            } else if (char === "}") {
+                if (depth === 2 && pickStart >= 0) {
+                    try {
+                        onPick(JSON.parse(text.slice(pickStart, scanned + 1)));
+                    } catch (error) {
+                        console.error("Skipping an AI pick that isn't valid JSON:", error.message);
+                    }
+                    pickStart = -1;
+                }
+                depth--;
+            }
+        }
+    };
+}
+
+/// Asks Claude for films this user is likely to enjoy, streaming the answer. onPick, if given, gets each
+/// { title, year, reason } as soon as Claude has written it; the full list is also returned at the end.
+/// Fails before any pick arrives if AI isn't set up, the daily limit is reached, or the request fails
+async function recommendFilms(user_id, lists, signals, count, onPick = () => {}) {
     const anthropic = getClient();
     takeDailyRequest(user_id);
 
-    const response = await anthropic.messages.create({
+    const picks = [];
+    const parse = createPickParser((pick) => {
+        picks.push(pick);
+        onPick(pick);
+    });
+    const stream = anthropic.messages.stream({
         model: MODEL,
         max_tokens: 8000,
         system: SYSTEM_PROMPT,
@@ -134,19 +179,23 @@ async function recommendFilms(user_id, lists, signals, count) {
         messages: [{
             role: "user",
             content: [
-                { type: "text", text: describeLists(lists), cache_control: { type: "ephemeral" } },
+                // An hour, since refills are often more than the default 5 minutes apart
+                { type: "text", text: describeLists(lists), cache_control: { type: "ephemeral", ttl: "1h" } },
                 { type: "text", text: describeRequest(signals, count) },
             ],
         }],
     });
 
-    if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") {
-        throw new Error(`AI recommendations stopped early (${response.stop_reason})`);
-    }
-    const text = response.content.find((block) => block.type === "text")?.text ?? "";
+    stream.on("text", parse);
+    const response = await stream.finalMessage();
+
     const { usage: tokens } = response;
     console.log(`AI discover: ${tokens.input_tokens} input, ${tokens.cache_creation_input_tokens ?? 0} cache write, ${tokens.cache_read_input_tokens ?? 0} cache read, ${tokens.output_tokens} output tokens`);
-    return JSON.parse(text).recommendations ?? [];
+    if (response.stop_reason === "refusal" || (response.stop_reason === "max_tokens" && !picks.length)) {
+        throw new Error(`AI recommendations stopped early (${response.stop_reason})`);
+    }
+    // Cut off by max_tokens after some picks: keep the ones that were finished
+    return picks;
 }
 
 module.exports = { recommendFilms, AIUnavailableError, AILimitError };

@@ -155,7 +155,10 @@ struct TasteProfile: Codable {
 
 class DiscoverViewModel: ObservableObject {
     /// Cards still to swipe, top card first
-    @Published private(set) var deck: [Movie] = []
+    @Published private(set) var deck: [Movie] = [] {
+        // Saved so Discover opens with cards straight away next time
+        didSet { saveDeck() }
+    }
     @Published private(set) var isLoading = false
     @Published private(set) var loadFailed = false
     @Published private(set) var isExhausted = false
@@ -188,7 +191,10 @@ class DiscoverViewModel: ObservableObject {
     private static let genreFilterKey = "discover.genreFilter"
     private static let profileKey = "discover.tasteProfile"
     private static let maxPages = 30
-    private static let refillThreshold = 5
+    private static let deckKey = "discover.savedDeck"
+    private static let savedDeckLimit = 30
+    // Bumped whenever the deck starts over, so films from a load started before then are ignored
+    private var loadGeneration = 0
 
     init() {
         let stored = UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? []
@@ -197,6 +203,11 @@ class DiscoverViewModel: ObservableObject {
         genreFilter = Set(UserDefaults.standard.array(forKey: Self.genreFilterKey) as? [Int] ?? [])
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
+        // The cards left last time, minus any since skipped or disliked; ones added to a list go once the lists sync
+        let saved = UserDefaults.standard.data(forKey: Self.deckKey)
+            .flatMap { try? JSONDecoder().decode([Movie].self, from: $0) } ?? []
+        deck = saved.filter { !passedIDs.contains($0.id) && !dislikedIDs.contains($0.id) }
+        shownIDs = Set(deck.map(\.id))
     }
 
     private static let seedsPerBatch = 6
@@ -267,6 +278,17 @@ class DiscoverViewModel: ObservableObject {
         }
     }
 
+    /// AI picks take a few seconds to start arriving, so the next batch is fetched while plenty of cards remain
+    private var refillThreshold: Int {
+        Personalization.useAI && aiAvailable ? 12 : 5
+    }
+
+    private func saveDeck() {
+        if let data = try? JSONEncoder().encode(Array(deck.prefix(Self.savedDeckLimit))) {
+            UserDefaults.standard.set(data, forKey: Self.deckKey)
+        }
+    }
+
     func showSkippedAgain() {
         usedSeeds = []
         resetAI()
@@ -324,6 +346,9 @@ class DiscoverViewModel: ObservableObject {
     }
 
     private func resetAI() {
+        loadGeneration += 1
+        // Any load still in flight belongs to the old deck and will be ignored
+        isLoading = false
         aiAvailable = true
         aiEmptyBatches = 0
         aiSuggestedTitles = []
@@ -352,7 +377,7 @@ class DiscoverViewModel: ObservableObject {
     }
 
     private func refillIfNeeded() {
-        if deck.count < Self.refillThreshold {
+        if deck.count < refillThreshold {
             loadMore()
         }
     }
@@ -402,15 +427,23 @@ class DiscoverViewModel: ObservableObject {
             exclude_ids: Array(dislikedIDs.union(passedIDs).union(shownIDs).prefix(5000)),
             count: 20
         )
-        APIService.shared.aiDiscoverMovies(request) { result in
+        let generation = loadGeneration
+        var freshCount = 0
+        // Films arrive one at a time and are dealt straight away, in the AI's order (it balances close
+        // matches with adventurous picks)
+        APIService.shared.aiDiscoverStream(request, onMovie: { movie in
+            guard generation == self.loadGeneration else { return }
+            self.aiSuggestedTitles.append(movie.title)
+            if self.isFresh(movie) {
+                freshCount += 1
+                self.deal([movie])
+            }
+        }) { result in
+            guard generation == self.loadGeneration else { return }
             self.isLoading = false
             switch result {
-            case .success(let movies):
-                self.aiSuggestedTitles.append(contentsOf: movies.map(\.title))
-                let fresh = movies.filter(self.isFresh)
-                // Keep the AI's order: it already balances close matches with adventurous picks
-                self.deal(fresh)
-                self.aiEmptyBatches = fresh.isEmpty ? self.aiEmptyBatches + 1 : 0
+            case .success:
+                self.aiEmptyBatches = freshCount == 0 ? self.aiEmptyBatches + 1 : 0
                 if self.aiEmptyBatches >= 2 {
                     self.aiAvailable = false
                 }
@@ -432,7 +465,8 @@ class DiscoverViewModel: ObservableObject {
             avoidGenres: profile.avoidedGenres.filter { !genreFilter.contains($0) },
             onlyGenres: chosen,
             page: page
-        ) { result in
+        ) { [generation = loadGeneration] result in
+            guard generation == self.loadGeneration else { return }
             self.isLoading = false
             switch result {
             case .success(let movies):
