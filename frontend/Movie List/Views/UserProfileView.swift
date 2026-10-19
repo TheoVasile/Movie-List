@@ -22,6 +22,7 @@ struct UserProfileView: View {
                     VStack(spacing: 24) {
                         profileHeader
                         stats
+                        statsLink
                         FollowingSection()
                             .appearAnimation(delay: 0.18)
                         listsSection
@@ -82,6 +83,36 @@ struct UserProfileView: View {
             statTile(value: topLanguage, label: "Top Language", icon: "globe")
         }
         .appearAnimation(delay: 0.14)
+    }
+
+    private var statsLink: some View {
+        NavigationLink {
+            StatsView()
+                .environment(\.managedObjectContext, context)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.bar.xaxis")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your Stats")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Decades, genres, languages and your most underrated pick")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .cardStyle(cornerRadius: 18)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .appearAnimation(delay: 0.16)
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {

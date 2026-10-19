@@ -11,6 +11,7 @@ import FirebaseAuth
 import GoogleSignIn
 import GoogleSignInSwift
 import CoreData
+import WidgetKit
 
 enum AuthenticationState {
   case unauthenticated
@@ -128,6 +129,10 @@ extension AuthenticationViewModel {
     func signOut() {
     do {
         PersistenceController.shared.deleteAllCoreDataObjects()
+        SyncStatus.shared.reset()
+        // The next person to sign in shouldn't see this account's films on the Home Screen
+        WidgetSnapshot.remove()
+        WidgetCenter.shared.reloadAllTimelines()
       try Auth.auth().signOut()
     }
     catch {
