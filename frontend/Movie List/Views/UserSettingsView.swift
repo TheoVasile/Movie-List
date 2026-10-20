@@ -28,6 +28,10 @@ struct UserSettingsView : View {
     @State private var phoneNumber = ""
     @State private var notifyActivity = true
     @AppStorage(NotificationManager.suggestionsKey) private var notifySuggestions = true
+    // Streaming alerts and how many services the user has picked for them, as last loaded from the server
+    @State private var notifyStreaming = true
+    @State private var savedNotifyStreaming = true
+    @State private var streamingServiceCount: Int? = nil
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -181,13 +185,35 @@ struct UserSettingsView : View {
                         }
                         .tint(Theme.accent)
                         .onChange(of: notifySuggestions) { _ in notifications.scheduleSuggestions() }
+                        Toggle(isOn: $notifyStreaming) {
+                            Label("Now Streaming", systemImage: "play.tv")
+                        }
+                        .tint(Theme.accent)
+                        .onChange(of: notifyStreaming) { wanted in
+                            guard wanted != savedNotifyStreaming else { return }
+                            APIService.shared.saveStreamingPreferences(notify: wanted) { result in
+                                if case .success(let saved) = result { savedNotifyStreaming = saved.notify } else { notifyStreaming = !wanted }
+                            }
+                        }
+                        NavigationLink {
+                            StreamingServicesView { count in streamingServiceCount = count }
+                        } label: {
+                            HStack {
+                                Label("My Streaming Services", systemImage: "tv")
+                                Spacer()
+                                if let streamingServiceCount {
+                                    Text(streamingServiceCount == 0 ? "None" : "\(streamingServiceCount)")
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                            }
+                        }
                     }
                 } header: {
                     Text("Notifications")
                 } footer: {
                     Text(notifications.authorization == .denied
                          ? "Notifications for CineList are turned off in your iPhone's Settings."
-                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings.")
+                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings. Now Streaming: when a film on your watchlist starts streaming on one of your services, or comes out.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -247,6 +273,12 @@ struct UserSettingsView : View {
                 name = savedName
                 notifyRequests = social.profile?.notify_requests ?? true
                 notifyActivity = social.profile?.notify_activity ?? true
+                APIService.shared.fetchStreamingPreferences { result in
+                    guard case .success(let saved) = result else { return }
+                    savedNotifyStreaming = saved.notify
+                    notifyStreaming = saved.notify
+                    streamingServiceCount = saved.services.count
+                }
                 notifications.refreshAuthorization()
             }
             .navigationTitle("Settings")

@@ -147,6 +147,13 @@ struct MovieNightFilters: Equatable {
 }
 
 /// A streaming service the user can filter recommendations by
+/// Which services the user has, in which country, and whether they want to hear when watchlist films arrive on them
+struct StreamingPreferences: Decodable {
+    let region: String?
+    let services: [Int]
+    let notify: Bool
+}
+
 struct StreamingService: Codable, Hashable, Identifiable {
     let id: Int
     let name: String
@@ -534,6 +541,20 @@ class APIService {
     }
 
     /// Streaming services in the user's country, most popular first
+    /// The user's streaming services and country, and whether they want "now streaming" alerts
+    func fetchStreamingPreferences(completion: @escaping (Result<StreamingPreferences, Error>) -> Void) {
+        sendJSON("GET", "/users/me/streaming", completion: completion)
+    }
+
+    /// Saves any of them; nil leaves that one as it is. Calls back with what was saved
+    func saveStreamingPreferences(services: [Int]? = nil, notify: Bool? = nil, completion: @escaping (Result<StreamingPreferences, Error>) -> Void) {
+        // The country always goes along, so alerts follow the user when they move
+        var body: [String: Any] = ["region": Locale.current.region?.identifier ?? "US"]
+        if let services { body["services"] = services }
+        if let notify { body["notify"] = notify }
+        sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
+    }
+
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
     }

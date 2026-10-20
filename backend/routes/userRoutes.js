@@ -1,5 +1,7 @@
 const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup } = require("../models/groupModel");
+const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
+const { availableServices } = require("../services/filmFilters");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
@@ -188,6 +190,43 @@ router.put("/me/notifications", async (req, res) => {
         res.json({ requests, activity });
     } catch (error) {
         console.error("Error saving notification settings:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The user's streaming services, their country, and whether they want "now streaming" alerts
+router.get("/me/streaming", async (req, res) => {
+    try {
+        res.json(await streamingPreferences(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching streaming settings:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Saves them, e.g. { "region": "CA", "services": [8, 337], "notify": true }. Any can be left out. Services have
+// to be ones offered in that country
+router.put("/me/streaming", async (req, res) => {
+    const { notify } = req.body ?? {};
+    const region = req.body?.region === undefined ? undefined : String(req.body.region).toUpperCase();
+    if (region !== undefined && !/^[A-Z]{2}$/.test(region)) {
+        return res.status(400).json({ error: "region must be a two-letter country code." });
+    }
+    if (notify !== undefined && typeof notify !== "boolean") {
+        return res.status(400).json({ error: "notify must be true or false." });
+    }
+    try {
+        let services;
+        if (req.body?.services !== undefined) {
+            if (!Array.isArray(req.body.services)) return res.status(400).json({ error: "services must be a list of ids." });
+            const current = await streamingPreferences(req.user.uid);
+            const offered = new Set((await availableServices(region ?? current?.region ?? "US")).map((s) => s.id));
+            services = [...new Set(req.body.services.map(Number))].filter((id) => offered.has(id)).slice(0, 20);
+        }
+        await setStreamingPreferences(req.user.uid, { region, services, notify });
+        res.json(await streamingPreferences(req.user.uid));
+    } catch (error) {
+        console.error("Error saving streaming settings:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

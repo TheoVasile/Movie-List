@@ -43,6 +43,12 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;
             -- When the user last got the daily friends digest, so they never get two in a day
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
+            -- Streaming alerts: the user's country and services (TMDb provider ids), whether they want the alerts,
+            -- and when they were last sent one
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS streaming_region VARCHAR(2);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS streaming_services INT[] NOT NULL DEFAULT '{}';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_streaming BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS last_streaming_alert_at TIMESTAMP;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (
@@ -55,6 +61,24 @@ const createTables = async () => {
                 group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
                 PRIMARY KEY (group_id, user_id)
+            );
+
+            -- Which services each film streams on in each country, as of the last daily check, so streaming alerts
+            -- only go out for changes
+            CREATE TABLE IF NOT EXISTS film_availability (
+                tmdb_id INT NOT NULL,
+                region VARCHAR(2) NOT NULL,
+                providers INT[] NOT NULL DEFAULT '{}',
+                checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (tmdb_id, region)
+            );
+            -- Streaming alerts already sent, so a film that leaves a service and comes back isn't announced twice
+            CREATE TABLE IF NOT EXISTS streaming_alerts_sent (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                provider_id INT NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, tmdb_id, provider_id)
             );
 
             -- Lists people follow to hear about updates in their daily digest
