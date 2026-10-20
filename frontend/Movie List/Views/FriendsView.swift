@@ -755,7 +755,7 @@ struct FriendProfileView: View {
         .navigationTitle("@\(person.handle)")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMovieNight) {
-            MovieNightView(person: person, canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))
+            MovieNightView(people: [person], canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))
         }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }

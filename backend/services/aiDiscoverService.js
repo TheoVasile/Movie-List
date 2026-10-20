@@ -209,23 +209,35 @@ async function recommendFilms(user_id, lists, signals, count, onPick = () => {})
     return picks;
 }
 
-const MOVIE_NIGHT_PROMPT = `You pick films for two friends to watch together on a movie night, using their film-ranking lists (films in rank order, best first, where ✓ marks films they've watched).
+const MOVIE_NIGHT_PROMPT = `You pick films for a group of friends to watch together on a movie night, using each person's film-ranking lists (films in rank order, best first, where ✓ marks films they've watched).
 
-Find films both of them are likely to enjoy: look for overlaps in their tastes (directors, eras, countries, tone, themes, genres) and weigh highly ranked films most. Where their tastes differ, pick films that bridge them rather than ones only one of them would like.
+Find films everyone is likely to enjoy: look for overlaps in their tastes (directors, eras, countries, tone, themes, genres) and weigh highly ranked films most. Where tastes differ, pick films that bridge them rather than ones only one person would like.
 
-Recommend real, released feature films. Never recommend a film that's in either person's lists, so it's new to both of them. Always return the full number of films asked for, and mix safe crowd-pleasers with a few bolder picks.
+Recommend real, released feature films. Never recommend a film that's in anyone's lists, so it's new to all of them. Always return the full number of films asked for, and mix safe crowd-pleasers with a few bolder picks. Follow any limits on genre, language or streaming service exactly.
 
-For each film give its exact original release title as listed on TMDb, its release year, and one short sentence (under 25 words) on why it suits both of them, naming something each of them ranks when you can.`;
+For each film give its exact original release title as listed on TMDb, its release year, and one short sentence (under 25 words) on why it suits the group, naming films from two or more people's lists when you can.`;
 
-// Each person's lists are cut to this many films, so a movie night costs about half a cent
-const MOVIE_NIGHT_FILMS_EACH = 2000;
+// Everyone's lists together are cut to about this many films, so a movie night stays around half a cent
+const MOVIE_NIGHT_TOTAL_FILMS = 4000;
 
-/// Asks Claude for films two friends would both enjoy and neither has in their lists.
-/// Returns [{ title, year, reason }]. Counts against the asking user's daily limit
-async function recommendForTwo(user_id, myLists, friendLists, friendName, count) {
+/// Asks Claude for films a group would all enjoy and none of them has in their lists. people is
+/// [{ name, lists }], the first being the user ("you"). constraints may limit genres, languages and streaming
+/// services. Returns [{ title, year, reason }]. Counts against the user's daily limit
+async function recommendForGroup(user_id, people, count, constraints = {}) {
     const anthropic = getClient();
     takeDailyRequest(user_id);
 
+    const each = Math.floor(MOVIE_NIGHT_TOTAL_FILMS / people.length);
+    const limits = [];
+    if (constraints.genres?.length) limits.push(`Every film must be one of these genres: ${constraints.genres.join(", ")}.`);
+    if (constraints.languages?.length) {
+        const names = constraints.languages.map((code) => new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code);
+        limits.push(`Every film must be originally in ${names.join(" or ")}.`);
+    }
+    if (constraints.services?.length) {
+        limits.push(`Every film must be streaming now on ${constraints.services.join(" or ")}${constraints.region ? ` in ${constraints.region}` : ""}.`);
+    }
+    const names = people.slice(1).map((p) => p.name);
     const response = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 4000,
@@ -237,15 +249,17 @@ async function recommendForTwo(user_id, myLists, friendLists, friendName, count)
         messages: [{
             role: "user",
             content: [
-                { type: "text", text: describeLists(myLists, "The first person (\"you\")", MOVIE_NIGHT_FILMS_EACH) },
-                { type: "text", text: describeLists(friendLists, `Their friend ${friendName}`, MOVIE_NIGHT_FILMS_EACH) },
-                { type: "text", text: `Recommend ${count} films for the two of them to watch together. In each reason, call the first person "you" and the friend ${friendName}.` },
+                ...people.map((person, i) => ({
+                    type: "text",
+                    text: describeLists(person.lists, i === 0 ? "The person asking (\"you\")" : person.name, each),
+                })),
+                { type: "text", text: `${limits.join(" ")}${limits.length ? "\n\n" : ""}Recommend ${count} films for all ${people.length} of them (you and ${names.join(", ")}) to watch together. In each reason, call the person asking "you" and everyone else by name.` },
             ],
         }],
     });
 
     const { usage: tokens } = response;
-    console.log(`AI movie night: ${tokens.input_tokens} input, ${tokens.output_tokens} output tokens`);
+    console.log(`AI movie night (${people.length} people): ${tokens.input_tokens} input, ${tokens.output_tokens} output tokens`);
     if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") {
         throw new Error(`Movie night recommendations stopped early (${response.stop_reason})`);
     }
@@ -299,4 +313,4 @@ async function placeInList(user_id, listName, films, newFilm) {
     return { rank: Math.min(Math.max(Math.round(Number(rank) || films.length + 1), 1), films.length + 1), reason: String(reason ?? "").slice(0, 200) };
 }
 
-module.exports = { recommendFilms, recommendForTwo, placeInList, AIUnavailableError, AILimitError };
+module.exports = { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILimitError };

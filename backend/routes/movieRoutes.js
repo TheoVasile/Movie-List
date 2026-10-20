@@ -7,7 +7,8 @@ const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
-const { recommendFilms, recommendForTwo, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = require("../models/groupModel");
 const pool = require("../config/db");
 const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
 
@@ -249,31 +250,49 @@ const MOVIE_NIGHT_SEEDS = 6;
 const MOVIE_NIGHT_PER_SEED = 2;
 const MOVIE_NIGHT_MIN_VOTES = 100;
 
-/// Movie night picks without AI: films on both people's watchlists first, then films TMDb recommends from
-/// both people's favourites, preferring ones recommended from each side, each with a reason naming the
-/// favourites it came from. Returns [{ ...discover movie, reason }]
-async function classicMovieNight(user_id, friend, friendName, count) {
-    const [mySeeds, friendSeeds, myIds, friendIds, myWatchlist, friendWatchlist] = await Promise.all([
-        fetchTopFilms(user_id, MOVIE_NIGHT_SEEDS),
-        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS, true),
-        fetchListedTmdbIds(user_id),
-        fetchListedTmdbIds(friend.firebase_uid),
-        fetchUnwatchedWatchlist(user_id),
-        fetchUnwatchedWatchlist(friend.firebase_uid, true),
-    ]);
+/// Movie night picks without AI, for the user and everyone else coming: films on several people's watchlists
+/// first, then films TMDb recommends from everyone's favourites, preferring films recommended from more people's
+/// favourites. Each favourite leads to at most a couple of picks. people is [{ firebase_uid, name, me }].
+/// filters (languages, services) and genres narrow the picks. Returns [{ ...discover movie, reason }]
+async function classicMovieNight(people, count, filters, genres) {
+    // Fewer favourites each as the group grows, so the number of TMDb requests stays about the same
+    const seedsEach = Math.max(2, Math.floor(12 / people.length));
+    const data = await Promise.all(people.map(async (person) => {
+        const [seeds, listed, watchlist] = await Promise.all([
+            fetchTopFilms(person.firebase_uid, seedsEach, !person.me),
+            fetchListedTmdbIds(person.firebase_uid),
+            fetchUnwatchedWatchlist(person.firebase_uid, !person.me),
+        ]);
+        return { ...person, seeds, listed, watchlist };
+    }));
+    const listedByAnyone = new Set(data.flatMap((person) => [...person.listed]));
+    const possessive = (person) => (person.me ? "your" : `${person.name}'s`);
+    const wantedGenres = new Set(genres);
+    const fits = async (movie) => (!wantedGenres.size || movie.genre_ids.some((id) => wantedGenres.has(id)))
+        && (!hasFilters(filters) || await matchesFilters(movie, filters));
 
-    // Films you both want to watch
-    const shared = [...myWatchlist.keys()].filter((id) => friendWatchlist.has(id)).slice(0, 3).map((id) => {
-        const row = myWatchlist.get(id);
-        return {
-            ...toDiscoverMovie({ ...row, id, release_date: String(row.release_date ?? "").slice(0, 10), poster_path: row.poster_path || null }),
-            reason: `On both your watchlists, and neither of you has seen it yet`,
-        };
-    }).filter((movie) => movie.id);
+    // Films two or more of you want to watch and haven't seen
+    const onWatchlists = new Map();
+    for (const person of data) {
+        for (const [id, row] of person.watchlist) {
+            const entry = onWatchlists.get(id) ?? { row, count: 0 };
+            entry.count++;
+            onWatchlists.set(id, entry);
+        }
+    }
+    const shared = [];
+    for (const [id, { row, count: wanted }] of [...onWatchlists].filter(([, e]) => e.count >= 2).sort((a, b) => b[1].count - a[1].count)) {
+        const movie = toDiscoverMovie({ ...row, id, release_date: String(row.release_date ?? "").slice(0, 10), poster_path: row.poster_path || null });
+        if (!movie || !(await fits(movie))) continue;
+        shared.push({ ...movie, reason: wanted === people.length
+            ? (people.length === 2 ? "On both your watchlists, and neither of you has seen it yet" : "On all your watchlists, and none of you has seen it yet")
+            : `On ${wanted} of your watchlists` });
+        if (shared.length >= 3) break;
+    }
 
-    // Which of each person's favourites TMDb recommends each film from
+    // Which people's favourites TMDb recommends each film from
     const params = { api_key: process.env.API_KEY, language: "en-US", page: 1 };
-    const seeds = [...mySeeds.map((seed) => ({ ...seed, mine: true })), ...friendSeeds.map((seed) => ({ ...seed, mine: false }))];
+    const seeds = data.flatMap((person, index) => person.seeds.map((seed) => ({ ...seed, person: index })));
     const outcomes = await Promise.allSettled(
         seeds.map((seed) => axios.get(`https://api.themoviedb.org/3/movie/${seed.tmdb_id}/recommendations`, { params, timeout: 15000 }))
     );
@@ -282,91 +301,110 @@ async function classicMovieNight(user_id, friend, friendName, count) {
         if (outcome.status !== "fulfilled") return;
         for (const result of outcome.value.data.results ?? []) {
             const movie = toDiscoverMovie(result);
-            if (!movie || (result.vote_count ?? 0) < MOVIE_NIGHT_MIN_VOTES || myIds.has(movie.id) || friendIds.has(movie.id)) continue;
-            const entry = candidates.get(movie.id) ?? { movie, mine: [], theirs: [] };
-            (seeds[i].mine ? entry.mine : entry.theirs).push(seeds[i].title);
+            if (!movie || (result.vote_count ?? 0) < MOVIE_NIGHT_MIN_VOTES || listedByAnyone.has(movie.id)) continue;
+            const entry = candidates.get(movie.id) ?? { movie, from: new Map() };
+            if (!entry.from.has(seeds[i].person)) entry.from.set(seeds[i].person, seeds[i].title);
             candidates.set(movie.id, entry);
         }
     });
+    const ranked = [...candidates.values()].sort((a, b) =>
+        (b.from.size - a.from.size) || (b.movie.vote_average - a.movie.vote_average));
 
-    const score = (entry) => (entry.mine.length && entry.theirs.length ? 100 : 0) + (entry.mine.length + entry.theirs.length) * 10 + entry.movie.vote_average;
-    const ranked = [...candidates.values()].sort((a, b) => score(b) - score(a));
-    // Too few films come from both sides, so the rest alternate between each person's favourites
-    const both = ranked.filter((entry) => entry.mine.length && entry.theirs.length);
-    const mineOnly = ranked.filter((entry) => !entry.theirs.length);
-    const theirsOnly = ranked.filter((entry) => !entry.mine.length);
-    const ordered = [...both];
-    for (let i = 0; i < Math.max(mineOnly.length, theirsOnly.length); i++) {
-        if (theirsOnly[i]) ordered.push(theirsOnly[i]);
-        if (mineOnly[i]) ordered.push(mineOnly[i]);
-    }
-
-    const reasonFor = (entry) => entry.mine.length && entry.theirs.length
-        ? `Recommended from your ${entry.mine[0]} and ${friendName}'s ${entry.theirs[0]}`
-        : entry.mine.length
-            ? `For fans of ${entry.mine[0]}, one of your favourites`
-            : `For fans of ${entry.theirs[0]}, one of ${friendName}'s favourites`;
-    // Each favourite leads to at most a couple of picks, so the list covers more of both people's tastes
+    const reasonFor = (entry) => {
+        const sources = [...entry.from].slice(0, 3).map(([index, title]) => `${possessive(data[index])} ${title}`);
+        if (sources.length === 1) {
+            const [index, title] = [...entry.from][0];
+            return data[index].me ? `For fans of ${title}, one of your favourites` : `For fans of ${title}, one of ${data[index].name}'s favourites`;
+        }
+        return `Recommended from ${sources.slice(0, -1).join(", ")} and ${sources[sources.length - 1]}`;
+    };
     const perSeed = new Map();
     const picks = [];
-    for (const entry of ordered) {
-        const sources = [...entry.mine.slice(0, 1), ...entry.theirs.slice(0, 1)];
-        if (sources.some((title) => (perSeed.get(title) ?? 0) >= MOVIE_NIGHT_PER_SEED)) continue;
-        sources.forEach((title) => perSeed.set(title, (perSeed.get(title) ?? 0) + 1));
+    for (const entry of ranked) {
+        if (picks.length >= count * 2) break;
+        const titles = [...entry.from.values()];
+        if (titles.some((title) => (perSeed.get(title) ?? 0) >= MOVIE_NIGHT_PER_SEED)) continue;
+        if (!(await fits(entry.movie))) continue;
+        titles.forEach((title) => perSeed.set(title, (perSeed.get(title) ?? 0) + 1));
         picks.push({ ...entry.movie, reason: reasonFor(entry) });
     }
     const seen = new Set();
     return [...shared, ...picks].filter((movie) => !seen.has(movie.id) && seen.add(movie.id)).slice(0, count);
 }
 
-// Films the signed-in user and a friend they follow would both enjoy, e.g. { "handle": "sam", "count": 10,
-// "mode": "ai" } -> [{ ...discover movie, reason }]. "ai" (the default) asks Claude and needs both people to allow
-// AI; "classic" uses TMDb's recommendations from both people's favourites and needs nothing more than following
+// Films the user and the people coming would all enjoy. Either a saved group ({ "group_id": 3 }) or people
+// the user follows ({ "handles": ["sam", "ana"] }, or the older { "handle": "sam" }), with optional
+// { "mode": "classic", "languages", "providers", "provider_names", "region", "genres": [ids], "genre_names" }.
+// "ai" (the default) asks Claude and needs everyone, the user included, to allow AI; "classic" uses TMDb
 router.post("/movie-night", async (req, res) => {
     try {
-        const handle = cleanText(req.body?.handle, 40).replace(/^@/, "").toLowerCase();
-        if (!handle) {
-            return res.status(400).json({ error: "A friend's @username is required." });
+        const body = req.body ?? {};
+        const count = Math.min(Math.max(parseInt(body.count, 10) || 10, 1), 15);
+        const filters = parseFilters(body);
+        const genres = parseIds(Array.isArray(body.genres) ? body.genres.join(",") : "", 20);
+
+        // Who's coming, besides the user
+        let others;
+        const me = (await pool.query("SELECT firebase_uid, username AS name, ai_allowed FROM users WHERE firebase_uid = $1", [req.user.uid])).rows[0];
+        if (!me) return res.status(404).json({ error: "Account not found." });
+        if (Number.isInteger(body.group_id)) {
+            const everyone = await groupParticipants(req.user.uid, body.group_id);
+            if (!everyone) return res.status(404).json({ error: "Group not found." });
+            others = everyone.filter((person) => person.firebase_uid !== req.user.uid);
+        } else {
+            const handles = (Array.isArray(body.handles) ? body.handles : [body.handle])
+                .map((h) => cleanText(h, 40).replace(/^@/, "").toLowerCase()).filter(Boolean).slice(0, MAX_GROUP_MEMBERS);
+            if (!handles.length) return res.status(400).json({ error: "Pick who's coming." });
+            const followed = await followedByHandle(req.user.uid, handles);
+            if (followed.length < handles.length) {
+                return res.status(403).json({ error: "You can only plan a movie night with people you follow.", reason: "not_following" });
+            }
+            others = (await pool.query("SELECT firebase_uid, handle, username AS name, ai_allowed FROM users WHERE firebase_uid = ANY($1)", [followed.map((f) => f.firebase_uid)])).rows;
         }
-        const count = Math.min(Math.max(parseInt(req.body?.count, 10) || 10, 1), 15);
-        const friend = await fetchFriend(req.user.uid, handle);
-        if (!friend || friend.firebase_uid === req.user.uid) {
-            return res.status(404).json({ error: "User not found." });
+        if (!others.length) return res.status(400).json({ error: "Nobody else is in this group." });
+        const people = [{ ...me, me: true }, ...others.map((p) => ({ ...p, name: p.name || `@${p.handle}`, me: false }))];
+
+        if (body.mode === "classic") {
+            return res.json(await classicMovieNight(people, count, filters, genres));
         }
-        if (!friend.following) {
-            return res.status(403).json({ error: "Follow them to plan a movie night together.", reason: "not_following" });
+        // Everyone's lists go to the AI, so everyone has to have allowed it
+        if (!me.ai_allowed) {
+            return res.status(403).json({ error: "Turn on AI features in Settings to use AI Picks.", reason: "ai_off_self" });
         }
-        const friendName = friend.display_name || `@${friend.handle}`;
-        if (req.body?.mode === "classic") {
-            return res.json(await classicMovieNight(req.user.uid, friend, friendName, count));
-        }
-        // Both people's lists go to the AI, so both have to have allowed it
-        if (!friend.my_ai_allowed) {
-            return res.status(403).json({ error: "Turn on AI features in Settings to plan a movie night.", reason: "ai_off_self" });
-        }
-        if (!friend.ai_allowed) {
-            return res.status(403).json({ error: "They haven't turned on AI features.", reason: "ai_off_friend" });
+        const off = others.filter((p) => !p.ai_allowed);
+        if (off.length) {
+            return res.status(403).json({ error: `${off.map((p) => p.name).join(", ")} ${off.length === 1 ? "hasn't" : "haven't"} turned on AI features.`, reason: "ai_off_friend" });
         }
 
-        const [myLists, friendLists, myIds, friendIds] = await Promise.all([
-            fetchListsForTaste(req.user.uid),
-            fetchListsForTaste(friend.firebase_uid, true),
-            fetchListedTmdbIds(req.user.uid),
-            fetchListedTmdbIds(friend.firebase_uid),
-        ]);
-        // A few extra, since some picks turn out to be in someone's lists or can't be found
-        const picks = await recommendForTwo(req.user.uid, myLists, friendLists, friendName, count + 5);
+        const data = await Promise.all(people.map(async (person) => ({
+            ...person,
+            lists: await fetchListsForTaste(person.firebase_uid, !person.me),
+            listed: await fetchListedTmdbIds(person.firebase_uid),
+        })));
+        const listedByAnyone = new Set(data.flatMap((person) => [...person.listed]));
+        const constraints = {
+            genres: cleanStrings(body.genre_names, 20),
+            languages: filters.languages,
+            services: cleanStrings(body.provider_names, 20),
+            region: filters.region,
+        };
+        const wanted = new Set(genres);
+        // Extra picks, since some turn out to be in someone's lists, can't be found or don't fit the filters
+        const picks = await recommendForGroup(req.user.uid, data.map((p) => ({ name: p.me ? "you" : p.name, lists: p.lists })),
+            count + (hasFilters(filters) || wanted.size ? 12 : 5), constraints);
 
         const found = await mapWithConcurrency(picks, async (pick) => {
             try {
                 const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
-                return movie && { ...movie, reason: cleanText(pick.reason, 200) };
+                if (!movie || (wanted.size && !movie.genre_ids.some((id) => wanted.has(id)))) return null;
+                if (hasFilters(filters) && !(await matchesFilters(movie, filters))) return null;
+                return { ...movie, reason: cleanText(pick.reason, 200) };
             } catch (error) {
                 return null;
             }
         });
         const seen = new Set();
-        const fresh = found.filter((movie) => movie && !myIds.has(movie.id) && !friendIds.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
+        const fresh = found.filter((movie) => movie && !listedByAnyone.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
         res.json(fresh.slice(0, count));
     } catch (error) {
         if (error instanceof AIUnavailableError) {

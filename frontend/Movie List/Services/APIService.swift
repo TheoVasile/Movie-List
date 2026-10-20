@@ -128,6 +128,24 @@ struct AIDiscoverRequest: Encodable {
     var list_id: Int64? = nil
 }
 
+/// A movie night group: everyone in it besides the user, and whether all of them (the user included) allow AI
+struct MovieGroup: Decodable, Identifiable, Hashable {
+    let id: Int64
+    let name: String
+    let is_owner: Bool
+    let members: [UserSummary]
+    let ai_possible: Bool
+}
+
+/// What a movie night's picks are limited to
+struct MovieNightFilters: Equatable {
+    var genres: Set<Int> = []
+    var languages: [String] = []
+    var services: [StreamingService] = []
+
+    var isEmpty: Bool { genres.isEmpty && languages.isEmpty && services.isEmpty }
+}
+
 /// A streaming service the user can filter recommendations by
 struct StreamingService: Codable, Hashable, Identifiable {
     let id: Int
@@ -649,13 +667,28 @@ class APIService {
     /// Films the user and a friend they follow would both enjoy, picked by the AI, each with a reason.
     /// A failure's code is the HTTP status (403 not following or AI not allowed by one of them, 429 daily
     /// limit, 503 AI not set up), and its description is the server's explanation when there is one
-    /// usesAI false asks for Classic picks, from TMDb's recommendations for both people's favourites
-    func movieNight(with handle: String, usesAI: Bool, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// Films for a movie night with people the user follows (handles) or a saved group, optionally narrowed
+    /// to genres, languages and streaming services. usesAI false asks for Classic picks, from TMDb's
+    /// recommendations for everyone's favourites. A failure's code is the HTTP status (403 not following or AI
+    /// not allowed by someone, 429 daily limit, 503 AI not set up), and its description is the server's explanation
+    func movieNight(handles: [String], groupID: Int64? = nil, usesAI: Bool, filters: MovieNightFilters = MovieNightFilters(),
+                    completion: @escaping (Result<[Movie], Error>) -> Void) {
         var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle, "count": 10, "mode": usesAI ? "ai" : "classic"])
-        // Reading two people's lists takes the AI a little while
+        var body: [String: Any] = [
+            "count": 10,
+            "mode": usesAI ? "ai" : "classic",
+            "genres": filters.genres.sorted(),
+            "genre_names": filters.genres.sorted().compactMap { TasteProfile.genreNames[$0] },
+            "languages": filters.languages,
+            "providers": filters.services.map(\.id),
+            "provider_names": filters.services.map(\.name),
+            "region": Locale.current.region?.identifier ?? "US",
+        ]
+        if let groupID { body["group_id"] = groupID } else { body["handles"] = handles }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        // Reading several people's lists takes the AI a little while
         request.timeoutInterval = 90
         send(request) { data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -668,6 +701,30 @@ class APIService {
                                                    userInfo: message.map { [NSLocalizedDescriptionKey: $0] }))
             }
             DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    func fetchGroups(completion: @escaping (Result<[MovieGroup], Error>) -> Void) {
+        sendJSON("GET", "/users/me/groups", completion: completion)
+    }
+
+    private struct CreatedGroup: Decodable { let id: Int64 }
+
+    /// Makes a movie night group from people the user follows. Calls back with whether it worked
+    func createGroup(name: String, handles: [String], completion: @escaping (Bool) -> Void) {
+        sendJSON("POST", "/users/me/groups", body: ["name": name, "handles": handles]) { (result: Result<CreatedGroup, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
+    /// Deletes a group the user made, or leaves one they were added to
+    func leaveGroup(_ id: Int64, completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/me/groups/\(id)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        send(request) { _, response, _ in
+            let ok = (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { completion(ok) }
         }
     }
 

@@ -44,6 +44,19 @@ const createTables = async () => {
             -- When the user last got the daily friends digest, so they never get two in a day
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
 
+            -- Movie night groups, made by one user from people they follow
+            CREATE TABLE IF NOT EXISTS watch_groups (
+                id SERIAL PRIMARY KEY,
+                owner_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                name VARCHAR(60) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS watch_group_members (
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                PRIMARY KEY (group_id, user_id)
+            );
+
             -- Lists people follow to hear about updates in their daily digest
             CREATE TABLE IF NOT EXISTS list_follows (
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
