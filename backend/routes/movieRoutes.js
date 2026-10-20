@@ -433,8 +433,8 @@ router.post("/ai-discover", async (req, res) => {
         const body = req.body ?? {};
         // Hard filters: picks in other languages or not streaming on the chosen services are dropped
         const filters = parseFilters(body);
-        // Recommend from one list only, when the user picked one
-        const fromList = Number.isInteger(body.list_id) ? body.list_id : null;
+        // Recommend from some lists only, when the user picked them (list_id is from builds that allowed one)
+        const fromLists = (Array.isArray(body.list_ids) ? body.list_ids : [body.list_id]).filter(Number.isInteger).slice(0, 20);
         const signals = {
             liked: cleanFilms(body.liked, 500),
             passed: cleanFilms(body.passed, 500),
@@ -457,9 +457,9 @@ router.post("/ai-discover", async (req, res) => {
         const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
         const [allLists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
-        const chosenList = fromList !== null ? allLists.find((list) => list.id === fromList) : null;
-        const lists = chosenList ? [chosenList] : allLists;
-        if (chosenList) signals.basedOnList = chosenList.name;
+        const chosenLists = allLists.filter((list) => fromLists.includes(list.id));
+        const lists = chosenLists.length ? chosenLists : allLists;
+        if (chosenLists.length) signals.basedOnLists = chosenLists.map((list) => list.name);
         const streaming = req.accepts(["application/json", "application/x-ndjson"]) === "application/x-ndjson";
 
         // Each pick is looked up on TMDb as soon as Claude writes it, so lookups overlap with the rest of the

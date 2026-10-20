@@ -125,7 +125,7 @@ struct AIDiscoverRequest: Encodable {
     var languages: [String] = []
     var providers: [Int] = []
     var provider_names: [String] = []
-    var list_id: Int64? = nil
+    var list_ids: [Int64] = []
 }
 
 /// A movie night group: everyone in it besides the user, and whether all of them (the user included) allow AI
