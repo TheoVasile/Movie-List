@@ -121,6 +121,18 @@ struct AIDiscoverRequest: Encodable {
     let already_suggested: [String]
     let exclude_ids: [Int64]
     let count: Int
+    // Filters: original languages, streaming services (ids and names) in region, and one list to recommend from
+    var languages: [String] = []
+    var providers: [Int] = []
+    var provider_names: [String] = []
+    var list_id: Int64? = nil
+}
+
+/// A streaming service the user can filter recommendations by
+struct StreamingService: Codable, Hashable, Identifiable {
+    let id: Int
+    let name: String
+    let logo_path: String?
 }
 
 /// A streaming service, shop or free service, as TMDb names it
@@ -503,6 +515,11 @@ class APIService {
         sendJSON("GET", "/users/me/followed-lists", completion: completion)
     }
 
+    /// Streaming services in the user's country, most popular first
+    func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
+        sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
+    }
+
     func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {
         sendJSON("GET", "/users/me/requests", completion: completion)
     }
@@ -720,13 +737,16 @@ class APIService {
     }
     /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
     /// onlyGenres: the user picked these genres themselves, so every film returned has one of them
-    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
             URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "languages", value: languages.joined(separator: ",")),
+            URLQueryItem(name: "providers", value: providers.map(String.init).joined(separator: ",")),
+            URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US"),
         ] + (onlyGenres ? [URLQueryItem(name: "only_genres", value: "1")] : [])
         guard let url = components?.url else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))

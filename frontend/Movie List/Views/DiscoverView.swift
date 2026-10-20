@@ -35,6 +35,9 @@ struct DiscoverView: View {
     @State private var showGenrePicker = false
     // Genres ticked in the picker, applied when it closes with Done
     @State private var draftGenres: Set<Int> = []
+    @State private var draftFilters = DiscoverFilters()
+    // Streaming services in the user's country, loaded when the filters open
+    @State private var services: [StreamingService] = []
 
     private let swipeThreshold: CGFloat = 110
 
@@ -131,6 +134,7 @@ struct DiscoverView: View {
         }
         .onAppear(perform: syncWithLists)
         .onChange(of: listedIDs) { _ in syncWithLists() }
+        .onChange(of: viewModel.filters.listID) { _ in syncWithLists() }
     }
 }
 
@@ -249,6 +253,7 @@ private extension DiscoverView {
         Button {
             Haptics.tap()
             draftGenres = viewModel.genreFilter
+            draftFilters = viewModel.filters
             showGenrePicker = true
         } label: {
             HStack(spacing: 8) {
@@ -274,9 +279,18 @@ private extension DiscoverView {
     }
 
     var genreSummary: String {
+        var parts: [String] = []
+        if let list = viewModel.filters.listName { parts.append("From \(list)") }
         if !viewModel.genreFilter.isEmpty {
-            return "Only " + Self.genreName(viewModel.genreFilter.sorted { Self.genreName($0) < Self.genreName($1) })
+            parts.append(Self.genreName(viewModel.genreFilter.sorted { Self.genreName($0) < Self.genreName($1) }))
         }
+        if !viewModel.filters.languages.isEmpty {
+            parts.append(viewModel.filters.languages.map(DiscoverFilters.languageName).joined(separator: ", "))
+        }
+        if !viewModel.filters.services.isEmpty {
+            parts.append("On " + viewModel.filters.services.map(\.name).joined(separator: ", "))
+        }
+        if !parts.isEmpty { return parts.joined(separator: " · ") }
         return favoriteGenreNames.isEmpty ? "All genres" : "Tuned to \(favoriteGenreNames.joined(separator: ", "))"
     }
 
@@ -323,6 +337,62 @@ private extension DiscoverView {
                     }
                     .buttonStyle(PressableButtonStyle(scale: 0.97))
 
+                    filterSection("BASED ON") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                            filterChip("All My Lists", selected: draftFilters.listID == nil) {
+                                draftFilters.listID = nil
+                                draftFilters.listName = nil
+                            }
+                            ForEach(movieLists.filter { !$0.movies.isEmpty }, id: \.id) { list in
+                                filterChip(list.name ?? "List", selected: draftFilters.listID == list.id) {
+                                    draftFilters.listID = list.id
+                                    draftFilters.listName = list.name
+                                }
+                            }
+                        }
+                        Text("Pick one list to get recommendations like the films in it.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+
+                    filterSection("LANGUAGE") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+                            ForEach(DiscoverFilters.commonLanguages, id: \.self) { code in
+                                filterChip(DiscoverFilters.languageName(code), selected: draftFilters.languages.contains(code)) {
+                                    if let index = draftFilters.languages.firstIndex(of: code) {
+                                        draftFilters.languages.remove(at: index)
+                                    } else {
+                                        draftFilters.languages.append(code)
+                                    }
+                                }
+                            }
+                        }
+                        Text("Only films originally made in one of these languages. None picked means any language.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+
+                    filterSection("STREAMING ON") {
+                        if services.isEmpty {
+                            ProgressView()
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                                ForEach(services) { service in
+                                    filterChip(service.name, selected: draftFilters.services.contains(service)) {
+                                        if let index = draftFilters.services.firstIndex(of: service) {
+                                            draftFilters.services.remove(at: index)
+                                        } else {
+                                            draftFilters.services.append(service)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Text("Only films you can stream on one of these, free or with your subscription, in your country.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+
                     VStack(alignment: .leading, spacing: 10) {
                         Text("OR PICK GENRES")
                             .font(.caption2.weight(.heavy))
@@ -341,7 +411,13 @@ private extension DiscoverView {
                 .padding(20)
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("Genres")
+            .navigationTitle("Filters")
+            .onAppear {
+                guard services.isEmpty else { return }
+                APIService.shared.fetchStreamingServices { result in
+                    if case .success(let loaded) = result { services = loaded }
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -351,12 +427,48 @@ private extension DiscoverView {
                     Button("Done") {
                         Haptics.success()
                         showGenrePicker = false
-                        withAnimation(Theme.spring) { viewModel.setGenreFilter(draftGenres) }
+                        withAnimation(Theme.spring) {
+                            // The new list's films have to be in place before the deck starts over
+                            viewModel.update(listedIDs: listedIDs, seedPool: seedPool(for: draftFilters.listID))
+                            viewModel.setFilters(draftFilters)
+                            viewModel.setGenreFilter(draftGenres)
+                        }
                     }
                     .bold()
                 }
             }
         }
+    }
+
+    func filterSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.caption2.weight(.heavy))
+                .tracking(1.2)
+                .foregroundColor(Theme.textSecondary)
+            content()
+        }
+    }
+
+    func filterChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundColor(selected ? Theme.onAccent : Theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 8)
+                .background(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     func genreOption(_ genre: Int) -> some View {
@@ -430,7 +542,19 @@ private extension DiscoverView {
     }
 
     var actionButtons: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 18) {
+            // Brings back the last skipped or "not for me" card
+            circleButton(icon: "arrow.uturn.backward", size: 40, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
+                Haptics.tap()
+                withAnimation(Theme.spring) {
+                    viewModel.undo()
+                    dragOffset = .zero
+                    showDetails = false
+                }
+            }
+            .disabled(!viewModel.canUndo)
+            .opacity(viewModel.canUndo ? 1 : 0.35)
+            .accessibilityLabel("Undo")
             circleButton(icon: "hand.thumbsdown", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
                 notForMe()
             }
@@ -661,8 +785,14 @@ private extension DiscoverView {
     // Every film in every list, weighted by its rank within that list (#1 of n weighs n times the last),
     // so recommendations draw on the whole collection with favourites likelier
     var seedPool: [(id: Int64, weight: Double)] {
+        seedPool(for: viewModel.filters.listID)
+    }
+
+    // Every film in the lists Discover is based on, weighted by rank: just the chosen list, or all of them
+    func seedPool(for listID: Int64?) -> [(id: Int64, weight: Double)] {
         var weights: [Int64: Double] = [:]
-        for list in movieLists {
+        let lists = listID.map { id in movieLists.filter { $0.id == id } } ?? Array(movieLists)
+        for list in lists {
             let ranked = list.movies.sorted { $0.rank < $1.rank }
             for (index, movie) in ranked.enumerated() where movie.tmdb_id > 0 {
                 let weight = Double(ranked.count - index) / Double(ranked.count)

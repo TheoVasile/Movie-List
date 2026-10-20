@@ -77,6 +77,24 @@ enum Personalization {
     }
 }
 
+/// What Discover is limited to, beyond genres: films in some languages, streaming on some services, or
+/// recommended from one list only. Kept on this device
+struct DiscoverFilters: Codable, Equatable {
+    var languages: [String] = []
+    var services: [StreamingService] = []
+    var listID: Int64? = nil
+    var listName: String? = nil
+
+    var isEmpty: Bool { languages.isEmpty && services.isEmpty && listID == nil }
+
+    /// Languages people most often filter by, as TMDb's original-language codes
+    static let commonLanguages = ["en", "fr", "es", "it", "de", "ja", "ko", "zh", "hi", "pt", "sv", "da", "no", "ru", "fa", "tr", "pl", "th", "ta", "te"]
+
+    static func languageName(_ code: String) -> String {
+        Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased()
+    }
+}
+
 /// How the user responded to a Discover card
 enum DiscoverReaction {
     case liked
@@ -211,10 +229,15 @@ class DiscoverViewModel: ObservableObject {
     private var shownIDs: Set<Int64> = []
     // Genres the user chose to see; empty means automatic, tuned to their taste. Kept across launches
     @Published private(set) var genreFilter: Set<Int>
+    @Published private(set) var filters: DiscoverFilters
+    // Recent skips and "not for me"s, newest last, so they can be undone. Adding to a list isn't undone here
+    @Published private(set) var undoHistory: [(movie: Movie, reaction: DiscoverReaction, profile: TasteProfile)] = []
+    private static let undoLimit = 20
 
     private static let passedKey = "discover.passedMovieIDs"
     private static let dislikedKey = "discover.dislikedMovieIDs"
     private static let genreFilterKey = "discover.genreFilter"
+    private static let filtersKey = "discover.filters"
     private static let profileKey = "discover.tasteProfile"
     private static let maxPages = 30
     private static let deckKey = "discover.savedDeck"
@@ -227,6 +250,8 @@ class DiscoverViewModel: ObservableObject {
         passedIDs = Set(stored.map(Int64.init))
         dislikedIDs = Set((UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? []).map(Int64.init))
         genreFilter = Set(UserDefaults.standard.array(forKey: Self.genreFilterKey) as? [Int] ?? [])
+        filters = UserDefaults.standard.data(forKey: Self.filtersKey)
+            .flatMap { try? JSONDecoder().decode(DiscoverFilters.self, from: $0) } ?? DiscoverFilters()
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
         // The cards left last time, minus any since skipped or disliked; ones added to a list go once the lists sync
@@ -272,6 +297,7 @@ class DiscoverViewModel: ObservableObject {
     }
 
     func pass(_ movie: Movie) {
+        remember(movie, .skipped)
         deck.removeAll { $0.id == movie.id }
         passedIDs.insert(movie.id)
         UserDefaults.standard.set(passedIDs.map { Int($0) }, forKey: Self.passedKey)
@@ -280,6 +306,7 @@ class DiscoverViewModel: ObservableObject {
     }
 
     func dislike(_ movie: Movie) {
+        remember(movie, .disliked)
         deck.removeAll { $0.id == movie.id }
         dislikedIDs.insert(movie.id)
         UserDefaults.standard.set(dislikedIDs.map { Int($0) }, forKey: Self.dislikedKey)
@@ -292,6 +319,8 @@ class DiscoverViewModel: ObservableObject {
     /// Calls back with the lists it was added to and the new copy in each, in the order given; if every
     /// add fails, the card comes back on top
     func add(_ movie: Movie, to lists: [CDMovieList], context: NSManagedObjectContext, completion: @escaping ([(list: CDMovieList, movie: CDMovie)]) -> Void) {
+        // Undo goes back through skips; once a film is added, the swipes before it can't be undone past it
+        undoHistory = []
         deck.removeAll { $0.id == movie.id }
         listedIDs.insert(movie.id)
         learn(from: movie, .liked)
@@ -344,6 +373,38 @@ class DiscoverViewModel: ObservableObject {
         guard genres != genreFilter else { return }
         genreFilter = genres
         UserDefaults.standard.set(Array(genres), forKey: Self.genreFilterKey)
+        sourceChanged()
+    }
+
+    private func remember(_ movie: Movie, _ reaction: DiscoverReaction) {
+        undoHistory.append((movie, reaction, profile))
+        if undoHistory.count > Self.undoLimit { undoHistory.removeFirst() }
+    }
+
+    var canUndo: Bool { !undoHistory.isEmpty }
+
+    /// Brings back the last skipped or "not for me" card, on top, as if it was never swiped
+    func undo() {
+        guard let last = undoHistory.popLast() else { return }
+        passedIDs.remove(last.movie.id)
+        dislikedIDs.remove(last.movie.id)
+        UserDefaults.standard.set(passedIDs.map { Int($0) }, forKey: Self.passedKey)
+        UserDefaults.standard.set(dislikedIDs.map { Int($0) }, forKey: Self.dislikedKey)
+        profile = last.profile
+        if let data = try? JSONEncoder().encode(profile) {
+            UserDefaults.standard.set(data, forKey: Self.profileKey)
+        }
+        deck.removeAll { $0.id == last.movie.id }
+        deck.insert(last.movie, at: 0)
+    }
+
+    /// Limits Discover by language, streaming service or list (empty to show everything). Starts the deck over
+    func setFilters(_ newFilters: DiscoverFilters) {
+        guard newFilters != filters else { return }
+        filters = newFilters
+        if let data = try? JSONEncoder().encode(newFilters) {
+            UserDefaults.standard.set(data, forKey: Self.filtersKey)
+        }
         sourceChanged()
     }
 
@@ -433,8 +494,9 @@ class DiscoverViewModel: ObservableObject {
     private func isFresh(_ movie: Movie) -> Bool {
         !listedIDs.contains(movie.id) && !passedIDs.contains(movie.id) && !dislikedIDs.contains(movie.id) && !shownIDs.contains(movie.id)
             && !deck.contains { $0.id == movie.id }
-            // The server and the AI are asked for these genres too; this catches any that slip through
+            // The server and the AI are asked for these genres and languages too; this catches any that slip through
             && (genreFilter.isEmpty || !genreFilter.isDisjoint(with: movie.genre_ids ?? []))
+            && (filters.languages.isEmpty || filters.languages.contains(movie.original_language))
     }
 
     private func deal(_ movies: [Movie]) {
@@ -464,7 +526,11 @@ class DiscoverViewModel: ObservableObject {
             pronouns: Personalization.value(for: Personalization.pronounsKey),
             already_suggested: Array(aiSuggestedTitles.suffix(400)),
             exclude_ids: Array(dislikedIDs.union(passedIDs).union(shownIDs).prefix(5000)),
-            count: 20
+            count: 20,
+            languages: filters.languages,
+            providers: filters.services.map(\.id),
+            provider_names: filters.services.map(\.name),
+            list_id: filters.listID
         )
         let generation = loadGeneration
         var freshCount = 0
@@ -503,6 +569,8 @@ class DiscoverViewModel: ObservableObject {
             genres: chosen ? genreFilter.sorted() : profile.favoriteGenres,
             avoidGenres: profile.avoidedGenres.filter { !genreFilter.contains($0) },
             onlyGenres: chosen,
+            languages: filters.languages,
+            providers: filters.services.map(\.id),
             page: page
         ) { [generation = loadGeneration] result in
             guard generation == self.loadGeneration else { return }

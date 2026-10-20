@@ -18,7 +18,7 @@ async function fetchListsForTaste(user_id, sharedOnly = false) {
     const lists = new Map();
     for (const row of result.rows) {
         if (!lists.has(row.list_id)) {
-            lists.set(row.list_id, { name: row.list_name, films: [] });
+            lists.set(row.list_id, { id: row.list_id, name: row.list_name, films: [] });
         }
         lists.get(row.list_id).films.push({
             title: row.title,
