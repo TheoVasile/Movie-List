@@ -110,6 +110,9 @@ const createTables = async () => {
             -- When a film was added, for friends' activity. Films added before this was kept have none
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_at TIMESTAMP;
             ALTER TABLE list_movies ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP;
+            -- Placed by Smart Placement (Claude) rather than by the user. Cleared when the user approves the
+            -- spot or moves the film themselves
+            ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS ai_placed BOOLEAN NOT NULL DEFAULT false;
 
             -- Watched is per user, not per list: a film watched once shows as watched in every list
             CREATE TABLE IF NOT EXISTS watched_movies (

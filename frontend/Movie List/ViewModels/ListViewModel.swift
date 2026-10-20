@@ -107,6 +107,10 @@ class ListViewModel: ObservableObject {
     @Published var isRankingNewMovie = false
     // Genres to filter the list by; a film is shown only if it has all of them. Only changes what's shown
     @Published var selectedGenres: Set<Int> = []
+    // Shows only films placed by Smart Placement and not yet approved
+    @Published var showAIPlacedOnly = false
+    // Bumped when a film's AI mark changes, so rows showing it update
+    @Published private(set) var placementVersion = 0
     @Published private(set) var isLoadingGenres = false
     // Set once a movie's new rank is saved, so the list can scroll to where it landed
     @Published var movedMovieID: Int64? = nil
@@ -203,6 +207,11 @@ class ListViewModel: ObservableObject {
     func moveMovie(from source: IndexSet, to destination: Int) {
         guard let from = source.first else { return }
         let movie = movies[from]
+        // Dragging a film into place means the user chose its spot
+        if AIPlacement.isPlaced(listID: movieList.id, movieID: movie.id) {
+            AIPlacement.set(false, listID: movieList.id, movieID: movie.id)
+            placementVersion += 1
+        }
         // destination counts the moved row's old slot, so moving down lands one place earlier
         let newIndex = destination > from ? destination - 1 : destination
         guard newIndex != from else { return }
@@ -256,48 +265,90 @@ class ListViewModel: ObservableObject {
         }
     }
 
+    func isAIPlaced(_ movie: CDMovie) -> Bool {
+        _ = placementVersion
+        return AIPlacement.isPlaced(listID: movieList.id, movieID: movie.id)
+    }
+
+    var hasAIPlacedFilms: Bool {
+        movies.contains(where: isAIPlaced)
+    }
+
+    /// Asks Claude where the film belongs and moves it there. Calls back on the main thread with a message to
+    /// show: where it went, or why it couldn't
+    func smartPlace(_ movie: CDMovie, completion: @escaping (String) -> Void) {
+        APIService.shared.smartPlace(listID: movieList.id, movieID: movie.id) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let placement):
+                    AIPlacement.set(true, listID: self.movieList.id, movieID: movie.id)
+                    self.placementVersion += 1
+                    self.moveLocally(movie, to: placement.rank)
+                    completion("Claude placed it at #\(placement.rank)")
+                case .failure(let error):
+                    switch (error as NSError).code {
+                    case 403: completion("Allow AI features in Settings to use Smart Placement")
+                    case 429: completion("You've used today's AI requests. It's at the bottom for now")
+                    default: completion("Smart Placement didn't work. It's at the bottom for now")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Keeps a Smart Placement spot as if the user had chosen it
+    func approvePlacement(_ movie: CDMovie) {
+        AIPlacement.set(false, listID: movieList.id, movieID: movie.id)
+        placementVersion += 1
+        APIService.shared.approvePlacement(listID: movieList.id, movieID: movie.id) { approved in
+            if !approved {
+                AIPlacement.set(true, listID: self.movieList.id, movieID: movie.id)
+                self.placementVersion += 1
+            }
+        }
+    }
+
     func updateMovieRanking(updatedMovie: CDMovie, newRank: Int) {
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: updatedMovie.id, rank: newRank) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
                     print("updated db rankings")
-                    // Convert NSSet to sorted array
-                    var reordered = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
-
-                    // Remove the movie from the list
-                    reordered.removeAll { $0.id == updatedMovie.id }
-
-                    // Insert the movie at the new rank
-                    let insertIndex = min(max(newRank - 1, 0), reordered.count)
-                    reordered.insert(updatedMovie, at: insertIndex)
-
-                    // Reassign correct rankings for all movies, sliding rows into their new places
-                    withAnimation(Theme.spring) {
-                        self.movies = reordered
-                        for (index, movie) in self.movies.enumerated() {
-                            movie.rank = Int32(index + 1)
-                        }
+                    // Moving a film yourself means you chose its spot
+                    if AIPlacement.isPlaced(listID: self.movieList.id, movieID: updatedMovie.id) {
+                        AIPlacement.set(false, listID: self.movieList.id, movieID: updatedMovie.id)
+                        self.placementVersion += 1
                     }
-
-                    // Update movieList's relationship
-                    self.movieList.movies = Set(self.movies)
-                    self.movedMovieID = updatedMovie.id
-
-                    // Save changes to Core Data
-                    do {
-                        try self.context.save()
-                        print("Core Data rankings updated successfully")
-                    } catch {
-                        print("Error saving Core Data:", error)
-                    }
+                    self.moveLocally(updatedMovie, to: newRank)
                 case .failure(let error):
                     print("error updating movie rank:", error)
                 }
             }
         }
     }
-    
+
+    /// Puts a film at a rank on the phone after the server has moved it, renumbering the rest
+    private func moveLocally(_ updatedMovie: CDMovie, to newRank: Int) {
+        var reordered = Array(movieList.movies).sorted(by: { $0.rank < $1.rank })
+        reordered.removeAll { $0.id == updatedMovie.id }
+        reordered.insert(updatedMovie, at: min(max(newRank - 1, 0), reordered.count))
+
+        // Reassign correct rankings for all movies, sliding rows into their new places
+        withAnimation(Theme.spring) {
+            movies = reordered
+            for (index, movie) in movies.enumerated() {
+                movie.rank = Int32(index + 1)
+            }
+        }
+        movieList.movies = Set(movies)
+        movedMovieID = updatedMovie.id
+        do {
+            try context.save()
+        } catch {
+            print("Error saving Core Data:", error)
+        }
+    }
+
     func searchMovies() {
         if newMovieSearchText.isEmpty { return }
         let query = newMovieSearchText

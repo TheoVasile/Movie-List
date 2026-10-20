@@ -601,7 +601,11 @@ private extension DiscoverView {
             onCancel: {
                 endRanking()
                 showToast("Added to \(listName) at #\(movie.rank)")
-            }
+            },
+            onSmartPlace: Personalization.aiAllowed ? {
+                endRanking()
+                model.smartPlace(movie) { message in showToast("\(message) in \(listName)") }
+            } : nil
         ) { rankedMovie, rank in
             model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
             endRanking()
