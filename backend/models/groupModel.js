@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { openPollsFor } = require("./pollModel");
 
 // Movie night groups: a name and some people, made by one user from people they follow. Everyone in a group
 // can see it and plan a movie night for it
@@ -38,6 +39,7 @@ async function fetchGroups(user_id) {
          ORDER BY (u.firebase_uid = g.owner_id) DESC, u.username`,
         [user_id, groups.rows.map((g) => g.id)]
     );
+    const openPolls = await openPollsFor(user_id, groups.rows.map((g) => g.id));
     return groups.rows.map((group) => {
         const members = people.rows.filter((p) => p.group_id === group.id);
         return {
@@ -47,6 +49,9 @@ async function fetchGroups(user_id) {
             // Everyone else in the group, as the user sees them
             members: members.filter((p) => !p.is_me).map(({ handle, display_name, avatar_version, is_owner }) => ({ handle, display_name, avatar_version, is_owner, following: false })),
             ai_possible: members.every((p) => p.ai_allowed),
+            // Whether a vote is open, and whether the user still has films to vote on in it
+            poll_open: openPolls.has(group.id),
+            needs_my_vote: openPolls.get(group.id) === true,
         };
     });
 }

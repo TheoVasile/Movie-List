@@ -15,7 +15,8 @@ const app = express();
 app.use(express.json({ limit: "5mb" }));
 app.use(cors());
 
-createTables();
+// Then closes movie night votes on time, which needs their tables
+createTables().then(() => require("./models/pollModel").scheduleOpenPolls());
 
 // For the host's health checks, so it needs no sign-in
 app.get("/health", (req, res) => res.send("ok"));

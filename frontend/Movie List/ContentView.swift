@@ -101,6 +101,9 @@ struct ContentView: View {
             switch destination {
             case .profile:
                 tab = .profile
+            case .group(let id):
+                tab = .profile
+                notifications.openGroupID = id
             case .film(let tmdbID):
                 if let url = URL(string: "cinelist://film/\(tmdbID)") { openLink(url) }
             case nil:

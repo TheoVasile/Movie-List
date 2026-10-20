@@ -57,6 +57,34 @@ const createTables = async () => {
                 PRIMARY KEY (group_id, user_id)
             );
 
+            -- Movie night votes: films someone in a group sent for everyone to vote on, and the votes
+            CREATE TABLE IF NOT EXISTS group_polls (
+                id SERIAL PRIMARY KEY,
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                created_by VARCHAR(255) REFERENCES users(firebase_uid) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closes_at TIMESTAMP NOT NULL,
+                closed_at TIMESTAMP,
+                winner_tmdb_id INT
+            );
+            CREATE TABLE IF NOT EXISTS poll_options (
+                poll_id INT NOT NULL REFERENCES group_polls(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                poster_path VARCHAR(255),
+                release_date VARCHAR(20),
+                reason TEXT,
+                position INT NOT NULL,
+                PRIMARY KEY (poll_id, tmdb_id)
+            );
+            CREATE TABLE IF NOT EXISTS poll_votes (
+                poll_id INT NOT NULL REFERENCES group_polls(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                vote SMALLINT NOT NULL CHECK (vote IN (-1, 1)),
+                PRIMARY KEY (poll_id, tmdb_id, user_id)
+            );
+
             -- Lists people follow to hear about updates in their daily digest
             CREATE TABLE IF NOT EXISTS list_follows (
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,

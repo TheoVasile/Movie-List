@@ -135,6 +135,50 @@ struct MovieGroup: Decodable, Identifiable, Hashable {
     let is_owner: Bool
     let members: [UserSummary]
     let ai_possible: Bool
+    // Whether a vote is open, and whether the user still has films to vote on in it. Optional for older servers
+    let poll_open: Bool?
+    let needs_my_vote: Bool?
+}
+
+/// A movie night vote: 2 to 5 films someone in a group sent, with everyone's 👍 and 👎 so far
+struct GroupPoll: Decodable, Equatable {
+    let id: Int64
+    let created_by_name: String?
+    let started_by_me: Bool
+    let closes_at: String
+    let closed: Bool
+    let winner_tmdb_id: Int64?
+    // How many people have voted on at least one film, out of everyone in the group
+    let voters: Int
+    let people: Int
+    let options: [PollOption]
+
+    var winner: PollOption? { options.first { $0.tmdb_id == winner_tmdb_id } }
+
+    var closesAt: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: closes_at) ?? ISO8601DateFormatter().date(from: closes_at)
+    }
+}
+
+struct PollOption: Decodable, Identifiable, Equatable {
+    var id: Int64 { tmdb_id }
+    let tmdb_id: Int64
+    let title: String
+    let poster_path: String?
+    let release_date: String?
+    let reason: String?
+    let up: Int
+    let down: Int
+    // 1, -1, or 0 when the user hasn't voted on it
+    let my_vote: Int
+
+    /// As a Movie, for adding the winner to a list
+    var movie: Movie {
+        Movie(id: tmdb_id, title: title, release_date: release_date ?? "", overview: "", poster_path: poster_path,
+              original_language: "", popularity: 0, reason: reason)
+    }
 }
 
 /// What a movie night's picks are limited to
@@ -715,6 +759,37 @@ class APIService {
         sendJSON("POST", "/users/me/groups", body: ["name": name, "handles": handles]) { (result: Result<CreatedGroup, Error>) in
             completion((try? result.get()) != nil)
         }
+    }
+
+    /// Sends films for the group to vote on, closing after the given hours; calls back with the new poll
+    func startPoll(groupID: Int64, films: [Movie], hours: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
+        let body: [String: Any] = [
+            "hours": hours,
+            "films": films.map { film -> [String: Any] in
+                var item: [String: Any] = ["tmdb_id": film.id, "title": film.title, "release_date": film.release_date]
+                if let poster = film.poster_path { item["poster_path"] = poster }
+                if let reason = film.reason { item["reason"] = reason }
+                return item
+            },
+        ]
+        sendJSON("POST", "/users/me/groups/\(groupID)/polls", body: body, completion: completion)
+    }
+
+    /// The group's open vote, or the last one for a day after it closes; nil when there's none
+    func fetchPoll(groupID: Int64, completion: @escaping (Result<GroupPoll?, Error>) -> Void) {
+        sendJSON("GET", "/users/me/groups/\(groupID)/polls/current") { (result: Result<GroupPoll, Error>) in
+            switch result {
+            case .success(let poll): completion(.success(poll))
+            // 204: no vote right now
+            case .failure(let error) where (error as NSError).code == 204: completion(.success(nil))
+            case .failure(let error): completion(.failure(error))
+            }
+        }
+    }
+
+    /// Votes 👍 (1) or 👎 (-1) on a film, or takes the vote back (0); calls back with the poll as it is now
+    func vote(groupID: Int64, pollID: Int64, tmdbID: Int64, vote: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
+        sendJSON("PUT", "/users/me/groups/\(groupID)/polls/\(pollID)/votes", body: ["tmdb_id": tmdbID, "vote": vote], completion: completion)
     }
 
     /// Deletes a group the user made, or leaves one they were added to
