@@ -286,7 +286,7 @@ struct PersonRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(name: person.display_name)
+            Avatar(name: person.display_name, handle: person.handle, version: person.avatar_version)
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.display_name)
                     .font(.headline)
@@ -342,7 +342,7 @@ struct FollowRequestRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(name: person.display_name)
+            Avatar(name: person.display_name, handle: person.handle, version: person.avatar_version)
             VStack(alignment: .leading, spacing: 2) {
                 Text(person.display_name)
                     .font(.headline)
@@ -387,14 +387,69 @@ struct FollowRequestRow: View {
 struct Avatar: View {
     let name: String
     var size: CGFloat = 40
+    // Whose profile picture to show (nil for the signed-in user's own) and when it last changed; with no
+    // version there's no picture, so the first letter of their name is shown
+    var handle: String? = nil
+    var version: Double? = nil
+
+    @State private var image: UIImage? = nil
 
     var body: some View {
-        Text(String(name.first ?? "?").uppercased())
-            .font(.system(size: size * 0.45, weight: .bold, design: .rounded))
-            .foregroundColor(Theme.onAccent)
-            .frame(width: size, height: size)
-            .background(Theme.accentGradient)
-            .clipShape(Circle())
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(String(name.first ?? "?").uppercased())
+                    .font(.system(size: size * 0.45, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.onAccent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Theme.accentGradient)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .task(id: version) {
+            guard let version else {
+                image = nil
+                return
+            }
+            image = await AvatarStore.shared.image(handle: handle, version: version)
+        }
+    }
+}
+
+/// Profile pictures fetched this session, by person and version, so each is downloaded once
+final class AvatarStore {
+    static let shared = AvatarStore()
+    private let cache = NSCache<NSString, UIImage>()
+
+    @MainActor
+    func image(handle: String?, version: Double) async -> UIImage? {
+        let key = "\(handle ?? "me")-\(Int64(version))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+        let image = await withCheckedContinuation { continuation in
+            APIService.shared.fetchAvatar(handle: handle, version: version) { continuation.resume(returning: $0) }
+        }
+        if let image { cache.setObject(image, forKey: key) }
+        return image
+    }
+
+    /// Shrinks a photo to a 256-point square from its centre, as a JPEG small enough to upload
+    static func profileJPEG(from photo: UIImage) -> Data? {
+        let side = min(photo.size.width, photo.size.height)
+        guard side > 0 else { return nil }
+        let target = CGSize(width: 256, height: 256)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let squared = UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            let scale = target.width / side
+            let drawn = CGSize(width: photo.size.width * scale, height: photo.size.height * scale)
+            photo.draw(in: CGRect(x: (target.width - drawn.width) / 2, y: (target.height - drawn.height) / 2,
+                                  width: drawn.width, height: drawn.height))
+        }
+        return squared.jpegData(compressionQuality: 0.8)
     }
 }
 
@@ -469,7 +524,8 @@ struct FriendProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
-                    Avatar(name: person.display_name, size: 64)
+                    Avatar(name: person.display_name, size: 64, handle: person.handle,
+                           version: lists?.avatar_version ?? person.avatar_version)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(person.display_name)
                             .font(.title2.weight(.heavy))
@@ -657,7 +713,7 @@ struct FriendTakesSection: View {
                         .foregroundColor(Theme.textPrimary)
                     ForEach(takes) { take in
                         HStack(alignment: .top, spacing: 12) {
-                            Avatar(name: take.display_name, size: 34)
+                            Avatar(name: take.display_name, size: 34, handle: take.handle, version: take.avatar_version)
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
                                     Text(take.display_name)

@@ -7,12 +7,19 @@
 
 import Foundation
 import SwiftUI
+import PhotosUI
 
 struct UserProfileView: View {
     @Environment(\.managedObjectContext) var context
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
     @State var showSettings: Bool = false
+    // Changing the profile picture
+    @State private var showPhotoOptions = false
+    @State private var showPhotoPicker = false
+    @State private var pickedPhoto: PhotosPickerItem? = nil
+    @State private var uploadingPhoto = false
+    @State private var photoError: String? = nil
     @ObservedObject private var social = SocialStore.shared
     var body: some View {
         NavigationStack {
@@ -54,11 +61,51 @@ struct UserProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: 12) {
-            img
-                .padding(4)
-                .overlay(Circle().stroke(Theme.accentGradient, lineWidth: 3))
-                .shadow(color: Theme.accent.opacity(0.35), radius: 20)
-                .appearAnimation()
+            Button {
+                Haptics.tap()
+                if social.profile?.avatar_version != nil {
+                    showPhotoOptions = true
+                } else {
+                    showPhotoPicker = true
+                }
+            } label: {
+                img
+                    .padding(4)
+                    .overlay(Circle().stroke(Theme.accentGradient, lineWidth: 3))
+                    .shadow(color: Theme.accent.opacity(0.35), radius: 20)
+                    .overlay(alignment: .bottomTrailing) {
+                        Group {
+                            if uploadingPhoto {
+                                ProgressView().tint(Theme.onAccent)
+                            } else {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(Theme.onAccent)
+                            }
+                        }
+                        .frame(width: 30, height: 30)
+                        .background(Theme.accentGradient, in: Circle())
+                        .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+                    }
+            }
+            .buttonStyle(PressableButtonStyle(scale: 0.96))
+            .accessibilityLabel("Change profile picture")
+            .disabled(uploadingPhoto)
+            .appearAnimation()
+            .confirmationDialog("Profile Picture", isPresented: $showPhotoOptions) {
+                Button("Choose a New Photo") { showPhotoPicker = true }
+                Button("Remove Photo", role: .destructive, action: removePhoto)
+            }
+            .photosPicker(isPresented: $showPhotoPicker, selection: $pickedPhoto, matching: .images)
+            .onChange(of: pickedPhoto) { item in
+                guard let item else { return }
+                upload(item)
+            }
+            if let photoError {
+                Text(photoError)
+                    .font(.footnote)
+                    .foregroundColor(Theme.accentSecondary)
+            }
             VStack(spacing: 4) {
                 Text(viewModel.user?.displayName ?? "No Name")
                     .font(.title2.weight(.heavy))
@@ -228,9 +275,12 @@ struct UserProfileView: View {
         .cardStyle(cornerRadius: 16)
     }
     
+    // The picture the user chose here; otherwise their Google account's picture; otherwise a placeholder
     var img: some View {
         Group {
-            if let photoURL = viewModel.user?.photoURL {
+            if let version = social.profile?.avatar_version {
+                Avatar(name: viewModel.user?.displayName ?? "?", size: 96, handle: nil, version: version)
+            } else if let photoURL = viewModel.user?.photoURL {
                 AsyncImage(url: photoURL) { phase in
                     switch phase {
                     case .success(let image):
@@ -249,6 +299,41 @@ struct UserProfileView: View {
                 }
             } else {
                 placeholderImage
+            }
+        }
+    }
+
+    private func upload(_ item: PhotosPickerItem) {
+        uploadingPhoto = true
+        photoError = nil
+        Task {
+            defer {
+                uploadingPhoto = false
+                pickedPhoto = nil
+            }
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let photo = UIImage(data: data),
+                  let jpeg = AvatarStore.profileJPEG(from: photo) else {
+                photoError = "Couldn't open that photo."
+                return
+            }
+            let version = await withCheckedContinuation { continuation in
+                APIService.shared.uploadAvatar(jpeg) { continuation.resume(returning: $0) }
+            }
+            if version == nil {
+                photoError = "Couldn't upload your photo. Try again."
+            } else {
+                social.load()
+            }
+        }
+    }
+
+    private func removePhoto() {
+        APIService.shared.deleteAvatar { removed in
+            if removed {
+                social.load()
+            } else {
+                photoError = "Couldn't remove your photo. Try again."
             }
         }
     }
