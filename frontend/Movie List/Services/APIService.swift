@@ -77,6 +77,8 @@ struct MovieDetailsResponse: Codable {
     let watched: Bool?
     // The user's private note on the film; nil when they haven't written one
     let note: String?
+    // Placed by Smart Placement and not yet approved
+    let ai_placed: Bool?
 }
 
 struct ListDetailsResponse: Codable {
@@ -1011,6 +1013,25 @@ class APIService {
                 result = .failure(NSError(domain: "Note save failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    private struct Placement: Decodable { let rank: Int; let reason: String }
+
+    /// Smart Placement: Claude decides where a film already in the list belongs, and the server moves it there.
+    /// Calls back with the new rank and why, or an error whose code is the HTTP status
+    func smartPlace(listID: Int64, movieID: Int64, completion: @escaping (Result<(rank: Int, reason: String), Error>) -> Void) {
+        sendJSON("POST", "/movies/smart-place", body: ["list_id": listID, "movie_id": movieID]) { (result: Result<Placement, Error>) in
+            completion(result.map { ($0.rank, $0.reason) })
+        }
+    }
+
+    private struct Approved: Decodable { let approved: Bool }
+
+    /// Keeps a Smart Placement spot, clearing its AI mark
+    func approvePlacement(listID: Int64, movieID: Int64, completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/movies/approve-placement", body: ["list_id": listID, "movie_id": movieID]) { (result: Result<Approved, Error>) in
+            completion((try? result.get()) != nil)
         }
     }
 

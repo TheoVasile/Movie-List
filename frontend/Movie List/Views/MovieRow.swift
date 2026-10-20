@@ -14,6 +14,8 @@ struct MovieRow: View {
     @Binding var selectedMovie: CDMovie?
     @Binding var showSetRank: Bool
     var info: MovieInfo? = nil
+    // Placed by Claude rather than by hand, shown as a faint mark on the rank
+    var aiPlaced = false
     var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
     
@@ -24,6 +26,18 @@ struct MovieRow: View {
                 .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 3)
                 // Rank sits on the poster's top-left corner, overhanging it slightly
                 .overlay(alignment: .topLeading) { rankBadge.offset(x: -8, y: -8) }
+                .overlay(alignment: .bottomTrailing) {
+                    if aiPlaced {
+                        // A quiet reminder, not a badge: the spot was suggested, not chosen
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                            .padding(3)
+                            .background(Theme.surface.opacity(0.85), in: Circle())
+                            .offset(x: 4, y: 4)
+                            .accessibilityLabel("Placed by Claude")
+                    }
+                }
             VStack(alignment: .leading, spacing: 6) {
                 Text(movie.title ?? "No title")
                     .font(.headline)

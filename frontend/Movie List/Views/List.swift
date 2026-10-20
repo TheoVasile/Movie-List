@@ -45,11 +45,12 @@ struct ListView: View {
         viewModel.movies.filter { movie in
             (viewModel.searchText.isEmpty || (movie.title ?? "").localizedCaseInsensitiveContains(viewModel.searchText))
                 && viewModel.matchesGenreFilter(movie)
+                && (!viewModel.showAIPlacedOnly || viewModel.isAIPlaced(movie))
         }
     }
 
     var isFiltering: Bool {
-        !viewModel.searchText.isEmpty || !viewModel.selectedGenres.isEmpty
+        !viewModel.searchText.isEmpty || !viewModel.selectedGenres.isEmpty || viewModel.showAIPlacedOnly
     }
 
     var body: some View {
@@ -67,7 +68,11 @@ struct ListView: View {
                     movie: Binding.constant(selectedMovie),
                     prompt: viewModel.isRankingNewMovie ? "Where does \(selectedMovie.title ?? "it") rank?" : "Which do you prefer?",
                     cancelTitle: viewModel.isRankingNewMovie ? "Skip — keep it at the bottom" : "Cancel",
-                    onCancel: dismissCompare
+                    onCancel: dismissCompare,
+                    onSmartPlace: viewModel.isRankingNewMovie && Personalization.aiAllowed ? {
+                        dismissCompare()
+                        viewModel.smartPlace(selectedMovie) { showToast($0) }
+                    } : nil
                 ) { updatedMovie, rank in
                     dismissCompare()
                     viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
@@ -176,7 +181,8 @@ struct ListView: View {
                     onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
                     onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } },
                     onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) },
-                    onSaveNote: { note, done in viewModel.setNote(detailMovie, note, completion: done) }
+                    onSaveNote: { note, done in viewModel.setNote(detailMovie, note, completion: done) },
+                    onApprovePlacement: viewModel.isAIPlaced(detailMovie) ? { viewModel.approvePlacement(detailMovie) } : nil
                 )
             }
         }
@@ -242,7 +248,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), onAddToLists: { addingToLists = movie }) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), onAddToLists: { addingToLists = movie }) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())
@@ -420,6 +426,22 @@ private extension ListView {
     var genreFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // Only offered while some films were placed by Claude and not yet approved
+                if viewModel.hasAIPlacedFilms || viewModel.showAIPlacedOnly {
+                    Button {
+                        Haptics.tap()
+                        withAnimation(Theme.spring) { viewModel.showAIPlacedOnly.toggle() }
+                    } label: {
+                        Label("Placed by AI", systemImage: "sparkles")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(viewModel.showAIPlacedOnly ? Theme.onAccent : Theme.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(viewModel.showAIPlacedOnly ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.92))
+                }
                 if !viewModel.selectedGenres.isEmpty {
                     Button {
                         Haptics.tap()
@@ -571,7 +593,11 @@ private extension ListView {
             movie: .constant(movie),
             prompt: "Where does \(movie.title ?? "it") rank in \(listName)?",
             cancelTitle: "Skip — keep it at the bottom",
-            onCancel: { finishOtherListRanking(skipped: true) }
+            onCancel: { finishOtherListRanking(skipped: true) },
+            onSmartPlace: Personalization.aiAllowed ? {
+                model.smartPlace(movie) { message in showToast("\(message) in \(listName)") }
+                finishOtherListRanking(skipped: false)
+            } : nil
         ) { rankedMovie, rank in
             model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
             showToast("Ranked #\(rank) in \(listName)")

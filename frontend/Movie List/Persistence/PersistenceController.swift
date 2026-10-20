@@ -40,6 +40,7 @@ struct PersistenceController {
     /// over keeps any open list screen pointing at live objects
     func merge(_ responses: [ListDetailsResponse]) {
         let context = container.viewContext
+        AIPlacement.replaceAll(from: responses)
         let existing = (try? context.fetch(CDMovieList.fetchRequest())) ?? []
         var listsByID: [Int64: CDMovieList] = [:]
         for list in existing {

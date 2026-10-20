@@ -171,3 +171,36 @@ enum ListVisibility: String, CaseIterable, Identifiable {
         UserDefaults.standard.set(saved, forKey: storageKey)
     }
 }
+
+
+/// Which films in the user's lists were placed by Smart Placement and not yet approved, kept on the phone as
+/// "listID:movieID" (Core Data has no field for it) and refreshed from the server on every sync
+enum AIPlacement {
+    private static let storageKey = "aiPlacedFilms"
+
+    private static var saved: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: storageKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: storageKey) }
+    }
+
+    private static func key(_ listID: Int64, _ movieID: Int64) -> String { "\(listID):\(movieID)" }
+
+    static func isPlaced(listID: Int64, movieID: Int64) -> Bool {
+        saved.contains(key(listID, movieID))
+    }
+
+    static func set(_ placed: Bool, listID: Int64, movieID: Int64) {
+        if placed {
+            saved.insert(key(listID, movieID))
+        } else {
+            saved.remove(key(listID, movieID))
+        }
+    }
+
+    /// Replaces everything with what the server says, after a sync
+    static func replaceAll(from lists: [ListDetailsResponse]) {
+        saved = Set(lists.flatMap { list in
+            list.movies.filter { $0.ai_placed == true }.map { key(list.id, $0.id) }
+        })
+    }
+}

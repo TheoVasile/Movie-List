@@ -243,4 +243,50 @@ async function recommendForTwo(user_id, myLists, friendLists, friendName, count)
     return JSON.parse(text).recommendations ?? [];
 }
 
-module.exports = { recommendFilms, recommendForTwo, AIUnavailableError, AILimitError };
+const PLACEMENT_PROMPT = `You place a film in someone's ranked film list, best first, where they would most likely rank it themselves.
+
+Read the whole list to understand their taste and how strict they are: which directors, genres, eras and tones they rank high or low, and how films similar to the new one are placed. Then choose the position for the new film, where 1 means it becomes their favourite and one more than the list's length means it goes at the bottom.
+
+Give the position as an integer and one short sentence (under 15 words) naming the films it falls between or the pattern you used.`;
+
+const PLACEMENT_SCHEMA = {
+    type: "object",
+    properties: {
+        rank: { type: "integer" },
+        reason: { type: "string" },
+    },
+    required: ["rank", "reason"],
+    additionalProperties: false,
+};
+
+/// Asks Claude where a film belongs in one of the user's ranked lists. films is the list in rank order (without
+/// the new film), as { title, year }. Returns { rank, reason } with rank clamped to 1...films.length + 1
+async function placeInList(user_id, listName, films, newFilm) {
+    const anthropic = getClient();
+    takeDailyRequest(user_id);
+
+    const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}`).join("\n");
+    const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 500,
+        system: PLACEMENT_PROMPT,
+        output_config: {
+            effort: "low",
+            format: { type: "json_schema", schema: PLACEMENT_SCHEMA },
+        },
+        messages: [{
+            role: "user",
+            content: `The list "${listName}" (${films.length} films, best first):\n${lines}\n\nWhere would they rank ${filmLabel(newFilm)}?`,
+        }],
+    });
+    const { usage: tokens } = response;
+    console.log(`AI placement: ${tokens.input_tokens} input, ${tokens.output_tokens} output tokens`);
+    if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") {
+        throw new Error(`Placement stopped early (${response.stop_reason})`);
+    }
+    const text = response.content.find((block) => block.type === "text")?.text ?? "";
+    const { rank, reason } = JSON.parse(text);
+    return { rank: Math.min(Math.max(Math.round(Number(rank) || films.length + 1), 1), films.length + 1), reason: String(reason ?? "").slice(0, 200) };
+}
+
+module.exports = { recommendFilms, recommendForTwo, placeInList, AIUnavailableError, AILimitError };

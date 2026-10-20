@@ -15,7 +15,7 @@ async function fetchLists(user_id) {
     // One after another, so a single database connection is enough
     const lists = await pool.query("SELECT * FROM lists WHERE user_id = $1 ORDER BY id", [user_id]);
     const films = await pool.query(
-        `SELECT lm.list_id, lm.rank, m.*, (w.movie_id IS NOT NULL) AS watched
+        `SELECT lm.list_id, lm.rank, lm.ai_placed, m.*, (w.movie_id IS NOT NULL) AS watched
          FROM lists l
          JOIN list_movies lm ON lm.list_id = l.id
          JOIN movies m ON m.id = lm.movie_id

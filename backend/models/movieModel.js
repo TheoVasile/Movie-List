@@ -74,7 +74,9 @@ async function addMovieToList(list_id, movie_id, rank) {
     }
 }
 
-async function updateMovieRank(list_id, movie_id, new_rank) {
+// Moves a film to new_rank, shifting the films in between. A move by the user marks the film as hand-placed;
+// aiPlaced marks it as placed by Smart Placement instead
+async function updateMovieRank(list_id, movie_id, new_rank, aiPlaced = false) {
     const client = await pool.connect();
     try {
         await client.query("BEGIN"); // Start transaction
@@ -91,8 +93,12 @@ async function updateMovieRank(list_id, movie_id, new_rank) {
 
         const old_rank = rows[0].rank;
         if (old_rank === new_rank) {
-            await client.query("COMMIT"); // No updates needed, but commit transaction
-            return rows[0]; // Return the existing row as is
+            const unchanged = await client.query(
+                "UPDATE list_movies SET ai_placed = $3 WHERE list_id = $1 AND movie_id = $2 RETURNING *",
+                [list_id, movie_id, aiPlaced]
+            );
+            await client.query("COMMIT");
+            return unchanged.rows[0];
         }
         // Shift affected movies up or down
         await client.query(
@@ -111,8 +117,8 @@ async function updateMovieRank(list_id, movie_id, new_rank) {
 
         // Update the movie's rank
         const result = await client.query(
-            "UPDATE list_movies SET rank = $1 WHERE list_id = $2 AND movie_id = $3 RETURNING *",
-            [new_rank, list_id, movie_id]
+            "UPDATE list_movies SET rank = $1, ai_placed = $4 WHERE list_id = $2 AND movie_id = $3 RETURNING *",
+            [new_rank, list_id, movie_id, aiPlaced]
         );
         await client.query("COMMIT"); // Commit transaction
         return result.rows[0];
