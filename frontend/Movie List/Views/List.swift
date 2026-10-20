@@ -129,8 +129,6 @@ struct ListView: View {
             }
         }
         .toolbar {
-            // On the left, next to Back: the right side already has three buttons, and a fourth would be
-            // folded into a "more" (•••) menu
             if editMode.isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") {
@@ -149,7 +147,6 @@ struct ListView: View {
         } message: {
             Text("The list is back the way it was. Check your connection and try again.")
         }
-        .toolbar { ToolbarOptions }
         .confirmationDialog(
             bulkWatchedTitle,
             isPresented: Binding(get: { pendingBulkWatched != nil }, set: { if !$0 { pendingBulkWatched = nil } }),
@@ -334,58 +331,7 @@ private extension ListView {
         }
     }
     
-    @ToolbarContentBuilder
-    var ToolbarOptions: some ToolbarContent {
-        // Three buttons at most: a fourth gets folded into a "more" (•••) menu, so watched status
-        // lives in a row at the top of the list instead
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            if viewModel.movies.count > 1 {
-                Button {
-                    Haptics.tap()
-                    // The recommendation card is hidden while searching or filtering
-                    viewModel.searchText = ""
-                    viewModel.selectedGenres = []
-                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
-                    recommendationScrollRequest += 1
-                } label: {
-                    Image(systemName: "dice.fill")
-                }
-                .accessibilityLabel("Recommend Movie")
-            }
-            if !viewModel.movies.isEmpty {
-                Menu {
-                    Button {
-                        shareImage()
-                    } label: {
-                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
-                    }
-                    Button {
-                        exportZip()
-                    } label: {
-                        Label("Export List (ZIP)", systemImage: "doc.zipper")
-                    }
-                } label: {
-                    if isPreparingShare {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-                .disabled(isPreparingShare)
-                .accessibilityLabel("Share List")
-            }
-            Button {
-                Haptics.tap()
-                viewModel.showPopup = true
-            } label: {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Theme.accentGradient)
-            }
-            .accessibilityLabel("Add Movie")
-        }
-    }
-
-    // How many films are watched, with the bulk watched actions
+    // How many films are watched, with the bulk watched actions, and the list's actions
     var listActions: some View {
         HStack {
             Menu {
@@ -406,8 +352,67 @@ private extension ListView {
             }
             .accessibilityLabel("Watched Options")
             Spacer()
+            // The list's actions live here rather than in the navigation bar, where a long list name
+            // pushed them into a "more" (•••) menu
+            HStack(spacing: 10) {
+                iconButton("dice.fill", label: "Recommend a Film") {
+                    // The recommendation card is hidden while searching or filtering
+                    viewModel.searchText = ""
+                    viewModel.selectedGenres = []
+                    viewModel.showAIPlacedOnly = false
+                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
+                    recommendationScrollRequest += 1
+                }
+                .disabled(viewModel.movies.count < 2)
+                Menu {
+                    Button {
+                        shareImage()
+                    } label: {
+                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
+                    }
+                    Button {
+                        exportZip()
+                    } label: {
+                        Label("Export List (ZIP)", systemImage: "doc.zipper")
+                    }
+                } label: {
+                    iconCircle(isPreparingShare ? nil : "square.and.arrow.up")
+                }
+                .disabled(isPreparingShare)
+                .accessibilityLabel("Share or Export List")
+                iconButton("plus", label: "Add a Film", highlighted: true) {
+                    viewModel.showPopup = true
+                }
+            }
         }
         .padding(.horizontal, 16)
+    }
+
+    func iconButton(_ icon: String, label: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            iconCircle(icon, highlighted: highlighted)
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.9))
+        .accessibilityLabel(label)
+    }
+
+    // A round icon button; no icon shows a spinner
+    func iconCircle(_ icon: String?, highlighted: Bool = false) -> some View {
+        Group {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(highlighted ? Theme.onAccent : Theme.textPrimary)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 38, height: 38)
+        .background(highlighted ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface), in: Circle())
+        .overlay(Circle().stroke(highlighted ? Color.clear : Theme.stroke, lineWidth: 1))
     }
 
     func actionChip(_ title: String, systemImage: String) -> some View {
