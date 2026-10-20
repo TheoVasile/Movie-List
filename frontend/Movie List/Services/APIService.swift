@@ -177,6 +177,12 @@ struct WatchProviders: Decodable {
     var isEmpty: Bool { stream.isEmpty && free.isEmpty && rent.isEmpty && buy.isEmpty }
 }
 
+/// A film's main trailer on YouTube; key is nil when it has none
+struct Trailer: Decodable {
+    let key: String?
+    let name: String?
+}
+
 // MARK: - Friends
 
 /// The signed-in user's @username (nil until they pick one), display name and follow counts
@@ -991,6 +997,27 @@ class APIService {
                 result = .success(decoded)
             } else {
                 result = .failure(error ?? NSError(domain: "Watch providers lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// The film's main trailer on YouTube, if TMDb knows of one
+    func fetchTrailer(tmdbID: Int64, completion: @escaping (Result<Trailer, Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/movies/trailer")
+        components?.queryItems = [URLQueryItem(name: "tmdb_id", value: String(tmdbID))]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<Trailer, Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let decoded = try? JSONDecoder().decode(Trailer.self, from: data) {
+                result = .success(decoded)
+            } else {
+                result = .failure(error ?? NSError(domain: "Trailer lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }

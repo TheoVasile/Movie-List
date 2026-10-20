@@ -909,15 +909,18 @@ private struct DiscoverCard: View {
                             withAnimation(Theme.spring) { providers = loaded }
                         }
                     }
-                Button(action: onFullDetails) {
-                    Label("Full Details", systemImage: "info.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(Theme.posterText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
+                HStack(spacing: 8) {
+                    TrailerButton(tmdbID: movie.id, title: movie.title, onPoster: true)
+                    Button(action: onFullDetails) {
+                        Label("Full Details", systemImage: "info.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(Theme.posterText)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.94))
                 }
-                .buttonStyle(PressableButtonStyle(scale: 0.94))
                 .transition(.opacity)
             } else {
                 Label("Tap for details", systemImage: "hand.tap")
