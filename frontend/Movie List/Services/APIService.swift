@@ -226,6 +226,9 @@ struct FriendLists: Decodable {
     var following: Bool
     // The user has asked to follow them and is waiting for them to accept
     let requested: Bool?
+    // How many people follow them and how many they follow
+    let follower_count: Int?
+    let following_count: Int?
     // Whether they allow AI features; only sent to people who follow them
     let ai_allowed: Bool?
     let lists: [List]
@@ -466,6 +469,13 @@ class APIService {
 
     func fetchFollowing(completion: @escaping (Result<[UserSummary], Error>) -> Void) {
         sendJSON("GET", "/users/me/following", completion: completion)
+    }
+
+    /// Someone's followers or the people they follow (the user's own when handle is nil). Fails with 403 when
+    /// the user doesn't follow them
+    func fetchConnections(handle: String?, followers: Bool, completion: @escaping (Result<[UserSummary], Error>) -> Void) {
+        let who = handle.map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 } ?? "me"
+        sendJSON("GET", "/users/\(who)/\(followers ? "followers" : "following")", completion: completion)
     }
 
     func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {

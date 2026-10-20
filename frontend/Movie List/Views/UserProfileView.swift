@@ -114,9 +114,7 @@ struct UserProfileView: View {
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                 if let profile = social.profile, profile.handle != nil {
-                    Text("\(profile.following) following · \(profile.followers) \(profile.followers == 1 ? "follower" : "followers")")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(Theme.textTertiary)
+                    ConnectionCounts(handle: nil, followers: profile.followers, following: profile.following)
                 }
             }
             .appearAnimation(delay: 0.08)

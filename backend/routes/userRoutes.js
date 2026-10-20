@@ -1,6 +1,6 @@
 const express = require("express");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -194,6 +194,22 @@ router.get("/me/following", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
+// Followers and following: the user's own, or someone else's once the user's follow is accepted
+async function sendConnections(req, res, which, handle) {
+    try {
+        const result = await fetchConnections(req.user.uid, { handle, which });
+        if (!result) return res.status(404).json({ error: "User not found." });
+        if (result.hidden) return res.status(403).json({ error: "Follow them to see who they follow and who follows them." });
+        res.json(result.people);
+    } catch (error) {
+        console.error(`Error fetching ${which}:`, error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+router.get("/me/followers", (req, res) => sendConnections(req, res, "followers"));
+router.get("/:handle/followers", (req, res) => sendConnections(req, res, "followers", req.params.handle.toLowerCase()));
+router.get("/:handle/following", (req, res) => sendConnections(req, res, "following", req.params.handle.toLowerCase()));
 
 // What the people the user follows think of a film: watched, note and best list placing, e.g. /me/following/films/771
 router.get("/me/following/films/:tmdb_id", async (req, res) => {

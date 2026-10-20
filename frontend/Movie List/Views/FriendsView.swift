@@ -455,6 +455,90 @@ final class AvatarStore {
 
 // MARK: - Find people
 
+/// Someone's followers or the people they follow, as rows that open each person's profile
+struct ConnectionsView: View {
+    // nil for the signed-in user's own
+    let handle: String?
+    let followers: Bool
+    @State private var people: [UserSummary] = []
+    @State private var isLoading = true
+    @State private var message: String? = nil
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                if isLoading {
+                    ProgressView().padding(.top, 40)
+                } else if let message {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 40)
+                }
+                ForEach(people) { person in
+                    if person.handle == SocialStore.shared.profile?.handle {
+                        PersonRow(person: person, showsFollowButton: false)
+                    } else {
+                        NavigationLink {
+                            FriendProfileView(person: person)
+                        } label: {
+                            PersonRow(person: person)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle(followers ? "Followers" : "Following")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: load)
+        .refreshable { load() }
+    }
+
+    private func load() {
+        APIService.shared.fetchConnections(handle: handle, followers: followers) { result in
+            isLoading = false
+            switch result {
+            case .success(let loaded):
+                people = loaded
+                message = loaded.isEmpty ? (followers ? "No followers yet." : "Not following anyone yet.") : nil
+            case .failure(let error):
+                message = (error as NSError).code == 403
+                    ? "Follow them to see who they follow and who follows them."
+                    : "Couldn't load this list. Pull down to try again."
+            }
+        }
+    }
+}
+
+/// "12 followers · 30 following", each opening that list
+struct ConnectionCounts: View {
+    let handle: String?
+    let followers: Int
+    let following: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            NavigationLink {
+                ConnectionsView(handle: handle, followers: true)
+            } label: {
+                Text("\(followers) \(followers == 1 ? "follower" : "followers")")
+            }
+            Text("·")
+            NavigationLink {
+                ConnectionsView(handle: handle, followers: false)
+            } label: {
+                Text("\(following) following")
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundColor(Theme.textTertiary)
+    }
+}
+
 struct FindPeopleView: View {
     @State private var query = ""
     @State private var results: [UserSummary] = []
@@ -533,6 +617,11 @@ struct FriendProfileView: View {
                         Text("@\(person.handle)")
                             .font(.subheadline)
                             .foregroundColor(Theme.textSecondary)
+                        // Only followers can open these lists
+                        if social.isFollowing(person.handle), let lists, let followers = lists.follower_count,
+                           let following = lists.following_count {
+                            ConnectionCounts(handle: person.handle, followers: followers, following: following)
+                        }
                     }
                     Spacer()
                     FollowButton(person: person)
