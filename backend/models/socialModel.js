@@ -146,6 +146,38 @@ async function fetchFollowing(user_id) {
     return result.rows;
 }
 
+// Someone's followers or the people they follow, newest first, each with whether the viewer follows them or
+// has asked to. Anyone can see their own; other people's only once the viewer's follow is accepted. Returns
+// null when there's no such user, and { hidden: true } when the viewer isn't allowed to see them
+async function fetchConnections(viewer_id, { handle, which }) {
+    let target_id = viewer_id;
+    if (handle) {
+        const target = await pool.query(
+            `SELECT u.firebase_uid,
+                    EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following
+             FROM users u WHERE u.handle = $2`,
+            [viewer_id, handle]
+        );
+        const person = target.rows[0];
+        if (!person) return null;
+        if (person.firebase_uid !== viewer_id && !person.following) return { hidden: true };
+        target_id = person.firebase_uid;
+    }
+    // followers: people who follow the target; following: people the target follows
+    const [personColumn, targetColumn] = which === "followers" ? ["follower_id", "followee_id"] : ["followee_id", "follower_id"];
+    const result = await pool.query(
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version,
+                EXISTS (SELECT 1 FROM follows v WHERE v.follower_id = $2 AND v.followee_id = u.firebase_uid AND v.accepted) AS following,
+                EXISTS (SELECT 1 FROM follows v WHERE v.follower_id = $2 AND v.followee_id = u.firebase_uid AND NOT v.accepted) AS requested,
+                u.firebase_uid = $2 AS is_me
+         FROM follows f JOIN users u ON u.firebase_uid = f.${personColumn}
+         WHERE f.${targetColumn} = $1 AND f.accepted AND u.handle IS NOT NULL
+         ORDER BY f.created_at DESC`,
+        [target_id, viewer_id]
+    );
+    return { people: result.rows };
+}
+
 // Someone's lists with their films in rank order and which they've watched, for a user who follows them.
 // Notes are shown per film on its info screen instead (fetchFriendsOnFilm). null when there's no such user; { following: false } when the
 // user doesn't follow them
@@ -153,13 +185,16 @@ async function fetchUserLists(user_id, handle) {
     const target = await pool.query(
         `SELECT u.firebase_uid, u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
-                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested,
+                (SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.firebase_uid AND f.accepted)::int AS follower_count,
+                (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted)::int AS following_count
          FROM users u WHERE u.handle = $2`,
         [user_id, handle]
     );
     const person = target.rows[0];
     if (!person) return null;
-    const profile = { handle: person.handle, display_name: person.display_name, avatar_version: person.avatar_version, following: person.following, requested: person.requested, lists: [] };
+    const profile = { handle: person.handle, display_name: person.display_name, avatar_version: person.avatar_version, following: person.following, requested: person.requested,
+                      follower_count: person.follower_count, following_count: person.following_count, lists: [] };
     // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
     if (person.following) profile.ai_allowed = person.ai_allowed;
     if (!person.following) return profile;
@@ -217,4 +252,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
