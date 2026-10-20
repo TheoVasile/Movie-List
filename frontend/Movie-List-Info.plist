@@ -29,6 +29,8 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSContactsUsageDescription</key>
+	<string>CineList checks which of your contacts are on CineList so you can follow them. Emails and numbers are scrambled on your iPhone first and never stored.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- The backend on the Mac is plain http, which iOS only allows for local network addresses -->

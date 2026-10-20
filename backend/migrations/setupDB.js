@@ -33,6 +33,11 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar BYTEA;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMP;
 
+            -- A SHA-256 hash of the user's phone number (its last 10 digits), if they chose to add one so friends
+            -- can find them from their contacts. The number itself is never stored
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_hash CHAR(64);
+            CREATE INDEX IF NOT EXISTS users_phone_hash ON users (phone_hash);
+
             -- Which push notifications the user wants. The phone also has to allow notifications
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;

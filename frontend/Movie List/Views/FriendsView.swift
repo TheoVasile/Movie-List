@@ -543,15 +543,20 @@ struct FindPeopleView: View {
     @State private var query = ""
     @State private var results: [UserSummary] = []
     @State private var isSearching = false
+    // People found in the user's contacts, once they've asked
+    @State private var fromContacts: [UserSummary]? = nil
+    @State private var findingContacts = false
+    @State private var contactsMessage: String? = nil
 
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
                 if query.count < 2 {
-                    Text("Search for a friend by their @username.")
+                    contactsSection
+                    Text("Or search for a friend by their @username.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
-                        .padding(.top, 40)
+                        .padding(.top, 20)
                 } else if results.isEmpty && !isSearching {
                     Text("No one with a username starting with \"\(query)\".")
                         .font(.subheadline)
@@ -571,6 +576,7 @@ struct FindPeopleView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Find People")
+        .onAppear { if fromContacts == nil && ContactsFinder.wasAllowed { findInContacts() } }
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "@username")
         .textInputAutocapitalization(.never)
@@ -588,6 +594,73 @@ struct FindPeopleView: View {
             APIService.shared.searchUsers(trimmed) { result in
                 isSearching = false
                 if case .success(let people) = result { results = people }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var contactsSection: some View {
+        if let fromContacts {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(fromContacts.isEmpty ? "None of your contacts are on CineList yet." : "From Your Contacts")
+                    .font(fromContacts.isEmpty ? .subheadline : .headline)
+                    .foregroundColor(fromContacts.isEmpty ? Theme.textSecondary : Theme.textPrimary)
+                ForEach(fromContacts) { person in
+                    NavigationLink {
+                        FriendProfileView(person: person)
+                    } label: {
+                        PersonRow(person: person)
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.98))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Button(action: findInContacts) {
+                HStack(spacing: 12) {
+                    if findingContacts {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.title3)
+                            .foregroundStyle(Theme.accentGradient)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find Friends From Your Contacts")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Contacts' emails and numbers are scrambled on your iPhone before matching, and never stored.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .cardStyle(cornerRadius: 16)
+            }
+            .buttonStyle(PressableButtonStyle(scale: 0.98))
+            .disabled(findingContacts)
+            if let contactsMessage {
+                Text(contactsMessage)
+                    .font(.footnote)
+                    .foregroundColor(Theme.accentSecondary)
+            }
+        }
+    }
+
+    private func findInContacts() {
+        findingContacts = true
+        contactsMessage = nil
+        ContactsFinder.findFriends { result in
+            findingContacts = false
+            switch result {
+            case .success(let people):
+                fromContacts = people
+            case .failure(.denied):
+                contactsMessage = "CineList doesn't have access to your contacts. You can allow it in Settings → Privacy & Security → Contacts."
+            case .failure(.failed):
+                contactsMessage = "Couldn't check your contacts. Try again."
             }
         }
     }
