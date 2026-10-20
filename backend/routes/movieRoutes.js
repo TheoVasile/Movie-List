@@ -9,6 +9,7 @@ const { mapWithConcurrency, createLimiter } = require("../services/letterboxdSer
 const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
 const { recommendFilms, recommendForTwo, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 const pool = require("../config/db");
+const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
 
 const router = express.Router();
 const ownsBodyList = requireListOwner((req) => req.body.list_id);
@@ -137,6 +138,8 @@ router.get("/discover", async (req, res) => {
         const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
         const avoidGenres = parseIds(req.query.avoid_genres, 3);
         const params = { api_key: process.env.API_KEY, language: "en-US", page };
+        // Optional: only films in these original languages, and/or streaming on these services in region
+        const filters = parseFilters(req.query);
 
         // Films in any of the favourite genres ("|" means or), skipping obscure titles
         const genreFeed = genres.length
@@ -152,12 +155,29 @@ router.get("/discover", async (req, res) => {
             })]
             : [];
 
+        // With filters, recommendations alone rarely have enough matches, so TMDb is also asked directly for films
+        // that fit: one feed per language (or one for the services alone), in the chosen genres
+        const filteredFeeds = hasFilters(filters)
+            ? (filters.languages.length ? filters.languages.slice(0, 3) : [null]).map((language) => axios.get("https://api.themoviedb.org/3/discover/movie", {
+                params: {
+                    ...params,
+                    ...(language ? { with_original_language: language } : {}),
+                    ...(filters.providers.length ? { with_watch_providers: filters.providers.join("|"), watch_region: filters.region, with_watch_monetization_types: "flatrate|free|ads" } : {}),
+                    ...(genres.length && onlyGenres ? { with_genres: genres.join("|") } : {}),
+                    sort_by: "popularity.desc",
+                    "vote_count.gte": 100,
+                    include_adult: false,
+                },
+            }))
+            : [];
+
         // allSettled so one seed TMDb doesn't know about can't fail the whole request
         const [trending, ...recommendations] = await Promise.allSettled([
             axios.get("https://api.themoviedb.org/3/trending/movie/week", { params }),
             // The app sends different seeds for every batch, so each seed's best (first page) recommendations are used
             ...seeds.map((id) => axios.get(`https://api.themoviedb.org/3/movie/${id}/recommendations`, { params: { ...params, page: 1 } })),
             ...genreFeed,
+            ...filteredFeeds,
         ]);
         const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value.data.results : []);
 
@@ -174,7 +194,12 @@ router.get("/discover", async (req, res) => {
             .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
             .filter((movie) => !onlyGenres || movie.genre_ids.some((id) => wanted.has(id)));
 
-        res.json(movies);
+        if (!hasFilters(filters)) {
+            return res.json(movies);
+        }
+        // Every film is checked, recommendations and the filtered feeds alike, so nothing slips through
+        const passes = await mapWithConcurrency(movies, (movie) => matchesFilters(movie, filters), 10);
+        res.json(movies.filter((_, i) => passes[i]));
     } catch (error) {
         console.error("Error fetching discover movies:", error.message);
         res.status(500).json({ error: "Internal server error" });
@@ -355,9 +380,23 @@ router.post("/movie-night", async (req, res) => {
     }
 });
 
+// Streaming services available in a country, most popular first, for the Discover filters, e.g. ?region=CA
+router.get("/streaming-services", async (req, res) => {
+    try {
+        res.json(await availableServices(parseFilters(req.query).region));
+    } catch (error) {
+        console.error("Error fetching streaming services:", error.message);
+        res.status(502).json({ error: "Couldn't load streaming services." });
+    }
+});
+
 router.post("/ai-discover", async (req, res) => {
     try {
         const body = req.body ?? {};
+        // Hard filters: picks in other languages or not streaming on the chosen services are dropped
+        const filters = parseFilters(body);
+        // Recommend from some lists only, when the user picked them (list_id is from builds that allowed one)
+        const fromLists = (Array.isArray(body.list_ids) ? body.list_ids : [body.list_id]).filter(Number.isInteger).slice(0, 20);
         const signals = {
             liked: cleanFilms(body.liked, 500),
             passed: cleanFilms(body.passed, 500),
@@ -373,11 +412,16 @@ router.post("/ai-discover", async (req, res) => {
             swipeCount: Math.max(parseInt(body.swipe_count, 10) || 0, 0),
             likeCount: Math.max(parseInt(body.like_count, 10) || 0, 0),
             alreadySuggested: cleanStrings(body.already_suggested, 400),
+            languages: filters.languages,
+            services: cleanStrings(body.provider_names, 20),
         };
         const count = Math.min(Math.max(parseInt(body.count, 10) || 20, 1), 30);
         const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
-        const [lists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
+        const [allLists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
+        const chosenLists = allLists.filter((list) => fromLists.includes(list.id));
+        const lists = chosenLists.length ? chosenLists : allLists;
+        if (chosenLists.length) signals.basedOnLists = chosenLists.map((list) => list.name);
         const streaming = req.accepts(["application/json", "application/x-ndjson"]) === "application/x-ndjson";
 
         // Each pick is looked up on TMDb as soon as Claude writes it, so lookups overlap with the rest of the
@@ -404,13 +448,15 @@ router.post("/ai-discover", async (req, res) => {
             }
         };
 
-        // Ask for a few extra, since some picks turn out to be films the user already has or can't be found
-        await recommendFilms(req.user.uid, lists, signals, count + 10, (pick) => {
+        // Ask for a few extra, since some picks turn out to be films the user already has or can't be found, and
+        // more with filters, since some won't actually be in that language or on those services
+        await recommendFilms(req.user.uid, lists, signals, count + (hasFilters(filters) ? 20 : 10), (pick) => {
             const index = found.push(undefined) - 1;
             lookups.push(lookup(async () => {
                 try {
                     const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
-                    found[index] = movie && { ...movie, reason: cleanText(pick.reason, 200) };
+                    const fits = movie && (!hasFilters(filters) || await matchesFilters(movie, filters));
+                    found[index] = fits ? { ...movie, reason: cleanText(pick.reason, 200) } : null;
                 } catch (error) {
                     found[index] = null;
                 }

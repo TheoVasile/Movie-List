@@ -101,6 +101,17 @@ function describeLists(lists, who = "The user", maxFilms = MAX_LIST_FILMS) {
 function describeRequest(signals, count) {
     const parts = [];
     const titles = (films) => films.map(filmLabel).join("; ");
+    if (signals.basedOnLists?.length) {
+        const names = signals.basedOnLists.map((name) => `"${name}"`).join(" and ");
+        parts.push(`The user wants recommendations based only on their ${signals.basedOnLists.length === 1 ? "list" : "lists"} ${names}: find films fans of ${signals.basedOnLists.length === 1 ? "that list" : "those lists"} would love, rather than drawing on the rest of their taste.`);
+    }
+    if (signals.languages?.length) {
+        const names = signals.languages.map((code) => new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code);
+        parts.push(`Only recommend films originally made in ${names.join(" or ")}. Every film must be in one of these languages.`);
+    }
+    if (signals.services?.length) {
+        parts.push(`Only recommend films the user can stream right now on ${signals.services.join(" or ")}${signals.region ? ` in ${signals.region}` : ""}. Prefer well-known titles likely to be on these services.`);
+    }
     if (signals.requiredGenres?.length) {
         parts.push(`The user chose to see only these genres right now: ${signals.requiredGenres.join(", ")}. Every film you recommend must belong to at least one of them. This overrides their usual leanings.`);
     }
