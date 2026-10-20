@@ -82,10 +82,34 @@ enum Personalization {
 struct DiscoverFilters: Codable, Equatable {
     var languages: [String] = []
     var services: [StreamingService] = []
-    var listID: Int64? = nil
-    var listName: String? = nil
+    // The lists Discover is based on, with their names for the summary; empty means all of them
+    var listIDs: [Int64] = []
+    var listNames: [String] = []
 
-    var isEmpty: Bool { languages.isEmpty && services.isEmpty && listID == nil }
+    var isEmpty: Bool { languages.isEmpty && services.isEmpty && listIDs.isEmpty }
+
+    init() {}
+
+    // Filters saved before several lists could be picked had a single listID and listName
+    private enum CodingKeys: String, CodingKey { case languages, services, listIDs, listNames, listID, listName }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        languages = try container.decodeIfPresent([String].self, forKey: .languages) ?? []
+        services = try container.decodeIfPresent([StreamingService].self, forKey: .services) ?? []
+        listIDs = try container.decodeIfPresent([Int64].self, forKey: .listIDs)
+            ?? (try container.decodeIfPresent(Int64.self, forKey: .listID)).map { [$0] } ?? []
+        listNames = try container.decodeIfPresent([String].self, forKey: .listNames)
+            ?? (try container.decodeIfPresent(String.self, forKey: .listName)).map { [$0] } ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(languages, forKey: .languages)
+        try container.encode(services, forKey: .services)
+        try container.encode(listIDs, forKey: .listIDs)
+        try container.encode(listNames, forKey: .listNames)
+    }
 
     /// Languages people most often filter by, as TMDb's original-language codes
     static let commonLanguages = ["en", "fr", "es", "it", "de", "ja", "ko", "zh", "hi", "pt", "sv", "da", "no", "ru", "fa", "tr", "pl", "th", "ta", "te"]
@@ -230,6 +254,9 @@ class DiscoverViewModel: ObservableObject {
     // Genres the user chose to see; empty means automatic, tuned to their taste. Kept across launches
     @Published private(set) var genreFilter: Set<Int>
     @Published private(set) var filters: DiscoverFilters
+    // The genres the lists Discover is based on have most of, top first. Used as Automatic's genres until the
+    // swipes have taught it some
+    @Published private(set) var listGenres: [Int] = []
     // Recent skips and "not for me"s, newest last, so they can be undone. Adding to a list isn't undone here
     @Published private(set) var undoHistory: [(movie: Movie, reaction: DiscoverReaction, profile: TasteProfile)] = []
     private static let undoLimit = 20
@@ -287,6 +314,23 @@ class DiscoverViewModel: ObservableObject {
     }
 
     var topMovie: Movie? { deck.first }
+
+    /// What Automatic picks: genres learned from swipes, or the lists' own top genres until there are some
+    var automaticGenres: [Int] {
+        profile.favoriteGenres.isEmpty ? listGenres : profile.favoriteGenres
+    }
+
+    /// The genres most common in the films Discover is based on, from the TMDb info kept for list films
+    func updateListGenres(for tmdbIDs: [Int64]) {
+        var counts: [Int: Int] = [:]
+        for id in tmdbIDs {
+            for genre in MovieInfoCache.shared.info(for: id)?.genres ?? [] where genre != 10770 {
+                counts[genre, default: 0] += 1
+            }
+        }
+        let top = counts.sorted { $0.value > $1.value }.prefix(3).map(\.key)
+        if top != listGenres { listGenres = top }
+    }
 
     /// Call whenever the user's lists change, so cards for films they've since added disappear
     func update(listedIDs: Set<Int64>, seedPool: [(id: Int64, weight: Double)]) {
@@ -515,7 +559,7 @@ class DiscoverViewModel: ObservableObject {
             liked: profile.recentLiked.map(film),
             passed: profile.recentPassed.map(film),
             disliked: profile.recentDisliked.map(film),
-            favorite_genres: leanings.towards.compactMap(genreName),
+            favorite_genres: (leanings.towards.isEmpty ? listGenres : leanings.towards).compactMap(genreName),
             avoided_genres: leanings.awayFrom.compactMap(genreName),
             required_genres: genreFilter.sorted().compactMap(genreName),
             swipe_count: profile.swipeCount,
@@ -530,7 +574,7 @@ class DiscoverViewModel: ObservableObject {
             languages: filters.languages,
             providers: filters.services.map(\.id),
             provider_names: filters.services.map(\.name),
-            list_id: filters.listID
+            list_ids: filters.listIDs
         )
         let generation = loadGeneration
         var freshCount = 0
@@ -566,7 +610,7 @@ class DiscoverViewModel: ObservableObject {
         let chosen = !genreFilter.isEmpty
         APIService.shared.discoverMovies(
             seeds: nextSeeds(),
-            genres: chosen ? genreFilter.sorted() : profile.favoriteGenres,
+            genres: chosen ? genreFilter.sorted() : automaticGenres,
             avoidGenres: profile.avoidedGenres.filter { !genreFilter.contains($0) },
             onlyGenres: chosen,
             languages: filters.languages,

@@ -101,8 +101,9 @@ function describeLists(lists, who = "The user", maxFilms = MAX_LIST_FILMS) {
 function describeRequest(signals, count) {
     const parts = [];
     const titles = (films) => films.map(filmLabel).join("; ");
-    if (signals.basedOnList) {
-        parts.push(`The user wants recommendations based only on their list "${signals.basedOnList}": find films that list's fans would love, rather than drawing on the rest of their taste.`);
+    if (signals.basedOnLists?.length) {
+        const names = signals.basedOnLists.map((name) => `"${name}"`).join(" and ");
+        parts.push(`The user wants recommendations based only on their ${signals.basedOnLists.length === 1 ? "list" : "lists"} ${names}: find films fans of ${signals.basedOnLists.length === 1 ? "that list" : "those lists"} would love, rather than drawing on the rest of their taste.`);
     }
     if (signals.languages?.length) {
         const names = signals.languages.map((code) => new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code);
