@@ -39,6 +39,14 @@ const createTables = async () => {
             -- When the user last got the daily friends digest, so they never get two in a day
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
 
+            -- Lists people follow to hear about updates in their daily digest
+            CREATE TABLE IF NOT EXISTS list_follows (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                list_id INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, list_id)
+            );
+
             -- Firebase Cloud Messaging tokens: one per device the user is signed in on
             CREATE TABLE IF NOT EXISTS device_tokens (
                 token TEXT PRIMARY KEY,
@@ -90,6 +98,10 @@ const createTables = async () => {
                 rank INT,
                 UNIQUE (list_id, movie_id)
             );
+            -- Who can see a list: everyone signed in (public), the owner's accepted followers (followers, how all
+            -- lists worked before), or only the owner (private)
+            ALTER TABLE lists ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'followers';
+
             -- When a film was added, for friends' activity. Films added before this was kept have none
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_at TIMESTAMP;
             ALTER TABLE list_movies ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP;

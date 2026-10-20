@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { visibleTo } = require("./listModel");
 
 // @usernames: 3-20 lowercase letters, digits, underscores and dots, not starting or ending with a dot
 // and without two dots in a row
@@ -197,23 +198,37 @@ async function fetchUserLists(user_id, handle) {
                       follower_count: person.follower_count, following_count: person.following_count, lists: [] };
     // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
     if (person.following) profile.ai_allowed = person.ai_allowed;
-    if (!person.following) return profile;
+    // Followers see public and followers-only lists; anyone else sees only public ones
+    profile.lists = await fetchListsWithFilms(user_id, "l.user_id = $2", [person.firebase_uid]);
+    return profile;
+}
 
+// Lists matching a condition that the viewer ($1) can see, each with its films in rank order, which the owner
+// has watched, its visibility, how many follow it and whether the viewer does. $2 onwards are params
+async function fetchListsWithFilms(viewer_id, condition, params) {
     const rows = await pool.query(
-        `SELECT l.id AS list_id, l.name, l.overview, m.tmdb_id, m.title, m.release_date, m.poster_path, lm.rank,
+        `SELECT l.id AS list_id, l.name, l.overview, l.visibility, o.handle AS owner_handle, o.username AS owner_name,
+                EXISTS (SELECT 1 FROM list_follows lf WHERE lf.user_id = $1 AND lf.list_id = l.id) AS followed,
+                (SELECT COUNT(*) FROM list_follows lf WHERE lf.list_id = l.id)::int AS follower_count,
+                m.tmdb_id, m.title, m.release_date, m.poster_path, lm.rank,
                 (w.movie_id IS NOT NULL) AS watched
          FROM lists l
+         JOIN users o ON o.firebase_uid = l.user_id
          LEFT JOIN list_movies lm ON lm.list_id = l.id
          LEFT JOIN movies m ON m.id = lm.movie_id
          LEFT JOIN watched_movies w ON w.user_id = l.user_id AND w.movie_id = m.id
-         WHERE l.user_id = $1
+         WHERE ${condition} AND ${visibleTo("$1")}
          ORDER BY l.id, lm.rank NULLS LAST`,
-        [person.firebase_uid]
+        [viewer_id, ...params]
     );
     const lists = new Map();
     for (const row of rows.rows) {
         if (!lists.has(row.list_id)) {
-            lists.set(row.list_id, { id: row.list_id, name: row.name, overview: row.overview ?? "", movies: [] });
+            lists.set(row.list_id, {
+                id: row.list_id, name: row.name, overview: row.overview ?? "", visibility: row.visibility,
+                owner_handle: row.owner_handle, owner_name: row.owner_name,
+                followed: row.followed, follower_count: row.follower_count, movies: [],
+            });
         }
         if (row.tmdb_id) {
             lists.get(row.list_id).movies.push({
@@ -226,8 +241,13 @@ async function fetchUserLists(user_id, handle) {
             });
         }
     }
-    profile.lists = [...lists.values()];
-    return profile;
+    return [...lists.values()];
+}
+
+// Other people's lists the user follows and can still see, most recently followed first
+async function fetchFollowedLists(user_id) {
+    const lists = await fetchListsWithFilms(user_id, "l.id IN (SELECT list_id FROM list_follows WHERE user_id = $1) AND l.user_id <> $1", []);
+    return lists;
 }
 
 // What the people the user follows have to say about one film: whether they've watched it, their note,
@@ -241,7 +261,7 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
                 (SELECT n.note FROM movie_notes n WHERE n.user_id = u.firebase_uid AND n.movie_id IN (SELECT id FROM film)) AS note,
                 (SELECT json_build_object('list_name', l.name, 'rank', lm.rank, 'list_size', (SELECT COUNT(*) FROM list_movies c WHERE c.list_id = l.id))
                  FROM lists l JOIN list_movies lm ON lm.list_id = l.id
-                 WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film)
+                 WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film) AND l.visibility <> 'private'
                  ORDER BY lm.rank LIMIT 1) AS ranking
          FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
          WHERE f.follower_id = $1 AND f.accepted`,
@@ -252,4 +272,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };

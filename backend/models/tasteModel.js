@@ -1,8 +1,9 @@
 const pool = require("../config/db");
 
 // Every film in the user's lists, grouped by list (largest list first) and in rank order, with
-// whether the user has marked it watched. Used to describe the user's taste to the AI
-async function fetchListsForTaste(user_id) {
+// whether the user has marked it watched. Used to describe the user's taste to the AI. sharedOnly leaves out
+// private lists, for when the lists are a friend's
+async function fetchListsForTaste(user_id, sharedOnly = false) {
     const result = await pool.query(
         `SELECT l.id AS list_id, l.name AS list_name, m.title, m.release_date, m.original_language, lm.rank,
                 (w.movie_id IS NOT NULL) AS watched
@@ -10,9 +11,9 @@ async function fetchListsForTaste(user_id) {
          JOIN list_movies lm ON lm.list_id = l.id
          JOIN movies m ON m.id = lm.movie_id
          LEFT JOIN watched_movies w ON w.user_id = l.user_id AND w.movie_id = m.id
-         WHERE l.user_id = $1
+         WHERE l.user_id = $1 AND (NOT $2 OR l.visibility <> 'private')
          ORDER BY l.id, lm.rank NULLS LAST`,
-        [user_id]
+        [user_id, sharedOnly]
     );
     const lists = new Map();
     for (const row of result.rows) {
@@ -56,31 +57,33 @@ async function fetchFriend(user_id, handle) {
     return result.rows[0] ?? null;
 }
 
-// The films that best show someone's taste: the top of their biggest list that isn't a watchlist
-async function fetchTopFilms(user_id, limit) {
+// The films that best show someone's taste: the top of their biggest list that isn't a watchlist (and, with
+// sharedOnly, isn't private)
+async function fetchTopFilms(user_id, limit, sharedOnly = false) {
     const result = await pool.query(
         `SELECT m.tmdb_id, m.title
          FROM list_movies lm JOIN movies m ON m.id = lm.movie_id
          WHERE lm.list_id = (
              SELECT l.id FROM lists l JOIN list_movies c ON c.list_id = l.id
-             WHERE l.user_id = $1 AND l.name NOT ILIKE '%watch%'
+             WHERE l.user_id = $1 AND l.name NOT ILIKE '%watch%' AND (NOT $3 OR l.visibility <> 'private')
              GROUP BY l.id ORDER BY COUNT(*) DESC LIMIT 1
          )
          ORDER BY lm.rank NULLS LAST
          LIMIT $2`,
-        [user_id, limit]
+        [user_id, limit, sharedOnly]
     );
     return result.rows.map((row) => ({ tmdb_id: Number(row.tmdb_id), title: row.title }));
 }
 
-// Films someone hasn't watched yet in their watchlists (lists with "watch" in the name), by TMDb id
-async function fetchUnwatchedWatchlist(user_id) {
+// Films someone hasn't watched yet in their watchlists (lists with "watch" in the name), by TMDb id. sharedOnly
+// leaves out private lists
+async function fetchUnwatchedWatchlist(user_id, sharedOnly = false) {
     const result = await pool.query(
         `SELECT DISTINCT m.tmdb_id, m.title, m.release_date, m.overview, m.poster_path, m.original_language, m.popularity
          FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
-         WHERE l.user_id = $1 AND l.name ILIKE '%watch%'
+         WHERE l.user_id = $1 AND l.name ILIKE '%watch%' AND (NOT $2 OR l.visibility <> 'private')
            AND NOT EXISTS (SELECT 1 FROM watched_movies w WHERE w.user_id = $1 AND w.movie_id = m.id)`,
-        [user_id]
+        [user_id, sharedOnly]
     );
     return new Map(result.rows.map((row) => [Number(row.tmdb_id), row]));
 }

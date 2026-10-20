@@ -89,6 +89,8 @@ struct ListDetailsResponse: Codable {
     let movies: [MovieDetailsResponse]
     // Only set on Letterboxd imports: films that couldn't be matched to TMDb
     let skipped: [String]?
+    // "public", "followers" or "private"
+    let visibility: String?
 }
 
 struct LetterboxdImportRequest: Encodable {
@@ -219,6 +221,12 @@ struct FriendLists: Decodable {
         let name: String
         let overview: String
         let movies: [Film]
+        let visibility: String?
+        let owner_handle: String?
+        let owner_name: String?
+        // Whether the user follows this list, and how many people do
+        let followed: Bool?
+        let follower_count: Int?
     }
     let handle: String
     let display_name: String
@@ -476,6 +484,19 @@ class APIService {
     func fetchConnections(handle: String?, followers: Bool, completion: @escaping (Result<[UserSummary], Error>) -> Void) {
         let who = handle.map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 } ?? "me"
         sendJSON("GET", "/users/\(who)/\(followers ? "followers" : "following")", completion: completion)
+    }
+
+    private struct ListFollowResponse: Decodable { let followed: Bool }
+
+    /// Follows or unfollows someone else's list, to hear about films added to it
+    func setListFollowed(_ listID: Int64, _ follow: Bool, completion: @escaping (Bool) -> Void) {
+        sendJSON(follow ? "POST" : "DELETE", "/lists/\(listID)/follow") { (result: Result<ListFollowResponse, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
+    func fetchFollowedLists(completion: @escaping (Result<[FriendLists.List], Error>) -> Void) {
+        sendJSON("GET", "/users/me/followed-lists", completion: completion)
     }
 
     func fetchFollowRequests(completion: @escaping (Result<FollowRequests, Error>) -> Void) {
@@ -1103,11 +1124,12 @@ class APIService {
     }
 
     /// Renames a list and/or changes its description; nil leaves that field as it is
-    func updateList(listID: Int64, name: String?, overview: String?, completion: @escaping (Result<Void, Error>) -> Void) {
+    func updateList(listID: Int64, name: String?, overview: String?, visibility: ListVisibility? = nil, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/\(listID)") else { return }
         var body: [String: Any] = [:]
         if let name { body["name"] = name }
         if let overview { body["overview"] = overview }
+        if let visibility { body["visibility"] = visibility.rawValue }
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"

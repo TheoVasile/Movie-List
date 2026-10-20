@@ -125,3 +125,49 @@ extension CDMovieList {
         return movieList
     }
 }
+
+
+/// Who can see a list. New and existing lists are Followers until the owner changes it
+enum ListVisibility: String, CaseIterable, Identifiable {
+    case `public`, followers, `private`
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .public: return "Everyone"
+        case .followers: return "Followers"
+        case .private: return "Only Me"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .public: return "globe"
+        case .followers: return "person.2.fill"
+        case .private: return "lock.fill"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .public: return "Anyone on CineList can see and follow this list, even if they don't follow you."
+        case .followers: return "Only people you've accepted as followers can see and follow this list."
+        case .private: return "Only you can see this list. It's also left out of Movie Night and your friends' digests."
+        }
+    }
+
+    private static let storageKey = "listVisibility"
+
+    /// The visibility of one of the user's lists, as last synced or changed on this phone
+    static func of(_ listID: Int64) -> ListVisibility {
+        let saved = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: String]
+        return saved?[String(listID)].flatMap(ListVisibility.init) ?? .followers
+    }
+
+    static func remember(_ visibility: ListVisibility, for listID: Int64) {
+        var saved = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: String] ?? [:]
+        saved[String(listID)] = visibility.rawValue
+        UserDefaults.standard.set(saved, forKey: storageKey)
+    }
+}

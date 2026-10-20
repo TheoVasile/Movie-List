@@ -1,6 +1,6 @@
 const express = require("express");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -208,6 +208,16 @@ async function sendConnections(req, res, which, handle) {
     }
 }
 router.get("/me/followers", (req, res) => sendConnections(req, res, "followers"));
+
+// Other people's lists the user follows
+router.get("/me/followed-lists", async (req, res) => {
+    try {
+        res.json(await fetchFollowedLists(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching followed lists:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 router.get("/:handle/followers", (req, res) => sendConnections(req, res, "followers", req.params.handle.toLowerCase()));
 router.get("/:handle/following", (req, res) => sendConnections(req, res, "following", req.params.handle.toLowerCase()));
 

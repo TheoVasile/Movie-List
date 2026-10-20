@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const { notifyUser } = require("./pushService");
+const { visibleTo } = require("../models/listModel");
 
 // Watches or list additions saved more than this many to the second were done in bulk (an import, or
 // marking a whole list watched), not one by one, so they aren't news
@@ -38,6 +39,7 @@ async function fetchFriendActivity(user_id) {
              SELECT l.user_id, lm.movie_id, 'ranked', lm.added_at, lm.rank, l.name
              FROM list_movies lm JOIN lists l ON l.id = lm.list_id
              WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - INTERVAL '24 hours'
+               AND l.visibility <> 'private'
                AND (l.user_id, date_trunc('second', lm.added_at)) NOT IN (SELECT user_id, at FROM bulk_added)
          )
          SELECT e.kind, e.rank, e.list_name, e.at, fr.name AS friend, fr.handle, m.title, m.release_date,
@@ -51,9 +53,37 @@ async function fetchFriendActivity(user_id) {
     return result.rows;
 }
 
+/// Films added in the last day to other people's lists the user follows and can still see, one row per list
+/// with how many were added and the most recent one. Bulk additions (imports) are left out
+async function fetchFollowedListUpdates(user_id) {
+    const result = await pool.query(
+        `WITH followed AS (
+             SELECT l.id, l.name, l.user_id, o.username AS owner, o.handle
+             FROM list_follows lf JOIN lists l ON l.id = lf.list_id JOIN users o ON o.firebase_uid = l.user_id
+             WHERE lf.user_id = $1 AND l.user_id <> $1 AND ${visibleTo("$1")}
+         ), added AS (
+             SELECT lm.list_id, lm.added_at, m.title, m.release_date,
+                    COUNT(*) OVER (PARTITION BY lm.list_id, date_trunc('second', lm.added_at)) AS same_second
+             FROM list_movies lm JOIN movies m ON m.id = lm.movie_id
+             WHERE lm.list_id IN (SELECT id FROM followed) AND lm.added_at > NOW() - INTERVAL '24 hours'
+         )
+         SELECT f.name AS list_name, f.owner, f.handle, COUNT(*)::int AS added,
+                (ARRAY_AGG(a.title ORDER BY a.added_at DESC))[1] AS title,
+                (ARRAY_AGG(a.release_date ORDER BY a.added_at DESC))[1] AS release_date
+         FROM added a JOIN followed f ON f.id = a.list_id
+         WHERE a.same_second <= ${BULK_WATCH_SIZE}
+         GROUP BY f.name, f.owner, f.handle
+         ORDER BY added DESC`,
+        [user_id]
+    );
+    return result.rows.map((row) => ({ kind: "list_update", friend: row.owner, handle: row.handle, ...row }));
+}
+
 // How interesting an event is to this user: a film on their watchlist matters most, then a friend's new
 // top-10 placing, then a film the user already has, then anything else
 function score(event) {
+    // Someone chose to follow this list, so its updates come first
+    if (event.kind === "list_update") return 80 + event.added;
     let points = 0;
     if (event.my_list && /watch/i.test(event.my_list)) points += 100;
     else if (event.my_list) points += 30;
@@ -66,6 +96,10 @@ function describe(event) {
     const film = filmLabel(event);
     const onWatchlist = event.my_list && /watch/i.test(event.my_list);
     switch (event.kind) {
+        case "list_update": {
+            const more = event.added - 1;
+            return `${event.friend} added ${film}${more ? ` and ${more} more` : ""} to ${event.list_name}`;
+        }
         case "ranked":
             if (onWatchlist) return `${event.friend} added ${film}, which is on your watchlist`;
             if (event.rank && event.rank <= 10) return `${event.friend} ranked ${film} #${event.rank} in ${event.list_name}`;
@@ -79,10 +113,15 @@ function describe(event) {
 
 /// Builds today's digest for one user, or null when their friends did nothing worth a notification
 async function buildDigest(user_id) {
-    const events = await fetchFriendActivity(user_id);
+    const events = [...await fetchFollowedListUpdates(user_id), ...await fetchFriendActivity(user_id)];
     if (!events.length) return null;
     const best = [...events].sort((a, b) => score(b) - score(a))[0];
-    const others = events.length - 1;
+    // The same film can show up more than once (added to a followed list and ranked), so count each friend's
+    // film once; a followed list update counts as however many films were added
+    const key = (e) => `${e.friend}|${e.title}`;
+    const distinct = new Set(events.map(key));
+    const extraFromList = best.kind === "list_update" ? best.added - 1 : 0;
+    const others = Math.max(distinct.size - 1 - extraFromList, 0);
     const friends = new Set(events.map((e) => e.friend)).size;
     return {
         title: friends > 1 ? `${friends} friends were busy today` : "From your friends",
@@ -97,7 +136,8 @@ async function sendDailyDigests() {
     const people = await pool.query(
         `SELECT DISTINCT u.firebase_uid FROM users u JOIN device_tokens t ON t.user_id = u.firebase_uid
          WHERE u.notify_activity AND (u.last_digest_at IS NULL OR u.last_digest_at < NOW() - INTERVAL '20 hours')
-           AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted)`
+           AND (EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted)
+                OR EXISTS (SELECT 1 FROM list_follows lf WHERE lf.user_id = u.firebase_uid))`
     );
     let sent = 0;
     for (const { firebase_uid } of people.rows) {
@@ -115,4 +155,4 @@ async function sendDailyDigests() {
     return { candidates: people.rows.length, sent };
 }
 
-module.exports = { sendDailyDigests, buildDigest, fetchFriendActivity, describe };
+module.exports = { sendDailyDigests, buildDigest, fetchFriendActivity, fetchFollowedListUpdates, describe };
