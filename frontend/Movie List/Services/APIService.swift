@@ -79,6 +79,19 @@ struct MovieDetailsResponse: Codable {
     let note: String?
     // Placed by Smart Placement and not yet approved
     let ai_placed: Bool?
+    // On shared lists, who added it when it wasn't the user
+    let added_by_name: String?
+}
+
+/// Someone on a shared list: its owner, or a person they invited to edit it
+struct ListMember: Codable, Identifiable, Hashable {
+    var id: String { handle }
+    let handle: String
+    let display_name: String
+    let avatar_version: Double?
+    let is_owner: Bool
+    // The signed-in user
+    let is_me: Bool
 }
 
 struct ListDetailsResponse: Codable {
@@ -93,6 +106,10 @@ struct ListDetailsResponse: Codable {
     let skipped: [String]?
     // "public", "followers" or "private"
     let visibility: String?
+    // False for lists someone else owns and invited the user to edit; nil from servers before shared lists
+    let is_owner: Bool?
+    // Everyone on a shared list, owner first; empty when it isn't shared
+    let members: [ListMember]?
 }
 
 struct LetterboxdImportRequest: Encodable {
@@ -135,6 +152,50 @@ struct MovieGroup: Decodable, Identifiable, Hashable {
     let is_owner: Bool
     let members: [UserSummary]
     let ai_possible: Bool
+    // Whether a vote is open, and whether the user still has films to vote on in it. Optional for older servers
+    let poll_open: Bool?
+    let needs_my_vote: Bool?
+}
+
+/// A movie night vote: 2 to 5 films someone in a group sent, with everyone's 👍 and 👎 so far
+struct GroupPoll: Decodable, Equatable {
+    let id: Int64
+    let created_by_name: String?
+    let started_by_me: Bool
+    let closes_at: String
+    let closed: Bool
+    let winner_tmdb_id: Int64?
+    // How many people have voted on at least one film, out of everyone in the group
+    let voters: Int
+    let people: Int
+    let options: [PollOption]
+
+    var winner: PollOption? { options.first { $0.tmdb_id == winner_tmdb_id } }
+
+    var closesAt: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: closes_at) ?? ISO8601DateFormatter().date(from: closes_at)
+    }
+}
+
+struct PollOption: Decodable, Identifiable, Equatable {
+    var id: Int64 { tmdb_id }
+    let tmdb_id: Int64
+    let title: String
+    let poster_path: String?
+    let release_date: String?
+    let reason: String?
+    let up: Int
+    let down: Int
+    // 1, -1, or 0 when the user hasn't voted on it
+    let my_vote: Int
+
+    /// As a Movie, for adding the winner to a list
+    var movie: Movie {
+        Movie(id: tmdb_id, title: title, release_date: release_date ?? "", overview: "", poster_path: poster_path,
+              original_language: "", popularity: 0, reason: reason)
+    }
 }
 
 /// A year of the user's diary, for Year in Review
@@ -186,6 +247,13 @@ struct MovieNightFilters: Equatable {
 }
 
 /// A streaming service the user can filter recommendations by
+/// Which services the user has, in which country, and whether they want to hear when watchlist films arrive on them
+struct StreamingPreferences: Decodable {
+    let region: String?
+    let services: [Int]
+    let notify: Bool
+}
+
 struct StreamingService: Codable, Hashable, Identifiable {
     let id: Int
     let name: String
@@ -214,6 +282,12 @@ struct WatchProviders: Decodable {
     let buy: [WatchProvider]
 
     var isEmpty: Bool { stream.isEmpty && free.isEmpty && rent.isEmpty && buy.isEmpty }
+}
+
+/// A film's main trailer on YouTube; key is nil when it has none
+struct Trailer: Decodable {
+    let key: String?
+    let name: String?
 }
 
 // MARK: - Friends
@@ -572,12 +646,26 @@ class APIService {
         sendJSON("GET", "/users/me/followed-lists", completion: completion)
     }
 
-    /// Streaming services in the user's country, most popular first
     /// The user's Year in Review for a year
     func fetchYearReview(year: Int, completion: @escaping (Result<YearReview, Error>) -> Void) {
         sendJSON("GET", "/users/me/year-review", query: [URLQueryItem(name: "year", value: String(year))], completion: completion)
     }
 
+    /// The user's streaming services and country, and whether they want "now streaming" alerts
+    func fetchStreamingPreferences(completion: @escaping (Result<StreamingPreferences, Error>) -> Void) {
+        sendJSON("GET", "/users/me/streaming", completion: completion)
+    }
+
+    /// Saves any of them; nil leaves that one as it is. Calls back with what was saved
+    func saveStreamingPreferences(services: [Int]? = nil, notify: Bool? = nil, completion: @escaping (Result<StreamingPreferences, Error>) -> Void) {
+        // The country always goes along, so alerts follow the user when they move
+        var body: [String: Any] = ["region": Locale.current.region?.identifier ?? "US"]
+        if let services { body["services"] = services }
+        if let notify { body["notify"] = notify }
+        sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
+    }
+
+    /// Streaming services in the user's country, most popular first
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
     }
@@ -761,7 +849,66 @@ class APIService {
         }
     }
 
+    /// Sends films for the group to vote on, closing after the given hours; calls back with the new poll
+    func startPoll(groupID: Int64, films: [Movie], hours: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
+        let body: [String: Any] = [
+            "hours": hours,
+            "films": films.map { film -> [String: Any] in
+                var item: [String: Any] = ["tmdb_id": film.id, "title": film.title, "release_date": film.release_date]
+                if let poster = film.poster_path { item["poster_path"] = poster }
+                if let reason = film.reason { item["reason"] = reason }
+                return item
+            },
+        ]
+        sendJSON("POST", "/users/me/groups/\(groupID)/polls", body: body, completion: completion)
+    }
+
+    /// The group's open vote, or the last one for a day after it closes; nil when there's none
+    func fetchPoll(groupID: Int64, completion: @escaping (Result<GroupPoll?, Error>) -> Void) {
+        sendJSON("GET", "/users/me/groups/\(groupID)/polls/current") { (result: Result<GroupPoll, Error>) in
+            switch result {
+            case .success(let poll): completion(.success(poll))
+            // 204: no vote right now
+            case .failure(let error) where (error as NSError).code == 204: completion(.success(nil))
+            case .failure(let error): completion(.failure(error))
+            }
+        }
+    }
+
+    /// Votes 👍 (1) or 👎 (-1) on a film, or takes the vote back (0); calls back with the poll as it is now
+    func vote(groupID: Int64, pollID: Int64, tmdbID: Int64, vote: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
+        sendJSON("PUT", "/users/me/groups/\(groupID)/polls/\(pollID)/votes", body: ["tmdb_id": tmdbID, "vote": vote], completion: completion)
+    }
+
     /// Deletes a group the user made, or leaves one they were added to
+    /// Invites someone the user follows to edit one of their lists. Calls back with nil once they're added,
+    /// otherwise with a reason to show
+    func addListEditor(listID: Int64, handle: String, completion: @escaping (String?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)/editors") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle])
+        send(request) { data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let message = (200...299).contains(status) ? nil
+                : data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                    ?? "Couldn't add them. Check your connection and try again."
+            DispatchQueue.main.async { completion(message) }
+        }
+    }
+
+    /// Takes someone off a shared list (the owner can remove anyone), or with no handle, leaves it
+    func removeListEditor(listID: Int64, handle: String? = nil, completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)/editors/\(handle ?? "me")") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        send(request) { _, response, _ in
+            let ok = (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { completion(ok) }
+        }
+    }
+
     func leaveGroup(_ id: Int64, completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: "\(baseURL)/users/me/groups/\(id)") else { return }
         var request = URLRequest(url: url)
@@ -1035,6 +1182,27 @@ class APIService {
                 result = .success(decoded)
             } else {
                 result = .failure(error ?? NSError(domain: "Watch providers lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    /// The film's main trailer on YouTube, if TMDb knows of one
+    func fetchTrailer(tmdbID: Int64, completion: @escaping (Result<Trailer, Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/movies/trailer")
+        components?.queryItems = [URLQueryItem(name: "tmdb_id", value: String(tmdbID))]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            let result: Result<Trailer, Error>
+            if let data, let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+               let decoded = try? JSONDecoder().decode(Trailer.self, from: data) {
+                result = .success(decoded)
+            } else {
+                result = .failure(error ?? NSError(domain: "Trailer lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }

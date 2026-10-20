@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import FirebaseAuth
 
 
 extension CDMovieList {
@@ -202,5 +203,67 @@ enum AIPlacement {
         saved = Set(lists.flatMap { list in
             list.movies.filter { $0.ai_placed == true }.map { key(list.id, $0.id) }
         })
+    }
+}
+
+
+/// Who's on each shared list and who added which film, kept on the phone (Core Data has no fields for them) and
+/// refreshed from the server on every sync. Lists that aren't shared have no entry
+final class ListSharing: ObservableObject {
+    static let shared = ListSharing()
+
+    struct Info: Codable {
+        // False when someone else owns the list and invited the user to edit it
+        var isOwner: Bool
+        var members: [ListMember]
+        // Film id -> name of whoever added it, when it wasn't the user
+        var addedBy: [String: String]
+    }
+
+    private static let storageKey = "listSharing"
+
+    @Published private(set) var lists: [Int64: Info] = [:]
+
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: Self.storageKey),
+           let saved = try? JSONDecoder().decode([Int64: Info].self, from: data) {
+            lists = saved
+        }
+    }
+
+    func replaceAll(from responses: [ListDetailsResponse]) {
+        var updated: [Int64: Info] = [:]
+        for response in responses {
+            let members = response.members ?? []
+            let isOwner = response.is_owner ?? true
+            guard !members.isEmpty || !isOwner else { continue }
+            var addedBy: [String: String] = [:]
+            for movie in response.movies {
+                if let name = movie.added_by_name { addedBy[String(movie.id)] = name }
+            }
+            updated[response.id] = Info(isOwner: isOwner, members: members, addedBy: addedBy)
+        }
+        lists = updated
+        if let data = try? JSONEncoder().encode(updated) {
+            UserDefaults.standard.set(data, forKey: Self.storageKey)
+        }
+    }
+
+    func isShared(_ listID: Int64) -> Bool { lists[listID] != nil }
+
+    /// Whether the user owns the list; true for every list that isn't shared
+    func isOwner(_ listID: Int64) -> Bool { lists[listID]?.isOwner ?? true }
+
+    func members(of listID: Int64) -> [ListMember] { lists[listID]?.members ?? [] }
+
+    /// Everyone on the list but the user, owner first
+    func others(on listID: Int64) -> [ListMember] { members(of: listID).filter { !$0.is_me } }
+
+    func addedBy(listID: Int64, movieID: Int64) -> String? { lists[listID]?.addedBy[String(movieID)] }
+
+    /// Loads the lists again, after someone was added to or taken off one
+    func refresh(completion: (() -> Void)? = nil) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        SyncStatus.shared.sync(firebaseID: uid, completion: completion)
     }
 }

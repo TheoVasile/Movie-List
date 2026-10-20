@@ -72,4 +72,4 @@ async function availableServices(region) {
     return services;
 }
 
-module.exports = { parseFilters, hasFilters, matchesFilters, availableServices };
+module.exports = { parseFilters, hasFilters, matchesFilters, availableServices, streamingServices };

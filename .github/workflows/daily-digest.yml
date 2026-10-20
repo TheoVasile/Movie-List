@@ -1,4 +1,4 @@
-# Sends the daily friends digest notification. The backend's free host sleeps when idle and can't run a
+# Sends the daily friends digest and streaming alert notifications. The backend's free host sleeps when idle and can't run a
 # timer, so this wakes it once a day. Needs the repository secret DIGEST_SECRET, matching the backend's
 name: Daily friends digest
 
@@ -22,3 +22,12 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 120 -X POST \
             -H "x-digest-secret: $DIGEST_SECRET" \
             https://movie-list-backend-dgct.onrender.com/internal/digest
+      - name: Send streaming alerts
+        # Films on watchlists that just started streaming on someone's services, or come out today
+        if: always()
+        env:
+          DIGEST_SECRET: ${{ secrets.DIGEST_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 300 -X POST \
+            -H "x-digest-secret: $DIGEST_SECRET" \
+            https://movie-list-backend-dgct.onrender.com/internal/streaming-alerts

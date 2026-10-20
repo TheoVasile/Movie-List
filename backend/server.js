@@ -9,13 +9,15 @@ const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
 const pool = require("./config/db");
 const { sendDailyDigests } = require("./services/digestService");
+const { sendStreamingAlerts } = require("./services/streamingAlerts");
 
 const app = express();
 // Letterboxd imports can carry thousands of films in one request
 app.use(express.json({ limit: "5mb" }));
 app.use(cors());
 
-createTables();
+// Then closes movie night votes on time, which needs their tables
+createTables().then(() => require("./models/pollModel").scheduleOpenPolls());
 
 // For the host's health checks, so it needs no sign-in
 app.get("/health", (req, res) => res.send("ok"));
@@ -30,6 +32,19 @@ app.post("/internal/digest", async (req, res) => {
         res.json(await sendDailyDigests());
     } catch (error) {
         console.error("Error sending digests:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Sends the day's streaming alerts, from the same daily GitHub Action as the digest, with the same secret
+app.post("/internal/streaming-alerts", async (req, res) => {
+    const secret = process.env.DIGEST_SECRET;
+    if (!secret) return res.status(503).json({ error: "Alerts aren't set up." });
+    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        res.json(await sendStreamingAlerts());
+    } catch (error) {
+        console.error("Error sending streaming alerts:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

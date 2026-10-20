@@ -59,11 +59,12 @@ async function removeMovieFromList(list_id, movie_id) {
     }
 }
 
-async function addMovieToList(list_id, movie_id, rank) {
+// added_by is who added it, which shared lists show
+async function addMovieToList(list_id, movie_id, rank, added_by = null) {
     try {
         const result = await pool.query(
-            "INSERT INTO list_movies (list_id, movie_id, rank) VALUES ($1, $2, $3)",
-            [list_id, movie_id, rank]
+            "INSERT INTO list_movies (list_id, movie_id, rank, added_by) VALUES ($1, $2, $3, $4)",
+            [list_id, movie_id, rank, added_by]
         );
         // date_modified tracks when a film was last added, so the app can offer recently used lists first
         await pool.query("UPDATE lists SET date_modified = CURRENT_TIMESTAMP WHERE id = $1", [list_id]);

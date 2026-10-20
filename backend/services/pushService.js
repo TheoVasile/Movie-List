@@ -5,7 +5,9 @@ const pool = require("../config/db");
 const PREFERENCE = {
     follow_request: "notify_requests",
     follow_accepted: "notify_requests",
+    list_invite: "notify_requests",
     activity: "notify_activity",
+    streaming: "notify_streaming",
 };
 
 /// Saves the token for a device the user is signed in on. A token moves to whoever signed in on it last

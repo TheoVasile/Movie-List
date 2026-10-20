@@ -43,6 +43,12 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;
             -- When the user last got the daily friends digest, so they never get two in a day
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
+            -- Streaming alerts: the user's country and services (TMDb provider ids), whether they want the alerts,
+            -- and when they were last sent one
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS streaming_region VARCHAR(2);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS streaming_services INT[] NOT NULL DEFAULT '{}';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_streaming BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS last_streaming_alert_at TIMESTAMP;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (
@@ -55,6 +61,60 @@ const createTables = async () => {
                 group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
                 PRIMARY KEY (group_id, user_id)
+            );
+
+            -- Which services each film streams on in each country, as of the last daily check, so streaming alerts
+            -- only go out for changes
+            CREATE TABLE IF NOT EXISTS film_availability (
+                tmdb_id INT NOT NULL,
+                region VARCHAR(2) NOT NULL,
+                providers INT[] NOT NULL DEFAULT '{}',
+                checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (tmdb_id, region)
+            );
+            -- Streaming alerts already sent, so a film that leaves a service and comes back isn't announced twice
+            CREATE TABLE IF NOT EXISTS streaming_alerts_sent (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                provider_id INT NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, tmdb_id, provider_id)
+            );
+
+            -- Movie night votes: films someone in a group sent for everyone to vote on, and the votes
+            CREATE TABLE IF NOT EXISTS group_polls (
+                id SERIAL PRIMARY KEY,
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                created_by VARCHAR(255) REFERENCES users(firebase_uid) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closes_at TIMESTAMP NOT NULL,
+                closed_at TIMESTAMP,
+                winner_tmdb_id INT
+            );
+            CREATE TABLE IF NOT EXISTS poll_options (
+                poll_id INT NOT NULL REFERENCES group_polls(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                poster_path VARCHAR(255),
+                release_date VARCHAR(20),
+                reason TEXT,
+                position INT NOT NULL,
+                PRIMARY KEY (poll_id, tmdb_id)
+            );
+            CREATE TABLE IF NOT EXISTS poll_votes (
+                poll_id INT NOT NULL REFERENCES group_polls(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                vote SMALLINT NOT NULL CHECK (vote IN (-1, 1)),
+                PRIMARY KEY (poll_id, tmdb_id, user_id)
+            );
+
+            -- People the owner of a list has invited to edit it with them: they can add, rank and remove its films
+            CREATE TABLE IF NOT EXISTS list_editors (
+                list_id INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (list_id, user_id)
             );
 
             -- Lists people follow to hear about updates in their daily digest
@@ -126,6 +186,8 @@ const createTables = async () => {
             -- Placed by Smart Placement (Claude) rather than by the user. Cleared when the user approves the
             -- spot or moves the film themselves
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS ai_placed BOOLEAN NOT NULL DEFAULT false;
+            -- Who added a film, for shared lists. Null for films added before lists could be shared
+            ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_by VARCHAR(255) REFERENCES users(firebase_uid) ON DELETE SET NULL;
 
             -- Watched is per user, not per list: a film watched once shows as watched in every list
             CREATE TABLE IF NOT EXISTS watched_movies (
