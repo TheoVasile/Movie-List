@@ -33,6 +33,7 @@ struct UserProfileView: View {
                         diaryLink
                         FollowingSection()
                         FollowedListsSection()
+                        MovieNightGroupsSection()
                             .appearAnimation(delay: 0.18)
                         listsSection
                     }

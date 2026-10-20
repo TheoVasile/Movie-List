@@ -1,4 +1,5 @@
 const express = require("express");
+const { fetchGroups, createGroup, leaveOrDeleteGroup } = require("../models/groupModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
@@ -90,6 +91,46 @@ router.post("/contacts/match", async (req, res) => {
         res.json(await matchContacts(req.user.uid, emails, phones));
     } catch (error) {
         console.error("Error matching contacts:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Movie night groups the user owns or is in
+router.get("/me/groups", async (req, res) => {
+    try {
+        res.json(await fetchGroups(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching groups:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Makes a group from people the user follows, e.g. { "name": "Friday crew", "handles": ["sam", "ana"] }
+router.post("/me/groups", async (req, res) => {
+    const name = typeof req.body.name === "string" ? req.body.name.trim().slice(0, 60) : "";
+    const handles = (Array.isArray(req.body.handles) ? req.body.handles : []).map((h) => String(h).toLowerCase()).slice(0, 20);
+    if (!name || !handles.length) {
+        return res.status(400).json({ error: "A group needs a name and at least one person." });
+    }
+    try {
+        const id = await createGroup(req.user.uid, name, handles);
+        if (!id) return res.status(403).json({ error: "You can only add people you follow." });
+        res.status(201).json({ id });
+    } catch (error) {
+        console.error("Error creating group:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The owner deletes a group; anyone else leaves it
+router.delete("/me/groups/:id", async (req, res) => {
+    try {
+        if (!(await leaveOrDeleteGroup(req.user.uid, Number(req.params.id)))) {
+            return res.status(404).json({ error: "Group not found." });
+        }
+        res.status(204).end();
+    } catch (error) {
+        console.error("Error leaving group:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
