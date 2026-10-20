@@ -2,6 +2,7 @@ const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup } = require("../models/groupModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
+const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
@@ -120,6 +121,64 @@ router.post("/me/groups", async (req, res) => {
         res.status(201).json({ id });
     } catch (error) {
         console.error("Error creating group:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Sends 2 to 5 films for the group to vote on, e.g. { "films": [{ "tmdb_id": 329865, "title": "Arrival",
+// "poster_path": "/x.jpg", "release_date": "2016-11-10", "reason": "..." }], "hours": 3 }. Everyone else gets a push
+router.post("/me/groups/:id/polls", async (req, res) => {
+    const groupId = Number(req.params.id);
+    const seen = new Set();
+    const films = (Array.isArray(req.body.films) ? req.body.films : [])
+        .map((film) => ({
+            tmdb_id: Number(film?.tmdb_id),
+            title: typeof film?.title === "string" ? film.title.trim().slice(0, 255) : "",
+            poster_path: typeof film?.poster_path === "string" ? film.poster_path.slice(0, 255) : null,
+            release_date: typeof film?.release_date === "string" ? film.release_date.slice(0, 20) : null,
+            reason: typeof film?.reason === "string" ? film.reason.slice(0, 500) : null,
+        }))
+        .filter((film) => Number.isInteger(film.tmdb_id) && film.tmdb_id > 0 && film.title && !seen.has(film.tmdb_id) && seen.add(film.tmdb_id));
+    const hours = Math.min(24, Math.max(1, Math.round(Number(req.body.hours) || 3)));
+    if (!Number.isInteger(groupId) || films.length < MIN_FILMS || films.length > MAX_FILMS) {
+        return res.status(400).json({ error: `Pick ${MIN_FILMS} to ${MAX_FILMS} films to vote on.` });
+    }
+    try {
+        const id = await startPoll(req.user.uid, groupId, films, hours);
+        if (!id) return res.status(404).json({ error: "Group not found." });
+        res.status(201).json(await currentPoll(req.user.uid, groupId));
+    } catch (error) {
+        console.error("Error starting poll:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The group's open vote, or the last one for a day after it closes; 204 when there's none
+router.get("/me/groups/:id/polls/current", async (req, res) => {
+    try {
+        const poll = await currentPoll(req.user.uid, Number(req.params.id));
+        if (!poll) return res.status(204).end();
+        res.json(poll);
+    } catch (error) {
+        console.error("Error fetching poll:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Votes on one film, e.g. { "tmdb_id": 329865, "vote": 1 } (1 👍, -1 👎, 0 takes it back). Returns the poll as it is now
+router.put("/me/groups/:id/polls/:pollId/votes", async (req, res) => {
+    const groupId = Number(req.params.id), pollId = Number(req.params.pollId), tmdbId = Number(req.body.tmdb_id);
+    const value = Number(req.body.vote);
+    if (![groupId, pollId, tmdbId].every(Number.isInteger) || ![1, 0, -1].includes(value)) {
+        return res.status(400).json({ error: "A tmdb_id and a vote of 1, 0 or -1 are required." });
+    }
+    try {
+        if (!(await vote(req.user.uid, groupId, pollId, tmdbId, value))) {
+            return res.status(409).json({ error: "This vote has closed." });
+        }
+        res.json(await currentPoll(req.user.uid, groupId));
+    } catch (error) {
+        console.error("Error voting:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

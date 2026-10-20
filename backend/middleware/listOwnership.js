@@ -1,4 +1,4 @@
-const { isListOwner } = require("../models/listModel");
+const { isListOwner, canEditList } = require("../models/listModel");
 
 // Only lets a request through when the list it touches belongs to the signed-in user.
 // Must run after verifyToken. Answers 404 rather than 403 so other users' list ids can't be probed
@@ -17,4 +17,21 @@ function requireListOwner(getListId) {
     };
 }
 
+// Like requireListOwner, but also lets through people the owner invited to edit the list
+function requireListEditor(getListId) {
+    return async (req, res, next) => {
+        try {
+            const listId = Number(getListId(req));
+            if (!Number.isInteger(listId) || !(await canEditList(listId, req.user.uid))) {
+                return res.status(404).json({ error: "List not found." });
+            }
+            next();
+        } catch (error) {
+            console.error("Error checking list access:", error);
+            res.status(500).json({ error: "Internal server error" });
+        }
+    };
+}
+
 module.exports = requireListOwner;
+module.exports.requireListEditor = requireListEditor;

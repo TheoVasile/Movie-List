@@ -16,6 +16,8 @@ struct MovieRow: View {
     var info: MovieInfo? = nil
     // Placed by Claude rather than by hand, shown as a faint mark on the rank
     var aiPlaced = false
+    // On shared lists, who added it when it wasn't the user
+    var addedBy: String? = nil
     var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
     
@@ -57,6 +59,15 @@ struct MovieRow: View {
                 .lineLimit(1)
                 .font(.caption.weight(.medium))
                 .foregroundColor(Theme.textSecondary)
+                if let addedBy {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.fill")
+                        Text("Added by \(addedBy)")
+                    }
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(Theme.textTertiary)
+                        .lineLimit(1)
+                }
                 if movie.watched {
                     WatchedTag()
                         .transition(.scale(scale: 0.8, anchor: .leading).combined(with: .opacity))

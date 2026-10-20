@@ -222,15 +222,24 @@ private extension Home {
                         }
                         .buttonStyle(PressableButtonStyle())
                         .contextMenu {
-                            Button {
-                                editingList = movieList
-                            } label: {
-                                Label("Edit List", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                deleteList(movieList)
-                            } label: {
-                                Label("Delete List", systemImage: "trash")
+                            // Someone else's list the user was invited to edit can only be left
+                            if ListSharing.shared.isOwner(movieList.id) {
+                                Button {
+                                    editingList = movieList
+                                } label: {
+                                    Label("Edit List", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    deleteList(movieList)
+                                } label: {
+                                    Label("Delete List", systemImage: "trash")
+                                }
+                            } else {
+                                Button(role: .destructive) {
+                                    leaveList(movieList)
+                                } label: {
+                                    Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
+                                }
                             }
                         }
                         .appearAnimation(delay: Double(min(index, 8)) * 0.06)
@@ -290,6 +299,16 @@ private extension Home {
             exportItem = ShareItem(items: [try ListExport.makeZip(lists: Array(movieLists))])
         } catch {
             print("Error exporting lists:", error)
+        }
+    }
+
+    func leaveList(_ list: CDMovieList) {
+        APIService.shared.removeListEditor(listID: list.id) { ok in
+            guard ok else { return }
+            withAnimation(Theme.spring) {
+                CDMovieList.delete(movieList: list)
+            }
+            ListSharing.shared.refresh()
         }
     }
 
@@ -365,7 +384,11 @@ private struct ListCard: View {
                     Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
                     // Followers is the usual case, so only the other two get a quiet marker
                     let visibility = ListVisibility.of(movieList.id)
-                    if visibility != .followers {
+                    if ListSharing.shared.isShared(movieList.id) {
+                        Image(systemName: "person.2.fill")
+                            .imageScale(.small)
+                            .accessibilityLabel("Shared")
+                    } else if visibility != .followers {
                         Image(systemName: visibility.icon)
                             .imageScale(.small)
                             .accessibilityLabel(visibility == .public ? "Public" : "Private")

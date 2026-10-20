@@ -350,6 +350,8 @@ struct MovieDetailView: View {
             }
             .appearAnimation(delay: 0.18)
 
+            TrailerButton(tmdbID: Int64(movie.tmdb_id), title: movie.title ?? "")
+
             // The overview comes straight after the title, so it's readable without scrolling
             if let overview = movie.overview, !overview.isEmpty {
                 overviewSection(overview)
