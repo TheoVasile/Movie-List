@@ -659,6 +659,22 @@ struct FriendProfileView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 30)
                 }
+
+                // Lists they've made public can be seen and followed without following them
+                if !social.isFollowing(person.handle), let lists, !lists.lists.isEmpty {
+                    Text("Public Lists")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.top, 6)
+                    ForEach(lists.lists) { list in
+                        NavigationLink {
+                            FriendListView(list: list, owner: person.display_name)
+                        } label: {
+                            friendListCard(list)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
+                }
             }
             .padding(16)
         }
@@ -698,7 +714,6 @@ struct FriendProfileView: View {
     }
 
     private func load() {
-        guard social.isFollowing(person.handle) else { return }
         loadFailed = false
         APIService.shared.fetchFriendLists(person.handle) { result in
             switch result {
@@ -740,6 +755,11 @@ struct FriendProfileView: View {
 struct FriendListView: View {
     let list: FriendLists.List
     let owner: String
+    // nil until loaded from the list, then whatever the user last chose
+    @State private var followed: Bool? = nil
+    @State private var saving = false
+
+    private var isFollowed: Bool { followed ?? list.followed ?? false }
 
     var body: some View {
         List {
@@ -783,6 +803,93 @@ struct FriendListView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(list.name)
+        .toolbar {
+            // Following a list adds films added to it to the daily digest
+            if list.owner_handle != SocialStore.shared.profile?.handle {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        toggleFollow()
+                    } label: {
+                        Label(isFollowed ? "Following" : "Follow List", systemImage: isFollowed ? "bell.fill" : "bell")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .disabled(saving)
+                    .accessibilityHint("Get updates in your daily digest when films are added")
+                }
+            }
+        }
+    }
+
+    private func toggleFollow() {
+        Haptics.tap()
+        let wanted = !isFollowed
+        followed = wanted
+        saving = true
+        APIService.shared.setListFollowed(list.id, wanted) { saved in
+            saving = false
+            if saved {
+                FollowedListsStore.shared.load()
+            } else {
+                followed = !wanted
+            }
+        }
+    }
+}
+
+/// Other people's lists the user follows, shared by the screens that show them
+final class FollowedListsStore: ObservableObject {
+    static let shared = FollowedListsStore()
+    @Published private(set) var lists: [FriendLists.List] = []
+
+    func load() {
+        APIService.shared.fetchFollowedLists { result in
+            if case .success(let loaded) = result { self.lists = loaded }
+        }
+    }
+}
+
+/// "Lists You Follow" on Profile
+struct FollowedListsSection: View {
+    @ObservedObject private var store = FollowedListsStore.shared
+
+    var body: some View {
+        Group {
+            if !store.lists.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Lists You Follow")
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(Theme.textPrimary)
+                    ForEach(store.lists) { list in
+                        NavigationLink {
+                            FriendListView(list: list, owner: list.owner_name ?? "")
+                        } label: {
+                            HStack(spacing: 12) {
+                                PosterImage(path: list.movies.first?.poster_path, cornerRadius: 6, size: .small)
+                                    .frame(width: 40, height: 60)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(list.name)
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                        .lineLimit(1)
+                                    Text("by \(list.owner_name ?? "someone") · \(list.movies.count) films")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(Theme.textTertiary)
+                            }
+                            .padding(12)
+                            .cardStyle(cornerRadius: 16)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
+                }
+            }
+        }
+        .onAppear { store.load() }
     }
 }
 

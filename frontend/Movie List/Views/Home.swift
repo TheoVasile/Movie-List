@@ -361,9 +361,18 @@ private struct ListCard: View {
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
-                Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                HStack(spacing: 4) {
+                    Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
+                    // Followers is the usual case, so only the other two get a quiet marker
+                    let visibility = ListVisibility.of(movieList.id)
+                    if visibility != .followers {
+                        Image(systemName: visibility.icon)
+                            .imageScale(.small)
+                            .accessibilityLabel(visibility == .public ? "Public" : "Private")
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
             }
         }
         .padding(14)
@@ -417,6 +426,7 @@ struct EditListSheet: View {
     @Environment(\.managedObjectContext) private var context
     @State private var name: String
     @State private var overview: String
+    @State private var visibility: ListVisibility
     @State private var isSaving = false
     @State private var saveFailed = false
 
@@ -424,6 +434,7 @@ struct EditListSheet: View {
         self.movieList = movieList
         _name = State(initialValue: movieList.name ?? "")
         _overview = State(initialValue: movieList.overview ?? "")
+        _visibility = State(initialValue: ListVisibility.of(movieList.id))
     }
 
     private var trimmedName: String {
@@ -431,7 +442,7 @@ struct EditListSheet: View {
     }
 
     private var hasChanges: Bool {
-        trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "")
+        trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "") || visibility != ListVisibility.of(movieList.id)
     }
 
     var body: some View {
@@ -449,6 +460,18 @@ struct EditListSheet: View {
                     Text("Description")
                 } footer: {
                     Text("Optional. Shown at the top of the list.")
+                }
+                .listRowBackground(Theme.surface)
+                Section {
+                    Picker("Who Can See It", selection: $visibility) {
+                        ForEach(ListVisibility.allCases) { option in
+                            Label(option.title, systemImage: option.icon).tag(option)
+                        }
+                    }
+                } header: {
+                    Text("Visibility")
+                } footer: {
+                    Text(visibility.explanation)
                 }
                 .listRowBackground(Theme.surface)
             }
@@ -481,11 +504,12 @@ struct EditListSheet: View {
 
     private func save() {
         isSaving = true
-        APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview) { result in
+        APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview, visibility: visibility) { result in
             isSaving = false
             switch result {
             case .success:
                 Haptics.success()
+                ListVisibility.remember(visibility, for: movieList.id)
                 movieList.name = trimmedName
                 movieList.overview = overview
                 try? context.save()

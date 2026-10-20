@@ -229,11 +229,11 @@ const MOVIE_NIGHT_MIN_VOTES = 100;
 async function classicMovieNight(user_id, friend, friendName, count) {
     const [mySeeds, friendSeeds, myIds, friendIds, myWatchlist, friendWatchlist] = await Promise.all([
         fetchTopFilms(user_id, MOVIE_NIGHT_SEEDS),
-        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS),
+        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS, true),
         fetchListedTmdbIds(user_id),
         fetchListedTmdbIds(friend.firebase_uid),
         fetchUnwatchedWatchlist(user_id),
-        fetchUnwatchedWatchlist(friend.firebase_uid),
+        fetchUnwatchedWatchlist(friend.firebase_uid, true),
     ]);
 
     // Films you both want to watch
@@ -324,7 +324,7 @@ router.post("/movie-night", async (req, res) => {
 
         const [myLists, friendLists, myIds, friendIds] = await Promise.all([
             fetchListsForTaste(req.user.uid),
-            fetchListsForTaste(friend.firebase_uid),
+            fetchListsForTaste(friend.firebase_uid, true),
             fetchListedTmdbIds(req.user.uid),
             fetchListedTmdbIds(friend.firebase_uid),
         ]);

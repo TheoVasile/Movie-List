@@ -32,6 +32,7 @@ struct UserProfileView: View {
                         statsLink
                         diaryLink
                         FollowingSection()
+                        FollowedListsSection()
                             .appearAnimation(delay: 0.18)
                         listsSection
                     }
