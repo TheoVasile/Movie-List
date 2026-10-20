@@ -9,15 +9,20 @@ import Foundation
 import SwiftUI
 import CoreData
 
-/// Films the user and a friend would both enjoy, picked by the AI from both people's lists. Each pick
-/// says why it suits them both, and can be added straight to the user's lists
+/// Films the user and a friend would both enjoy, each saying why it suits them both, that can be added
+/// straight to the user's lists. AI Picks come from Claude reading both people's lists, and are only
+/// offered when both of them allow AI; Classic picks come from TMDb's recommendations for both people's
+/// favourites, plus films on both their watchlists
 struct MovieNightView: View {
     let person: UserSummary
+    // Whether both people allow AI features, which AI Picks need
+    let canUseAI: Bool
 
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authViewModel: AuthenticationViewModel
 
+    @State private var usesAI: Bool
     @State private var picks: [Movie] = []
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
@@ -25,8 +30,16 @@ struct MovieNightView: View {
     @State private var adding: Movie? = nil
     @State private var added: Set<Int64> = []
 
+    init(person: UserSummary, canUseAI: Bool) {
+        self.person = person
+        self.canUseAI = canUseAI
+        _usesAI = State(initialValue: canUseAI)
+    }
+
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
+                sourcePicker
             ZStack {
                 Theme.background.ignoresSafeArea()
                 if isLoading {
@@ -43,7 +56,9 @@ struct MovieNightView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Picked from your lists and \(person.display_name)'s. None of these are in either of your lists yet.")
+                            Text(usesAI
+                                 ? "Picked by Claude from your lists and \(person.display_name)'s. None of these are in either of your lists yet."
+                                 : "Recommended by TMDb from your favourites and \(person.display_name)'s, plus anything on both your watchlists.")
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
                             ForEach(Array(picks.enumerated()), id: \.element.id) { index, movie in
@@ -55,6 +70,8 @@ struct MovieNightView: View {
                     }
                 }
             }
+            }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Movie Night with \(person.display_name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -128,13 +145,15 @@ struct MovieNightView: View {
     private func load() {
         isLoading = true
         errorMessage = nil
-        APIService.shared.movieNight(with: person.handle) { result in
+        APIService.shared.movieNight(with: person.handle, usesAI: usesAI && canUseAI) { result in
             isLoading = false
             switch result {
             case .success(let movies):
                 picks = movies
                 if movies.isEmpty {
-                    errorMessage = "The AI didn't find anything new for you both this time."
+                    errorMessage = usesAI
+                        ? "The AI didn't find anything new for you both this time."
+                        : "Not enough to go on yet. Movie Night works best when you've both ranked a few films."
                 }
             case .failure(let error):
                 switch (error as NSError).code {
@@ -146,6 +165,26 @@ struct MovieNightView: View {
                 }
             }
         }
+    }
+
+    // AI Picks or Classic, like Discover. AI Picks only when both people allow AI
+    private var sourcePicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("Recommendations", selection: $usesAI) {
+                Text("AI Picks").tag(true)
+                Text("Classic").tag(false)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!canUseAI || isLoading)
+            .onChange(of: usesAI) { _ in load() }
+            if !canUseAI {
+                Text("AI Picks need you and \(person.display_name) to both allow AI features in Settings.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     private func add(_ movie: Movie, to lists: [CDMovieList]) {

@@ -56,4 +56,33 @@ async function fetchFriend(user_id, handle) {
     return result.rows[0] ?? null;
 }
 
-module.exports = { fetchListsForTaste, fetchListedTmdbIds, fetchFriend };
+// The films that best show someone's taste: the top of their biggest list that isn't a watchlist
+async function fetchTopFilms(user_id, limit) {
+    const result = await pool.query(
+        `SELECT m.tmdb_id, m.title
+         FROM list_movies lm JOIN movies m ON m.id = lm.movie_id
+         WHERE lm.list_id = (
+             SELECT l.id FROM lists l JOIN list_movies c ON c.list_id = l.id
+             WHERE l.user_id = $1 AND l.name NOT ILIKE '%watch%'
+             GROUP BY l.id ORDER BY COUNT(*) DESC LIMIT 1
+         )
+         ORDER BY lm.rank NULLS LAST
+         LIMIT $2`,
+        [user_id, limit]
+    );
+    return result.rows.map((row) => ({ tmdb_id: Number(row.tmdb_id), title: row.title }));
+}
+
+// Films someone hasn't watched yet in their watchlists (lists with "watch" in the name), by TMDb id
+async function fetchUnwatchedWatchlist(user_id) {
+    const result = await pool.query(
+        `SELECT DISTINCT m.tmdb_id, m.title, m.release_date, m.overview, m.poster_path, m.original_language, m.popularity
+         FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
+         WHERE l.user_id = $1 AND l.name ILIKE '%watch%'
+           AND NOT EXISTS (SELECT 1 FROM watched_movies w WHERE w.user_id = $1 AND w.movie_id = m.id)`,
+        [user_id]
+    );
+    return new Map(result.rows.map((row) => [Number(row.tmdb_id), row]));
+}
+
+module.exports = { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist };

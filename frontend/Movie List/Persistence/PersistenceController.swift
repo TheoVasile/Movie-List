@@ -186,6 +186,26 @@ struct PersistenceController {
         return formatter.date(from: string)
     }
 
+    // For films that aren't in any list, like Discover's, so screens built for saved films can show them.
+    // Nothing made here is ever saved
+    private static let scratchContext: NSManagedObjectContext = {
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = shared.container.persistentStoreCoordinator
+        return context
+    }()
+
+    /// A temporary copy of a TMDb film for the film info screen. It has no rank and isn't in any list
+    static func preview(of movie: Movie) -> CDMovie {
+        let context = scratchContext
+        context.reset()
+        let release = (try? CDMovie(id: 0, tmdb_id: Int32(movie.id), title: movie.title, release_date: movie.release_date,
+                                    overview: movie.overview, rank: 0, poster_path: movie.poster_path ?? "",
+                                    original_language: movie.original_language, popularity: movie.popularity, context: context))
+        return release ?? CDMovie(id: 0, tmdb_id: Int32(movie.id), title: movie.title, release_date: Date(), overview: movie.overview,
+                                  rank: 0, poster_path: movie.poster_path ?? "", original_language: movie.original_language,
+                                  popularity: movie.popularity, context: context)
+    }
+
     func deleteAllCoreDataObjects() {
         let context = container.viewContext
         let persistentStoreCoordinator = context.persistentStoreCoordinator

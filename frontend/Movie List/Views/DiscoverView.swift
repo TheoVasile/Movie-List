@@ -20,6 +20,8 @@ struct DiscoverView: View {
 
     @State private var dragOffset: CGSize = .zero
     @State private var showDetails = false
+    // The film whose full info screen is open, as a temporary copy that isn't saved anywhere
+    @State private var fullDetails: CDMovie? = nil
     // The film swiped right, waiting for the user to pick a list
     @State private var pendingMovie: Movie? = nil
     @State private var showListPicker = false
@@ -107,6 +109,13 @@ struct DiscoverView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $fullDetails) { preview in
+            // Add to Lists closes the info screen and carries on as if the card was swiped right
+            MovieDetailView(movie: preview, onAddToLists: {
+                fullDetails = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { swipeRight() }
+            })
+        }
         .sheet(isPresented: $showGenrePicker) {
             genrePicker
                 .presentationDetents([.medium, .large])
@@ -134,7 +143,10 @@ private extension DiscoverView {
         } else {
             ZStack {
                 ForEach(Array(viewModel.deck.prefix(3).enumerated()).reversed(), id: \.element.id) { index, movie in
-                    DiscoverCard(movie: movie, showDetails: index == 0 && showDetails)
+                    DiscoverCard(movie: movie, showDetails: index == 0 && showDetails) {
+                        Haptics.tap()
+                        fullDetails = PersistenceController.preview(of: movie)
+                    }
                         .overlay { if index == 0 { swipeStamps } }
                         // Cards behind the top one sit lower and smaller, and grow as the top card is dragged away
                         .scaleEffect(index == 0 ? 1 : 1 - CGFloat(index) * 0.05 + (index == 1 ? dragProgress * 0.05 : 0))
@@ -667,6 +679,8 @@ private extension DiscoverView {
 private struct DiscoverCard: View {
     let movie: Movie
     let showDetails: Bool
+    // Opens the film's full info screen: TMDb score, age rating, Where to Watch, friends' takes and IMDb
+    var onFullDetails: () -> Void = {}
     // Fetched the first time the card's details are opened
     @State private var providers: WatchProviders? = nil
 
@@ -715,6 +729,16 @@ private struct DiscoverCard: View {
                             withAnimation(Theme.spring) { providers = loaded }
                         }
                     }
+                Button(action: onFullDetails) {
+                    Label("Full Details", systemImage: "info.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Theme.posterText)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                .buttonStyle(PressableButtonStyle(scale: 0.94))
+                .transition(.opacity)
             } else {
                 Label("Tap for details", systemImage: "hand.tap")
                     .font(.caption.weight(.semibold))
