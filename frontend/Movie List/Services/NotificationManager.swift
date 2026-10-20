@@ -21,6 +21,7 @@ final class NotificationManager: NSObject, ObservableObject {
     enum Destination: Equatable {
         case profile
         case group(id: Int64)
+        case lists
         case film(tmdbID: Int64)
     }
 
@@ -153,8 +154,14 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
     // Shown as a banner even while the app is open
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        if notification.request.content.userInfo["type"] as? String == "follow_request" {
+        switch notification.request.content.userInfo["type"] as? String {
+        case "follow_request":
             DispatchQueue.main.async { SocialStore.shared.load() }
+        case "list_invite":
+            // The new shared list shows up straight away
+            DispatchQueue.main.async { ListSharing.shared.refresh() }
+        default:
+            break
         }
         completionHandler([.banner, .list, .sound])
     }
@@ -171,6 +178,9 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
                 if let id = (info["group_id"] as? String).flatMap(Int64.init) {
                     self.destination = .group(id: id)
                 }
+            case "list_invite":
+                ListSharing.shared.refresh()
+                self.destination = .lists
             default:
                 if let id = (info["tmdb_id"] as? String).flatMap(Int64.init) ?? (info["tmdb_id"] as? Int64) {
                     self.destination = .film(tmdbID: id)

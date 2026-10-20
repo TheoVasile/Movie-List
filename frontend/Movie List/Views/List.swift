@@ -39,6 +39,10 @@ struct ListView: View {
     // Active while the user drags films into a new order
     @State private var editMode: EditMode = .inactive
     @State private var editingDetails = false
+    // Who's on the list, for shared lists and inviting people
+    @ObservedObject private var sharing = ListSharing.shared
+    @State private var showSharing = false
+    @Environment(\.dismiss) private var dismiss
     
     // Search and genre filters only change which rows are shown; ranks stay as they are
     var filteredMovies: [CDMovie] {
@@ -115,10 +119,13 @@ struct ListView: View {
         .navigationTitle(movieList.name ?? "No Movie Name")
         .navigationBarTitleDisplayMode(.large)
         .toolbarTitleMenu {
-            Button {
-                editingDetails = true
-            } label: {
-                Label("Edit Details", systemImage: "pencil")
+            // Only the owner can rename a shared list
+            if sharing.isOwner(movieList.id) {
+                Button {
+                    editingDetails = true
+                } label: {
+                    Label("Edit Details", systemImage: "pencil")
+                }
             }
             if viewModel.movies.count > 1 {
                 Button {
@@ -141,6 +148,12 @@ struct ListView: View {
         }
         .sheet(isPresented: $editingDetails) {
             EditListSheet(movieList: movieList)
+        }
+        .sheet(isPresented: $showSharing) {
+            ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List") {
+                dismiss()
+            }
+            .presentationDetents([.medium, .large])
         }
         .alert("Couldn't save the new order", isPresented: $viewModel.reorderFailed) {
             Button("OK", role: .cancel) {}
@@ -200,6 +213,12 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
                 }
+                if sharing.isShared(movieList.id), !editMode.isEditing {
+                    SharedListBanner(listID: movieList.id) { showSharing = true }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
                 if viewModel.movies.isEmpty {
                     EmptyStateView(
                         icon: "film",
@@ -245,7 +264,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), onAddToLists: { addingToLists = movie }) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), onAddToLists: { addingToLists = movie }) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())
@@ -374,6 +393,16 @@ private extension ListView {
                         exportZip()
                     } label: {
                         Label("Export List (ZIP)", systemImage: "doc.zipper")
+                    }
+                    Divider()
+                    Button {
+                        showSharing = true
+                    } label: {
+                        if sharing.isOwner(movieList.id) {
+                            Label(sharing.isShared(movieList.id) ? "Edit Together…" : "Edit Together with Friends…", systemImage: "person.2")
+                        } else {
+                            Label("Who Can Edit", systemImage: "person.2")
+                        }
                     }
                 } label: {
                     iconCircle(isPreparingShare ? nil : "square.and.arrow.up")

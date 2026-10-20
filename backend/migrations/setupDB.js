@@ -85,6 +85,14 @@ const createTables = async () => {
                 PRIMARY KEY (poll_id, tmdb_id, user_id)
             );
 
+            -- People the owner of a list has invited to edit it with them: they can add, rank and remove its films
+            CREATE TABLE IF NOT EXISTS list_editors (
+                list_id INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (list_id, user_id)
+            );
+
             -- Lists people follow to hear about updates in their daily digest
             CREATE TABLE IF NOT EXISTS list_follows (
                 user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
@@ -154,6 +162,8 @@ const createTables = async () => {
             -- Placed by Smart Placement (Claude) rather than by the user. Cleared when the user approves the
             -- spot or moves the film themselves
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS ai_placed BOOLEAN NOT NULL DEFAULT false;
+            -- Who added a film, for shared lists. Null for films added before lists could be shared
+            ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_by VARCHAR(255) REFERENCES users(firebase_uid) ON DELETE SET NULL;
 
             -- Watched is per user, not per list: a film watched once shows as watched in every list
             CREATE TABLE IF NOT EXISTS watched_movies (
