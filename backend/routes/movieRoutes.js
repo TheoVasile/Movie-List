@@ -667,6 +667,42 @@ router.get("/imdb", async (req, res) => {
     }
 });
 
+// A film's trailer on YouTube, from TMDb's videos, e.g. ?tmdb_id=27205 -> { key: "YoHD9XEInc0", name: "Official Trailer" },
+// or { key: null } when it has none. It looks for the film's main trailer: official trailers over teasers and TV
+// spots, ones named like a main trailer, and nothing that's a re-release, dub or home-video ad. The oldest wins
+// ties, since a film's first full trailer is usually its main one and later uploads tend to be variants
+const trailerCache = new Map();
+
+router.get("/trailer", async (req, res) => {
+    const tmdbId = Number(req.query.tmdb_id);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
+    const cached = trailerCache.get(tmdbId);
+    if (cached && Date.now() - cached.at < 24 * 60 * 60 * 1000) return res.json(cached.trailer);
+    try {
+        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/videos`, {
+            // English videos plus ones with no language, which TMDb leaves out unless asked
+            params: { api_key: process.env.API_KEY, include_video_language: "en,null" },
+            timeout: 15000,
+        });
+        const variant = /version|b&w|dubbed|blu-?ray|dvd|digital|on demand|re-?release|anniversary|4k|35mm|tv spot|now playing|own it/i;
+        const main = /main trailer|^(official )?((us|international|int'l) )?trailer( \[[^\]]*\])?$/i;
+        const score = (video) => (video.type === "Trailer" ? 4 : 0) + (video.official ? 2 : 0) + (video.iso_639_1 === "en" ? 1 : 0)
+            + (main.test(video.name ?? "") ? 2 : 0) - (/teaser/i.test(video.name ?? "") ? 1 : 0) - (variant.test(video.name ?? "") ? 5 : 0);
+        const best = (response.data.results ?? [])
+            .filter((video) => video.site === "YouTube" && video.key && (video.type === "Trailer" || video.type === "Teaser"))
+            .sort((a, b) => score(b) - score(a) || String(a.published_at).localeCompare(String(b.published_at)))[0];
+        const trailer = best ? { key: best.key, name: best.name } : { key: null, name: null };
+        trailerCache.set(tmdbId, { at: Date.now(), trailer });
+        res.json(trailer);
+    } catch (error) {
+        if (error.response?.status === 404) return res.json({ key: null, name: null });
+        console.error("Error fetching trailer:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Where a film can be watched in one country, from TMDb (availability data by JustWatch), e.g.
 // ?tmdb_id=771&region=CA -> { region: "CA", link, stream: [{ id, name, logo_path }], free: [...], rent: [...], buy: [...] }.
 // Each group is in TMDb's display order; link is TMDb's watch page for the film. All empty when it isn't available there
