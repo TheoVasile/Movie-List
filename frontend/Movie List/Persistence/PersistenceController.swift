@@ -41,6 +41,7 @@ struct PersistenceController {
     func merge(_ responses: [ListDetailsResponse]) {
         let context = container.viewContext
         AIPlacement.replaceAll(from: responses)
+        ListSharing.shared.replaceAll(from: responses)
         let existing = (try? context.fetch(CDMovieList.fetchRequest())) ?? []
         var listsByID: [Int64: CDMovieList] = [:]
         for list in existing {

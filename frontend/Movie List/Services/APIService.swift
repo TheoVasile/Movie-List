@@ -79,6 +79,19 @@ struct MovieDetailsResponse: Codable {
     let note: String?
     // Placed by Smart Placement and not yet approved
     let ai_placed: Bool?
+    // On shared lists, who added it when it wasn't the user
+    let added_by_name: String?
+}
+
+/// Someone on a shared list: its owner, or a person they invited to edit it
+struct ListMember: Codable, Identifiable, Hashable {
+    var id: String { handle }
+    let handle: String
+    let display_name: String
+    let avatar_version: Double?
+    let is_owner: Bool
+    // The signed-in user
+    let is_me: Bool
 }
 
 struct ListDetailsResponse: Codable {
@@ -93,6 +106,10 @@ struct ListDetailsResponse: Codable {
     let skipped: [String]?
     // "public", "followers" or "private"
     let visibility: String?
+    // False for lists someone else owns and invited the user to edit; nil from servers before shared lists
+    let is_owner: Bool?
+    // Everyone on a shared list, owner first; empty when it isn't shared
+    let members: [ListMember]?
 }
 
 struct LetterboxdImportRequest: Encodable {
@@ -718,6 +735,34 @@ class APIService {
     }
 
     /// Deletes a group the user made, or leaves one they were added to
+    /// Invites someone the user follows to edit one of their lists. Calls back with nil once they're added,
+    /// otherwise with a reason to show
+    func addListEditor(listID: Int64, handle: String, completion: @escaping (String?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)/editors") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["handle": handle])
+        send(request) { data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let message = (200...299).contains(status) ? nil
+                : data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                    ?? "Couldn't add them. Check your connection and try again."
+            DispatchQueue.main.async { completion(message) }
+        }
+    }
+
+    /// Takes someone off a shared list (the owner can remove anyone), or with no handle, leaves it
+    func removeListEditor(listID: Int64, handle: String? = nil, completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)/editors/\(handle ?? "me")") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        send(request) { _, response, _ in
+            let ok = (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { completion(ok) }
+        }
+    }
+
     func leaveGroup(_ id: Int64, completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: "\(baseURL)/users/me/groups/\(id)") else { return }
         var request = URLRequest(url: url)

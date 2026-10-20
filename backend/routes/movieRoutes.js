@@ -13,7 +13,8 @@ const pool = require("../config/db");
 const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
 
 const router = express.Router();
-const ownsBodyList = requireListOwner((req) => req.body.list_id);
+// The list's owner, or someone they invited to edit it
+const editsBodyList = requireListOwner.requireListEditor((req) => req.body.list_id);
 
 // Lowercase, treat "&" as "and", drop punctuation and a leading article so
 // "Home, Alone" matches "Home Alone" and "godfather" matches "The Godfather"
@@ -544,7 +545,7 @@ router.post("/create", async (req, res) => {
 
 // Smart Placement: asks Claude where a film already in the user's list belongs, moves it there and marks it as
 // placed by AI, e.g. { "list_id": 3, "movie_id": 120 } -> { rank, reason }. Needs the user to allow AI
-router.post("/smart-place", ownsBodyList, async (req, res) => {
+router.post("/smart-place", editsBodyList, async (req, res) => {
     try {
         const listId = Number(req.body.list_id), movieId = Number(req.body.movie_id);
         if (!Number.isInteger(listId) || !Number.isInteger(movieId)) {
@@ -581,7 +582,7 @@ router.post("/smart-place", ownsBodyList, async (req, res) => {
 });
 
 // Keeps a Smart Placement spot as if the user had chosen it, clearing its AI mark
-router.put("/approve-placement", ownsBodyList, async (req, res) => {
+router.put("/approve-placement", editsBodyList, async (req, res) => {
     try {
         const result = await pool.query(
             "UPDATE list_movies SET ai_placed = false WHERE list_id = $1 AND movie_id = $2",
@@ -595,7 +596,7 @@ router.put("/approve-placement", ownsBodyList, async (req, res) => {
     }
 });
 
-router.put("/updateRank", ownsBodyList, async (req, res) => {
+router.put("/updateRank", editsBodyList, async (req, res) => {
     try {
         const { list_id, movie_id, rank } = req.body;
         const updatedMovie = await updateMovieRank(list_id, movie_id, rank);
@@ -804,7 +805,7 @@ router.put("/note", async (req, res) => {
     }
 });
 
-router.delete("/removeFromList/:list_id/:movie_id", requireListOwner((req) => req.params.list_id), async (req, res) => {
+router.delete("/removeFromList/:list_id/:movie_id", requireListOwner.requireListEditor((req) => req.params.list_id), async (req, res) => {
     try {
         const { list_id, movie_id } = req.params;
         const removedMovie = await removeMovieFromList(list_id, movie_id);
@@ -815,10 +816,10 @@ router.delete("/removeFromList/:list_id/:movie_id", requireListOwner((req) => re
     }
 });
 
-router.post("/addToList", ownsBodyList, async (req, res) => {
+router.post("/addToList", editsBodyList, async (req, res) => {
     try {
         const { list_id, movie_id, rank } = req.body;
-        const newMovie = await addMovieToList(list_id, movie_id, rank);
+        const newMovie = await addMovieToList(list_id, movie_id, rank, req.user.uid);
         res.status(201).json(newMovie);
     } catch (error) {
         console.error("Error adding movie to list:", error);

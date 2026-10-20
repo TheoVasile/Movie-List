@@ -101,6 +101,8 @@ struct ContentView: View {
             switch destination {
             case .profile:
                 tab = .profile
+            case .lists:
+                tab = .lists
             case .film(let tmdbID):
                 if let url = URL(string: "cinelist://film/\(tmdbID)") { openLink(url) }
             case nil:
