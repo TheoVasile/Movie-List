@@ -160,6 +160,8 @@ struct UserProfile: Decodable {
     // Which push notifications the user wants
     let notify_requests: Bool?
     let notify_activity: Bool?
+    // Whether they've added a phone number so contacts can find them
+    let has_phone: Bool?
 }
 
 /// Follow requests waiting on the user, and the @usernames the user has asked to follow
@@ -537,6 +539,20 @@ class APIService {
             let ok = (response as? HTTPURLResponse)?.statusCode == 200
             let image = ok ? data.flatMap(UIImage.init(data:)) : nil
             DispatchQueue.main.async { completion(image) }
+        }
+    }
+
+    /// Which contacts (as SHA-256 hashes of their emails and phone numbers) are on CineList
+    func matchContacts(emails: [String], phones: [String], completion: @escaping (Result<[UserSummary], Error>) -> Void) {
+        sendJSON("POST", "/users/contacts/match", body: ["emails": emails, "phones": phones], completion: completion)
+    }
+
+    private struct PhoneResponse: Decodable { let has_phone: Bool }
+
+    /// Saves the hash of the user's phone number so contacts can find them; nil removes it
+    func setPhoneHash(_ hash: String?, completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/users/me/phone", body: ["phone_hash": hash ?? NSNull()]) { (result: Result<PhoneResponse, Error>) in
+            completion((try? result.get()) != nil)
         }
     }
 

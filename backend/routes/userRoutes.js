@@ -1,6 +1,6 @@
 const express = require("express");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -63,6 +63,36 @@ async function sendAvatar(res, who) {
 }
 router.get("/me/avatar", (req, res) => sendAvatar(res, { user_id: req.user.uid }));
 router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase() }));
+
+// Lets friends find the user from their contacts by phone number, e.g. { "phone_hash": "<sha256 hex>" }; the app
+// hashes the number first. null removes it
+router.put("/me/phone", async (req, res) => {
+    const hash = req.body?.phone_hash;
+    if (hash !== null && !isHash(hash)) {
+        return res.status(400).json({ error: "phone_hash must be a SHA-256 hex string or null." });
+    }
+    try {
+        await setPhoneHash(req.user.uid, hash);
+        res.json({ has_phone: hash !== null });
+    } catch (error) {
+        console.error("Error saving phone:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Which of the user's contacts are on CineList: { "emails": [sha256...], "phones": [sha256...] }. Nothing sent
+// here is stored
+router.post("/contacts/match", async (req, res) => {
+    const clean = (list) => (Array.isArray(list) ? list : []).filter(isHash).slice(0, 5000);
+    const emails = clean(req.body?.emails), phones = clean(req.body?.phones);
+    if (!emails.length && !phones.length) return res.json([]);
+    try {
+        res.json(await matchContacts(req.user.uid, emails, phones));
+    } catch (error) {
+        console.error("Error matching contacts:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 // Changes the name shown to friends, e.g. { "name": "Jess Wilk" }
 router.put("/me/name", async (req, res) => {

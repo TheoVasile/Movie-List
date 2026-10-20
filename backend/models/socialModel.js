@@ -15,6 +15,7 @@ function isValidHandle(handle) {
 async function getProfile(user_id) {
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.notify_requests, u.notify_activity,
+                u.phone_hash IS NOT NULL AS has_phone,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests
@@ -34,6 +35,31 @@ async function setDisplayName(user_id, name) {
         if (error.code !== "23505" || error.constraint !== "users_username_key") throw error;
         return (await update(`${name} ${user_id.slice(0, 6)}`.slice(0, 50))).rows[0]?.username ?? null;
     }
+}
+
+// Contact matching works on SHA-256 hashes made on the phone: of an email, lowercased and trimmed; of a
+// phone number, its last 10 digits. Hashes sent for matching are compared and never stored
+const isHash = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+
+async function setPhoneHash(user_id, hash) {
+    await pool.query("UPDATE users SET phone_hash = $2 WHERE firebase_uid = $1", [user_id, hash]);
+}
+
+// People on CineList whose email or phone hash is among the user's contacts', with whether the user follows
+// them or has asked to. Only people with a @username, since that's how they're shown
+async function matchContacts(user_id, emailHashes, phoneHashes) {
+    const result = await pool.query(
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
+         FROM users u
+         WHERE u.firebase_uid <> $1 AND u.handle IS NOT NULL
+           AND (encode(sha256(lower(trim(u.email))::bytea), 'hex') = ANY($2::text[]) OR u.phone_hash = ANY($3::text[]))
+         ORDER BY u.username
+         LIMIT 200`,
+        [user_id, emailHashes, phoneHashes]
+    );
+    return result.rows;
 }
 
 // The user's profile picture: a small JPEG the app has already cropped and shrunk. null removes it
@@ -272,4 +298,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
