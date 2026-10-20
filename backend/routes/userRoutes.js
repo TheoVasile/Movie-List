@@ -1,5 +1,6 @@
 const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup } = require("../models/groupModel");
+const { yearReview } = require("../models/yearReviewModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
@@ -91,6 +92,21 @@ router.post("/contacts/match", async (req, res) => {
         res.json(await matchContacts(req.user.uid, emails, phones));
     } catch (error) {
         console.error("Error matching contacts:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The user's Year in Review, e.g. ?year=2026 (this year when left out): films watched, months, favourites and
+// their closest friend in taste
+router.get("/me/year-review", async (req, res) => {
+    const year = req.query.year === undefined ? new Date().getUTCFullYear() : Number(req.query.year);
+    if (!Number.isInteger(year) || year < 1900 || year > 3000) {
+        return res.status(400).json({ error: "year must be a year, e.g. 2026." });
+    }
+    try {
+        res.json(await yearReview(req.user.uid, year));
+    } catch (error) {
+        console.error("Error building year review:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

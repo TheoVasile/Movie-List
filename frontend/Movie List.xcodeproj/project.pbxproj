@@ -17,6 +17,7 @@
 		EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516C04920FFE5E41C8B08A86 /* DiaryView.swift */; };
 		4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */; };
 		3E6096DBFFB0412800BD6149 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F82567FEFBC0F7C71D5F12D /* StatsView.swift */; };
+		B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F372852096382634FBAE62AC /* YearInReviewView.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
 		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
 		FA7E5A012F00000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000001 /* Theme.swift */; };
@@ -121,6 +122,7 @@
 		516C04920FFE5E41C8B08A86 /* DiaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryView.swift; sourceTree = "<group>"; };
 		B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieNightView.swift; sourceTree = "<group>"; };
 		1F82567FEFBC0F7C71D5F12D /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		F372852096382634FBAE62AC /* YearInReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearInReviewView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		9FC89FBF336F9C71BB83DD99 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -307,6 +309,7 @@
 				516C04920FFE5E41C8B08A86 /* DiaryView.swift */,
 				B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */,
 				1F82567FEFBC0F7C71D5F12D /* StatsView.swift */,
+				F372852096382634FBAE62AC /* YearInReviewView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
 				FA7E5A012F00000000000014 /* FriendsView.swift */,
@@ -484,6 +487,7 @@
 				EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */,
 				4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */,
 				3E6096DBFFB0412800BD6149 /* StatsView.swift in Sources */,
+				B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,
 				FA7E5A012F00000000000015 /* FriendsView.swift in Sources */,
