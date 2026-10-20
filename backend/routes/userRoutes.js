@@ -1,6 +1,6 @@
 const express = require("express");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchFollowing, fetchUserLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -63,6 +63,36 @@ async function sendAvatar(res, who) {
 }
 router.get("/me/avatar", (req, res) => sendAvatar(res, { user_id: req.user.uid }));
 router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase() }));
+
+// Lets friends find the user from their contacts by phone number, e.g. { "phone_hash": "<sha256 hex>" }; the app
+// hashes the number first. null removes it
+router.put("/me/phone", async (req, res) => {
+    const hash = req.body?.phone_hash;
+    if (hash !== null && !isHash(hash)) {
+        return res.status(400).json({ error: "phone_hash must be a SHA-256 hex string or null." });
+    }
+    try {
+        await setPhoneHash(req.user.uid, hash);
+        res.json({ has_phone: hash !== null });
+    } catch (error) {
+        console.error("Error saving phone:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Which of the user's contacts are on CineList: { "emails": [sha256...], "phones": [sha256...] }. Nothing sent
+// here is stored
+router.post("/contacts/match", async (req, res) => {
+    const clean = (list) => (Array.isArray(list) ? list : []).filter(isHash).slice(0, 5000);
+    const emails = clean(req.body?.emails), phones = clean(req.body?.phones);
+    if (!emails.length && !phones.length) return res.json([]);
+    try {
+        res.json(await matchContacts(req.user.uid, emails, phones));
+    } catch (error) {
+        console.error("Error matching contacts:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 // Changes the name shown to friends, e.g. { "name": "Jess Wilk" }
 router.put("/me/name", async (req, res) => {
@@ -194,6 +224,32 @@ router.get("/me/following", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
+// Followers and following: the user's own, or someone else's once the user's follow is accepted
+async function sendConnections(req, res, which, handle) {
+    try {
+        const result = await fetchConnections(req.user.uid, { handle, which });
+        if (!result) return res.status(404).json({ error: "User not found." });
+        if (result.hidden) return res.status(403).json({ error: "Follow them to see who they follow and who follows them." });
+        res.json(result.people);
+    } catch (error) {
+        console.error(`Error fetching ${which}:`, error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
+router.get("/me/followers", (req, res) => sendConnections(req, res, "followers"));
+
+// Other people's lists the user follows
+router.get("/me/followed-lists", async (req, res) => {
+    try {
+        res.json(await fetchFollowedLists(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching followed lists:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+router.get("/:handle/followers", (req, res) => sendConnections(req, res, "followers", req.params.handle.toLowerCase()));
+router.get("/:handle/following", (req, res) => sendConnections(req, res, "following", req.params.handle.toLowerCase()));
 
 // What the people the user follows think of a film: watched, note and best list placing, e.g. /me/following/films/771
 router.get("/me/following/films/:tmdb_id", async (req, res) => {

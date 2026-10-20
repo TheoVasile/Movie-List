@@ -7,7 +7,8 @@ const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
-const { recommendFilms, recommendForTwo, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const { recommendFilms, recommendForTwo, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const pool = require("../config/db");
 
 const router = express.Router();
 const ownsBodyList = requireListOwner((req) => req.body.list_id);
@@ -229,11 +230,11 @@ const MOVIE_NIGHT_MIN_VOTES = 100;
 async function classicMovieNight(user_id, friend, friendName, count) {
     const [mySeeds, friendSeeds, myIds, friendIds, myWatchlist, friendWatchlist] = await Promise.all([
         fetchTopFilms(user_id, MOVIE_NIGHT_SEEDS),
-        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS),
+        fetchTopFilms(friend.firebase_uid, MOVIE_NIGHT_SEEDS, true),
         fetchListedTmdbIds(user_id),
         fetchListedTmdbIds(friend.firebase_uid),
         fetchUnwatchedWatchlist(user_id),
-        fetchUnwatchedWatchlist(friend.firebase_uid),
+        fetchUnwatchedWatchlist(friend.firebase_uid, true),
     ]);
 
     // Films you both want to watch
@@ -324,7 +325,7 @@ router.post("/movie-night", async (req, res) => {
 
         const [myLists, friendLists, myIds, friendIds] = await Promise.all([
             fetchListsForTaste(req.user.uid),
-            fetchListsForTaste(friend.firebase_uid),
+            fetchListsForTaste(friend.firebase_uid, true),
             fetchListedTmdbIds(req.user.uid),
             fetchListedTmdbIds(friend.firebase_uid),
         ]);
@@ -453,6 +454,59 @@ router.post("/create", async (req, res) => {
         res.status(201).json(newMovie);
     } catch (error) {
         console.error("Error creating movie:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Smart Placement: asks Claude where a film already in the user's list belongs, moves it there and marks it as
+// placed by AI, e.g. { "list_id": 3, "movie_id": 120 } -> { rank, reason }. Needs the user to allow AI
+router.post("/smart-place", ownsBodyList, async (req, res) => {
+    try {
+        const listId = Number(req.body.list_id), movieId = Number(req.body.movie_id);
+        if (!Number.isInteger(listId) || !Number.isInteger(movieId)) {
+            return res.status(400).json({ error: "list_id and movie_id are required." });
+        }
+        const allowed = await pool.query("SELECT ai_allowed FROM users WHERE firebase_uid = $1", [req.user.uid]);
+        if (!allowed.rows[0]?.ai_allowed) {
+            return res.status(403).json({ error: "Allow AI features in Settings to use Smart Placement." });
+        }
+        const rows = (await pool.query(
+            `SELECT l.name, lm.movie_id, lm.rank, m.title, m.release_date
+             FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
+             WHERE l.id = $1 ORDER BY lm.rank`,
+            [listId]
+        )).rows;
+        const film = rows.find((row) => row.movie_id === movieId);
+        if (!film) return res.status(404).json({ error: "That film isn't in this list." });
+        const others = rows.filter((row) => row.movie_id !== movieId)
+            .map((row) => ({ title: row.title, year: String(row.release_date ?? "").slice(0, 4) }));
+        const { rank, reason } = await placeInList(req.user.uid, film.name, others,
+            { title: film.title, year: String(film.release_date ?? "").slice(0, 4) });
+        await updateMovieRank(listId, movieId, rank, true);
+        res.json({ rank, reason });
+    } catch (error) {
+        if (error instanceof AIUnavailableError) {
+            return res.status(503).json({ error: "Smart Placement isn't set up." });
+        }
+        if (error instanceof AILimitError) {
+            return res.status(429).json({ error: error.message });
+        }
+        console.error("Error placing film:", error.message);
+        res.status(502).json({ error: "Smart Placement failed." });
+    }
+});
+
+// Keeps a Smart Placement spot as if the user had chosen it, clearing its AI mark
+router.put("/approve-placement", ownsBodyList, async (req, res) => {
+    try {
+        const result = await pool.query(
+            "UPDATE list_movies SET ai_placed = false WHERE list_id = $1 AND movie_id = $2",
+            [Number(req.body.list_id), Number(req.body.movie_id)]
+        );
+        if (!result.rowCount) return res.status(404).json({ error: "That film isn't in this list." });
+        res.json({ approved: true });
+    } catch (error) {
+        console.error("Error approving placement:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

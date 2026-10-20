@@ -33,11 +33,24 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar BYTEA;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMP;
 
+            -- A SHA-256 hash of the user's phone number (its last 10 digits), if they chose to add one so friends
+            -- can find them from their contacts. The number itself is never stored
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_hash CHAR(64);
+            CREATE INDEX IF NOT EXISTS users_phone_hash ON users (phone_hash);
+
             -- Which push notifications the user wants. The phone also has to allow notifications
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_activity BOOLEAN NOT NULL DEFAULT true;
             -- When the user last got the daily friends digest, so they never get two in a day
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_digest_at TIMESTAMP;
+
+            -- Lists people follow to hear about updates in their daily digest
+            CREATE TABLE IF NOT EXISTS list_follows (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                list_id INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, list_id)
+            );
 
             -- Firebase Cloud Messaging tokens: one per device the user is signed in on
             CREATE TABLE IF NOT EXISTS device_tokens (
@@ -90,9 +103,16 @@ const createTables = async () => {
                 rank INT,
                 UNIQUE (list_id, movie_id)
             );
+            -- Who can see a list: everyone signed in (public), the owner's accepted followers (followers, how all
+            -- lists worked before), or only the owner (private)
+            ALTER TABLE lists ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'followers';
+
             -- When a film was added, for friends' activity. Films added before this was kept have none
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_at TIMESTAMP;
             ALTER TABLE list_movies ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP;
+            -- Placed by Smart Placement (Claude) rather than by the user. Cleared when the user approves the
+            -- spot or moves the film themselves
+            ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS ai_placed BOOLEAN NOT NULL DEFAULT false;
 
             -- Watched is per user, not per list: a film watched once shows as watched in every list
             CREATE TABLE IF NOT EXISTS watched_movies (

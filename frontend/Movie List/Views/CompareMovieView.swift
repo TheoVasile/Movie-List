@@ -23,15 +23,18 @@ struct CompareMovieView: View {
     var onCancel: (() -> Void)?
     var prompt: String
     var cancelTitle: String
+    // Offered when adding a film: let Claude choose its place instead of comparing
+    var onSmartPlace: (() -> Void)?
 
     private enum Side { case selected, other }
     
-    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, prompt: String = "Which do you prefer?", cancelTitle: String = "Cancel", onCancel: (() -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
+    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, prompt: String = "Which do you prefer?", cancelTitle: String = "Cancel", onCancel: (() -> Void)? = nil, onSmartPlace: (() -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
             self._movies = movies
             self._movie = movie
             self.prompt = prompt
             self.cancelTitle = cancelTitle
             self.onCancel = onCancel
+            self.onSmartPlace = onSmartPlace
             self.onRankingUpdate = onRankingUpdate
         }
     
@@ -60,6 +63,13 @@ struct CompareMovieView: View {
                 Text("Need at least 2 movies to compare")
                     .foregroundColor(Theme.textSecondary)
                     .padding(.vertical, 40)
+            }
+            if let onSmartPlace {
+                Button(action: onSmartPlace) {
+                    Label("Let Claude place it", systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accentGradient)
+                }
             }
             if let onCancel {
                 Button(cancelTitle, action: onCancel)

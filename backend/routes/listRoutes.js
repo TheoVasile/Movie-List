@@ -1,5 +1,5 @@
 const express = require("express");
-const { createList, deleteList, fetchLists, updateList } = require("../models/listModel");
+const { createList, deleteList, fetchLists, updateList, setListFollowed, VISIBILITIES } = require("../models/listModel");
 const requireListOwner = require("../middleware/listOwnership");
 const { setListWatched } = require("../models/watchedModel");
 
@@ -46,23 +46,43 @@ router.put("/:id/watched", requireListOwner((req) => req.params.id), async (req,
 // Renames a list and/or changes its description, e.g. { "name": "Best of 2026", "overview": "..." }
 router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) => {
     try {
-        const { name, overview } = req.body;
+        const { name, overview, visibility } = req.body;
         if (name !== undefined && (typeof name !== "string" || !name.trim() || name.length > 100)) {
             return res.status(400).json({ error: "A name must be 1 to 100 characters." });
         }
         if (overview !== undefined && (typeof overview !== "string" || overview.length > 2000)) {
             return res.status(400).json({ error: "A description must be at most 2000 characters." });
         }
-        if (name === undefined && overview === undefined) {
+        if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
+            return res.status(400).json({ error: "Visibility must be public, followers or private." });
+        }
+        if (name === undefined && overview === undefined && visibility === undefined) {
             return res.status(400).json({ error: "Nothing to update." });
         }
-        const list = await updateList(Number(req.params.id), { name: name?.trim(), overview });
+        const list = await updateList(Number(req.params.id), { name: name?.trim(), overview, visibility });
         res.status(200).json(list);
     } catch (error) {
         console.error("Error updating list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
+// Follows someone else's list, to hear about films added to it in the daily digest
+router.post("/:id/follow", (req, res) => followList(req, res, true));
+router.delete("/:id/follow", (req, res) => followList(req, res, false));
+
+async function followList(req, res, follow) {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || !(await setListFollowed(req.user.uid, id, follow))) {
+            return res.status(404).json({ error: "List not found." });
+        }
+        res.json({ list_id: id, followed: follow });
+    } catch (error) {
+        console.error("Error following list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+}
 
 router.delete("/delete/:id", requireListOwner((req) => req.params.id), async (req, res) => {
     try {

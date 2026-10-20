@@ -18,6 +18,9 @@ struct MovieDetailView: View {
     var onToggleWatched: (() -> Void)? = nil
     // Saves the user's note; calls back with whether it was saved. Notes are only offered when this is set
     var onSaveNote: ((String, @escaping (Bool) -> Void) -> Void)? = nil
+    // Set while the film's spot was suggested by Smart Placement and not yet approved
+    var onApprovePlacement: (() -> Void)? = nil
+    @State private var placementApproved = false
 
     @State private var revealed = false
     @State private var overviewExpanded = false
@@ -315,6 +318,22 @@ struct MovieDetailView: View {
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let onApprovePlacement, !placementApproved {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                        Text("Placed by Claude")
+                        Text("·")
+                        Button("Keep This Spot") {
+                            Haptics.tap()
+                            withAnimation(Theme.spring) { placementApproved = true }
+                            onApprovePlacement()
+                        }
+                        .foregroundColor(Theme.accent)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .transition(.opacity)
+                }
             }
             .appearAnimation(delay: 0.1)
 

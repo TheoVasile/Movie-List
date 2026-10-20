@@ -125,3 +125,82 @@ extension CDMovieList {
         return movieList
     }
 }
+
+
+/// Who can see a list. New and existing lists are Followers until the owner changes it
+enum ListVisibility: String, CaseIterable, Identifiable {
+    case `public`, followers, `private`
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .public: return "Everyone"
+        case .followers: return "Followers"
+        case .private: return "Only Me"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .public: return "globe"
+        case .followers: return "person.2.fill"
+        case .private: return "lock.fill"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .public: return "Anyone on CineList can see and follow this list, even if they don't follow you."
+        case .followers: return "Only people you've accepted as followers can see and follow this list."
+        case .private: return "Only you can see this list. It's also left out of Movie Night and your friends' digests."
+        }
+    }
+
+    private static let storageKey = "listVisibility"
+
+    /// The visibility of one of the user's lists, as last synced or changed on this phone
+    static func of(_ listID: Int64) -> ListVisibility {
+        let saved = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: String]
+        return saved?[String(listID)].flatMap(ListVisibility.init) ?? .followers
+    }
+
+    static func remember(_ visibility: ListVisibility, for listID: Int64) {
+        var saved = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: String] ?? [:]
+        saved[String(listID)] = visibility.rawValue
+        UserDefaults.standard.set(saved, forKey: storageKey)
+    }
+}
+
+
+/// Which films in the user's lists were placed by Smart Placement and not yet approved, kept on the phone as
+/// "listID:movieID" (Core Data has no field for it) and refreshed from the server on every sync
+enum AIPlacement {
+    private static let storageKey = "aiPlacedFilms"
+
+    private static var saved: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: storageKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: storageKey) }
+    }
+
+    private static func key(_ listID: Int64, _ movieID: Int64) -> String { "\(listID):\(movieID)" }
+
+    static func isPlaced(listID: Int64, movieID: Int64) -> Bool {
+        saved.contains(key(listID, movieID))
+    }
+
+    static func set(_ placed: Bool, listID: Int64, movieID: Int64) {
+        if placed {
+            saved.insert(key(listID, movieID))
+        } else {
+            saved.remove(key(listID, movieID))
+        }
+    }
+
+    /// Replaces everything with what the server says, after a sync
+    static func replaceAll(from lists: [ListDetailsResponse]) {
+        saved = Set(lists.flatMap { list in
+            list.movies.filter { $0.ai_placed == true }.map { key(list.id, $0.id) }
+        })
+    }
+}

@@ -455,19 +455,108 @@ final class AvatarStore {
 
 // MARK: - Find people
 
+/// Someone's followers or the people they follow, as rows that open each person's profile
+struct ConnectionsView: View {
+    // nil for the signed-in user's own
+    let handle: String?
+    let followers: Bool
+    @State private var people: [UserSummary] = []
+    @State private var isLoading = true
+    @State private var message: String? = nil
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                if isLoading {
+                    ProgressView().padding(.top, 40)
+                } else if let message {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 40)
+                }
+                ForEach(people) { person in
+                    if person.handle == SocialStore.shared.profile?.handle {
+                        PersonRow(person: person, showsFollowButton: false)
+                    } else {
+                        NavigationLink {
+                            FriendProfileView(person: person)
+                        } label: {
+                            PersonRow(person: person)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle(followers ? "Followers" : "Following")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: load)
+        .refreshable { load() }
+    }
+
+    private func load() {
+        APIService.shared.fetchConnections(handle: handle, followers: followers) { result in
+            isLoading = false
+            switch result {
+            case .success(let loaded):
+                people = loaded
+                message = loaded.isEmpty ? (followers ? "No followers yet." : "Not following anyone yet.") : nil
+            case .failure(let error):
+                message = (error as NSError).code == 403
+                    ? "Follow them to see who they follow and who follows them."
+                    : "Couldn't load this list. Pull down to try again."
+            }
+        }
+    }
+}
+
+/// "12 followers · 30 following", each opening that list
+struct ConnectionCounts: View {
+    let handle: String?
+    let followers: Int
+    let following: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            NavigationLink {
+                ConnectionsView(handle: handle, followers: true)
+            } label: {
+                Text("\(followers) \(followers == 1 ? "follower" : "followers")")
+            }
+            Text("·")
+            NavigationLink {
+                ConnectionsView(handle: handle, followers: false)
+            } label: {
+                Text("\(following) following")
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundColor(Theme.textTertiary)
+    }
+}
+
 struct FindPeopleView: View {
     @State private var query = ""
     @State private var results: [UserSummary] = []
     @State private var isSearching = false
+    // People found in the user's contacts, once they've asked
+    @State private var fromContacts: [UserSummary]? = nil
+    @State private var findingContacts = false
+    @State private var contactsMessage: String? = nil
 
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
                 if query.count < 2 {
-                    Text("Search for a friend by their @username.")
+                    contactsSection
+                    Text("Or search for a friend by their @username.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
-                        .padding(.top, 40)
+                        .padding(.top, 20)
                 } else if results.isEmpty && !isSearching {
                     Text("No one with a username starting with \"\(query)\".")
                         .font(.subheadline)
@@ -487,6 +576,7 @@ struct FindPeopleView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Find People")
+        .onAppear { if fromContacts == nil && ContactsFinder.wasAllowed { findInContacts() } }
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "@username")
         .textInputAutocapitalization(.never)
@@ -504,6 +594,73 @@ struct FindPeopleView: View {
             APIService.shared.searchUsers(trimmed) { result in
                 isSearching = false
                 if case .success(let people) = result { results = people }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var contactsSection: some View {
+        if let fromContacts {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(fromContacts.isEmpty ? "None of your contacts are on CineList yet." : "From Your Contacts")
+                    .font(fromContacts.isEmpty ? .subheadline : .headline)
+                    .foregroundColor(fromContacts.isEmpty ? Theme.textSecondary : Theme.textPrimary)
+                ForEach(fromContacts) { person in
+                    NavigationLink {
+                        FriendProfileView(person: person)
+                    } label: {
+                        PersonRow(person: person)
+                    }
+                    .buttonStyle(PressableButtonStyle(scale: 0.98))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Button(action: findInContacts) {
+                HStack(spacing: 12) {
+                    if findingContacts {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.title3)
+                            .foregroundStyle(Theme.accentGradient)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find Friends From Your Contacts")
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Contacts' emails and numbers are scrambled on your iPhone before matching, and never stored.")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .cardStyle(cornerRadius: 16)
+            }
+            .buttonStyle(PressableButtonStyle(scale: 0.98))
+            .disabled(findingContacts)
+            if let contactsMessage {
+                Text(contactsMessage)
+                    .font(.footnote)
+                    .foregroundColor(Theme.accentSecondary)
+            }
+        }
+    }
+
+    private func findInContacts() {
+        findingContacts = true
+        contactsMessage = nil
+        ContactsFinder.findFriends { result in
+            findingContacts = false
+            switch result {
+            case .success(let people):
+                fromContacts = people
+            case .failure(.denied):
+                contactsMessage = "CineList doesn't have access to your contacts. You can allow it in Settings → Privacy & Security → Contacts."
+            case .failure(.failed):
+                contactsMessage = "Couldn't check your contacts. Try again."
             }
         }
     }
@@ -533,6 +690,11 @@ struct FriendProfileView: View {
                         Text("@\(person.handle)")
                             .font(.subheadline)
                             .foregroundColor(Theme.textSecondary)
+                        // Only followers can open these lists
+                        if social.isFollowing(person.handle), let lists, let followers = lists.follower_count,
+                           let following = lists.following_count {
+                            ConnectionCounts(handle: person.handle, followers: followers, following: following)
+                        }
                     }
                     Spacer()
                     FollowButton(person: person)
@@ -569,6 +731,22 @@ struct FriendProfileView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 30)
+                }
+
+                // Lists they've made public can be seen and followed without following them
+                if !social.isFollowing(person.handle), let lists, !lists.lists.isEmpty {
+                    Text("Public Lists")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.top, 6)
+                    ForEach(lists.lists) { list in
+                        NavigationLink {
+                            FriendListView(list: list, owner: person.display_name)
+                        } label: {
+                            friendListCard(list)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
                 }
             }
             .padding(16)
@@ -609,7 +787,6 @@ struct FriendProfileView: View {
     }
 
     private func load() {
-        guard social.isFollowing(person.handle) else { return }
         loadFailed = false
         APIService.shared.fetchFriendLists(person.handle) { result in
             switch result {
@@ -651,6 +828,11 @@ struct FriendProfileView: View {
 struct FriendListView: View {
     let list: FriendLists.List
     let owner: String
+    // nil until loaded from the list, then whatever the user last chose
+    @State private var followed: Bool? = nil
+    @State private var saving = false
+
+    private var isFollowed: Bool { followed ?? list.followed ?? false }
 
     var body: some View {
         List {
@@ -694,6 +876,93 @@ struct FriendListView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(list.name)
+        .toolbar {
+            // Following a list adds films added to it to the daily digest
+            if list.owner_handle != SocialStore.shared.profile?.handle {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        toggleFollow()
+                    } label: {
+                        Label(isFollowed ? "Following" : "Follow List", systemImage: isFollowed ? "bell.fill" : "bell")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .disabled(saving)
+                    .accessibilityHint("Get updates in your daily digest when films are added")
+                }
+            }
+        }
+    }
+
+    private func toggleFollow() {
+        Haptics.tap()
+        let wanted = !isFollowed
+        followed = wanted
+        saving = true
+        APIService.shared.setListFollowed(list.id, wanted) { saved in
+            saving = false
+            if saved {
+                FollowedListsStore.shared.load()
+            } else {
+                followed = !wanted
+            }
+        }
+    }
+}
+
+/// Other people's lists the user follows, shared by the screens that show them
+final class FollowedListsStore: ObservableObject {
+    static let shared = FollowedListsStore()
+    @Published private(set) var lists: [FriendLists.List] = []
+
+    func load() {
+        APIService.shared.fetchFollowedLists { result in
+            if case .success(let loaded) = result { self.lists = loaded }
+        }
+    }
+}
+
+/// "Lists You Follow" on Profile
+struct FollowedListsSection: View {
+    @ObservedObject private var store = FollowedListsStore.shared
+
+    var body: some View {
+        Group {
+            if !store.lists.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Lists You Follow")
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(Theme.textPrimary)
+                    ForEach(store.lists) { list in
+                        NavigationLink {
+                            FriendListView(list: list, owner: list.owner_name ?? "")
+                        } label: {
+                            HStack(spacing: 12) {
+                                PosterImage(path: list.movies.first?.poster_path, cornerRadius: 6, size: .small)
+                                    .frame(width: 40, height: 60)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(list.name)
+                                        .font(.headline)
+                                        .foregroundColor(Theme.textPrimary)
+                                        .lineLimit(1)
+                                    Text("by \(list.owner_name ?? "someone") · \(list.movies.count) films")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(Theme.textTertiary)
+                            }
+                            .padding(12)
+                            .cardStyle(cornerRadius: 16)
+                        }
+                        .buttonStyle(PressableButtonStyle(scale: 0.98))
+                    }
+                }
+            }
+        }
+        .onAppear { store.load() }
     }
 }
 
