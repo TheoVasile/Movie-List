@@ -108,6 +108,7 @@ struct StatsView: View {
     @State private var infoVersion = 0
     @State private var loadingInfo = false
     @State private var shareItem: ShareItem? = nil
+    @State private var showYearInReview = false
 
     private var summary: StatsSummary {
         _ = infoVersion
@@ -124,6 +125,8 @@ struct StatsView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 18) {
+                        yearInReviewCard
+                            .appearAnimation()
                         totals(summary)
                             .appearAnimation()
                         if let top = summary.topAverage, let all = summary.overallAverage {
@@ -163,6 +166,39 @@ struct StatsView: View {
                 .presentationDetents([.medium, .large])
         }
         .onAppear(perform: loadInfo)
+        .fullScreenCover(isPresented: $showYearInReview) {
+            NavigationStack { YearInReviewView() }
+        }
+    }
+
+    // Opens this year's Year in Review
+    private var yearInReviewCard: some View {
+        Button {
+            Haptics.tap()
+            showYearInReview = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.title)
+                    .foregroundStyle(Theme.accentGradient)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your \(String(Calendar.current.component(.year, from: Date()))) in Review")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("What you watched, your new favourites and your taste twin")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle(cornerRadius: 20)
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
     }
 
     private func loadInfo() {

@@ -198,6 +198,45 @@ struct PollOption: Decodable, Identifiable, Equatable {
     }
 }
 
+/// A year of the user's diary, for Year in Review
+struct YearReview: Decodable {
+    struct Film: Decodable, Identifiable, Hashable {
+        var id: Int64 { tmdb_id }
+        let tmdb_id: Int64
+        let title: String
+        let poster_path: String?
+        let release_date: String
+        // Only on most_rewatched and new_favourite
+        let times: Int?
+        let rank: Int?
+        let list_name: String?
+    }
+
+    struct Friend: Decodable {
+        let handle: String
+        let display_name: String
+        let avatar_version: Double?
+        let shared: Int
+        let example_title: String?
+    }
+
+    let year: Int
+    // Every year with diary entries, newest first
+    let years: [Int]
+    let films_watched: Int
+    let rewatches: Int
+    let total_watches: Int
+    // Watches per month, January first
+    let months: [Int]
+    let busiest_month: Int?
+    let first_film: Film?
+    let latest_film: Film?
+    let most_rewatched: Film?
+    let new_favourite: Film?
+    let closest_friend: Friend?
+    let films: [Film]
+}
+
 /// What a movie night's picks are limited to
 struct MovieNightFilters: Equatable {
     var genres: Set<Int> = []
@@ -607,7 +646,11 @@ class APIService {
         sendJSON("GET", "/users/me/followed-lists", completion: completion)
     }
 
-    /// Streaming services in the user's country, most popular first
+    /// The user's Year in Review for a year
+    func fetchYearReview(year: Int, completion: @escaping (Result<YearReview, Error>) -> Void) {
+        sendJSON("GET", "/users/me/year-review", query: [URLQueryItem(name: "year", value: String(year))], completion: completion)
+    }
+
     /// The user's streaming services and country, and whether they want "now streaming" alerts
     func fetchStreamingPreferences(completion: @escaping (Result<StreamingPreferences, Error>) -> Void) {
         sendJSON("GET", "/users/me/streaming", completion: completion)
@@ -622,6 +665,7 @@ class APIService {
         sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
     }
 
+    /// Streaming services in the user's country, most popular first
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
     }
