@@ -218,7 +218,7 @@ private extension DiscoverView {
             Text("Allow AI Features?")
                 .font(.title2.bold())
                 .foregroundColor(Theme.textPrimary)
-            Text("AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes, and your iPhone's country and language to Claude, Anthropic's AI. Your name and email are never sent. You can change this any time in Settings.")
+            Text("AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes, and your iPhone's country and language to a third-party AI provider. Your name and email are never sent. You can change this any time in Settings.")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -255,7 +255,7 @@ private extension DiscoverView {
         if !useAI {
             return "Recommended by TMDb from your lists"
         }
-        return viewModel.aiAvailable ? "Picked by Claude from your lists and swipes" : "AI picks unavailable, using TMDb for now"
+        return viewModel.aiAvailable ? "Picked by AI from your lists and swipes" : "AI picks unavailable, using TMDb for now"
     }
 
     // Sparkles mark AI recommendations, so they only appear while AI Picks is the chosen source

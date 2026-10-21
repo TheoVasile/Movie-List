@@ -274,7 +274,7 @@ class ListViewModel: ObservableObject {
         movies.contains(where: isAIPlaced)
     }
 
-    /// Asks Claude where the film belongs and moves it there. Calls back on the main thread with a message to
+    /// Asks the AI where the film belongs and moves it there. Calls back on the main thread with a message to
     /// show: where it went, or why it couldn't
     func smartPlace(_ movie: CDMovie, completion: @escaping (String) -> Void) {
         APIService.shared.smartPlace(listID: movieList.id, movieID: movie.id) { result in
@@ -284,7 +284,7 @@ class ListViewModel: ObservableObject {
                     AIPlacement.set(true, listID: self.movieList.id, movieID: movie.id)
                     self.placementVersion += 1
                     self.moveLocally(movie, to: placement.rank)
-                    completion("Claude placed it at #\(placement.rank)")
+                    completion("AI placed it at #\(placement.rank)")
                 case .failure(let error):
                     switch (error as NSError).code {
                     case 403: completion("Allow AI features in Settings to use Smart Placement")
