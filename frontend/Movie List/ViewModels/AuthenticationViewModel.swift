@@ -101,7 +101,7 @@ extension AuthenticationViewModel {
     }
   }
 
-    func signUpWithEmailPassword(name: String) async -> Bool {
+    func signUpWithEmailPassword(name: String, handle: String) async -> Bool {
         authenticationState = .authenticating
         do  {
             let result = try await Auth.auth().createUser(withEmail: email, password: password)
@@ -115,13 +115,11 @@ extension AuthenticationViewModel {
             try? await change.commitChanges()
             self.user = Auth.auth().currentUser
             
-            APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: displayName) { result in
-                switch result {
-                case .success( _):
-                    print("created user")
-                case .failure(let error):
-                    print(error.localizedDescription)
-                }
+            APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: displayName,
+                                         handle: handle) { result in
+                if case .failure(let error) = result { print(error.localizedDescription) }
+                // The account exists now; if the username didn't save, the app asks for one before going on
+                SocialStore.shared.load()
             }
             
             return true
@@ -242,12 +240,9 @@ extension AuthenticationViewModel {
         let firebaseUser = result.user
           
         APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
-            switch result {
-            case .success( _):
-                print("created user")
-            case .failure(let error):
-                print(error.localizedDescription)
-            }
+            if case .failure(let error) = result { print(error.localizedDescription) }
+            // New Google accounts have no username yet, which the app asks for once this has loaded
+            SocialStore.shared.load()
         }
         print("User \(firebaseUser.uid) signed in with email \(firebaseUser.email ?? "unknown")")
           PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.uid)

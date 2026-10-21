@@ -17,9 +17,11 @@ struct ContentView: View {
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
     @ObservedObject private var social = SocialStore.shared
-    // Asked once; afterwards the username is set from the Profile tab or Settings
-    @AppStorage("social.usernamePromptShown") private var usernamePromptShown = false
-    @State private var showUsernameSetup = false
+    // Everyone needs an @username, which is how people know each other here. Accounts without one (Google
+    // sign-ins, accounts from before usernames, or a sign-up whose username was taken) pick one before going on
+    private var needsUsername: Binding<Bool> {
+        Binding(get: { social.hasLoaded && social.profile != nil && social.profile?.handle == nil }, set: { _ in })
+    }
     @State private var tab = Tab.lists
     @ObservedObject private var notifications = NotificationManager.shared
 
@@ -84,14 +86,8 @@ struct ContentView: View {
         }
         .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
         .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
-        .onChange(of: social.hasLoaded) { loaded in
-            if loaded && social.profile != nil && social.profile?.handle == nil && !usernamePromptShown {
-                usernamePromptShown = true
-                showUsernameSetup = true
-            }
-        }
-        .sheet(isPresented: $showUsernameSetup) {
-            UsernameSetupView()
+        .fullScreenCover(isPresented: needsUsername) {
+            UsernameSetupView(required: true) { viewModel.signOut() }
         }
         .sheet(item: $linkedMovie) { movie in
             MovieDetailView(movie: movie)

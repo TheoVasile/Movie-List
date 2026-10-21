@@ -2,18 +2,62 @@ const express = require("express");
 const { loginUser } = require("../controllers/authController");
 const { deleteUser, createUser } = require("../models/userModel");
 const verifyToken = require("../middleware/authMiddleware");
+const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
+const pool = require("../config/db");
 
 const router = express.Router();
 
 router.post("/login", verifyToken, loginUser);
 
+// Makes the account, e.g. { "username": "Theo", "handle": "theo.v" }. The handle is saved too when it's
+// valid and free; handle_saved says whether it was, and the app asks for another one if not
 router.post("/create", verifyToken, async (req, res) => {
     try {
         const { username } = req.body;
         const newUser = await createUser(req.user.uid, req.user.email ?? req.body.email, username);
-        res.status(200).json(newUser);
+        const handle = typeof req.body.handle === "string" ? req.body.handle.trim().toLowerCase() : "";
+        let handle_saved = false;
+        if (isValidHandle(handle)) {
+            try {
+                await setHandle(req.user.uid, handle);
+                handle_saved = true;
+            } catch (error) {
+                if (!(error instanceof HandleTakenError)) throw error;
+            }
+        }
+        res.status(200).json({ ...newUser, handle_saved });
     } catch (error) {
         console.error("Error creating user:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// How many availability checks one address can make a minute, so this can't be used to list usernames
+const MAX_CHECKS_PER_MINUTE = 30;
+const recentChecks = new Map();
+
+// Whether an @username is free, for the sign-up form before the account exists, e.g.
+// /auth/handle-available?handle=theo.v -> { "valid": true, "available": false }
+router.get("/handle-available", async (req, res) => {
+    // The last X-Forwarded-For entry is the one Render's proxy added; earlier ones come from the client
+    const address = String(req.headers["x-forwarded-for"] ?? req.ip ?? "").split(",").pop().trim();
+    const now = Date.now();
+    const recent = (recentChecks.get(address) ?? []).filter((time) => now - time < 60 * 1000);
+    if (recent.length >= MAX_CHECKS_PER_MINUTE) {
+        return res.status(429).json({ error: "Too many checks. Try again in a minute." });
+    }
+    recent.push(now);
+    // Old addresses are forgotten wholesale rather than one by one
+    if (recentChecks.size > 10000) recentChecks.clear();
+    recentChecks.set(address, recent);
+
+    const handle = String(req.query.handle ?? "").trim().toLowerCase().replace(/^@/, "");
+    if (!isValidHandle(handle)) return res.json({ valid: false, available: false });
+    try {
+        const taken = await pool.query("SELECT 1 FROM users WHERE handle = $1", [handle]);
+        res.json({ valid: true, available: taken.rowCount === 0 });
+    } catch (error) {
+        console.error("Error checking username:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

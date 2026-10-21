@@ -84,7 +84,7 @@ router.post("/:id/editors", requireListOwner((req) => req.params.id), async (req
             case "full": return res.status(400).json({ error: `A list can have at most ${MAX_EDITORS} editors.` });
             case "already": return res.status(409).json({ error: "They can already edit this list." });
         }
-        const me = await pool.query("SELECT COALESCE(username, handle) AS name FROM users WHERE firebase_uid = $1", [req.user.uid]);
+        const me = await pool.query("SELECT COALESCE('@' || handle, username) AS name FROM users WHERE firebase_uid = $1", [req.user.uid]);
         await notifyUser(result.editor_id, "list_invite", {
             title: "New shared list",
             body: `${me.rows[0]?.name ?? "A friend"} added you to "${result.list_name}". You can add and rank films in it.`,

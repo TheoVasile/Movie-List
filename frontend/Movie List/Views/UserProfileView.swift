@@ -109,10 +109,11 @@ struct UserProfileView: View {
                     .foregroundColor(Theme.accentSecondary)
             }
             VStack(spacing: 4) {
-                Text(viewModel.user?.displayName ?? "No Name")
+                // Known by their @username, with their name below
+                Text(social.profile?.handle.map { "@\($0)" } ?? viewModel.user?.displayName ?? "No Name")
                     .font(.title2.weight(.heavy))
                     .foregroundColor(Theme.textPrimary)
-                Text(social.profile?.handle.map { "@\($0)" } ?? viewModel.user?.email ?? "No Email")
+                Text(social.profile?.handle == nil ? viewModel.user?.email ?? "" : viewModel.user?.displayName ?? "")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                 if let profile = social.profile, profile.handle != nil {
