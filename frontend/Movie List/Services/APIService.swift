@@ -366,6 +366,15 @@ struct FriendLists: Decodable {
         let poster_path: String?
         let rank: Int
         let watched: Bool
+        // For the film info screen; optional for older servers
+        let overview: String?
+        let original_language: String?
+        let popularity: Double?
+
+        var movie: Movie {
+            Movie(id: tmdb_id, title: title, release_date: release_date, overview: overview ?? "", poster_path: poster_path,
+                  original_language: original_language ?? "", popularity: popularity ?? 0)
+        }
     }
     struct List: Decodable, Identifiable {
         let id: Int64
