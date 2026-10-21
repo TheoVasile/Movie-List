@@ -23,6 +23,12 @@ struct Home: View {
     @State var showLetterboxdImport: Bool = false
     // The list whose name and description are being edited
     @State private var editingList: CDMovieList? = nil
+    // The list whose contributors are being changed
+    @State private var sharingList: CDMovieList? = nil
+    // A new list's visibility and the people (by @handle) who'll edit it with the user
+    @State private var newListVisibility = ListVisibility.public
+    @State private var newListEditors: Set<String> = []
+    @ObservedObject private var social = SocialStore.shared
     
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
@@ -99,9 +105,9 @@ struct Home: View {
                 startSync()
             }
         }
-        .sheet(isPresented: $showPopup) {
+        .sheet(isPresented: $showPopup, onDismiss: resetNewList) {
             newListSheet
-                .presentationDetents([.height(280)])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showLetterboxdImport) {
@@ -229,6 +235,11 @@ private extension Home {
                                 } label: {
                                     Label("Edit List", systemImage: "pencil")
                                 }
+                                Button {
+                                    sharingList = movieList
+                                } label: {
+                                    Label("Add Contributors…", systemImage: "person.badge.plus")
+                                }
                                 Button(role: .destructive) {
                                     deleteList(movieList)
                                 } label: {
@@ -250,48 +261,58 @@ private extension Home {
         .sheet(item: $editingList) { movieList in
             EditListSheet(movieList: movieList)
         }
+        .sheet(item: $sharingList) { movieList in
+            ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List")
+                .presentationDetents([.medium, .large])
+        }
     }
 
     func addNewList() {
-        if listName.count > 0 {
-            let newList = CDMovieList(id: Int64(1), name: listName, overview: "", context: context)
-            
-            APIService.shared.createList(
-                    userID: viewModel.user!.uid,
-                    name: listName,
-                    overview: "",
-                    isRanked: true
-                ) { result in
-                    switch result {
-                    case .success(let serverList):
-                        print("List synced to backend:", serverList)
+        let name = listName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, let userID = viewModel.user?.uid else { return }
+        let visibility = newListVisibility
+        let editors = Array(newListEditors)
+        let newList = CDMovieList(id: Int64(1), name: name, overview: "", context: context)
 
-                        // Optionally, update Core Data with the server ID
-                        DispatchQueue.main.async {
-                            newList.id = serverList.id // Replace with backend ID
-                            try? context.save()
-                        }
-
-                    case .failure(let error):
-                        print(viewModel.user?.uid ?? "no uid")
-                        print("Backend request failed, deleting from Core Data:", error.localizedDescription)
-
-                        // Step 3: If request fails, delete the local entry
-                        DispatchQueue.main.async {
-                            withAnimation(Theme.spring) {
-                                context.delete(newList)
-                                try? context.save()
-                            }
-                        }
-                    }
+        APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: true, visibility: visibility) { result in
+            switch result {
+            case .success(let serverList):
+                newList.id = serverList.id
+                ListVisibility.remember(visibility, for: serverList.id)
+                try? context.save()
+                inviteEditors(editors, to: serverList.id)
+            case .failure(let error):
+                print("Backend request failed, deleting from Core Data:", error.localizedDescription)
+                // The list only exists on the phone, so it goes
+                withAnimation(Theme.spring) {
+                    context.delete(newList)
+                    try? context.save()
                 }
-            
-            Haptics.success()
-            listName = ""
-            showPopup = false
+            }
+        }
+
+        Haptics.success()
+        showPopup = false
+    }
+
+    /// Invites people to edit a list that was just made, one after another, then shows them on it
+    func inviteEditors(_ handles: [String], to listID: Int64) {
+        guard let handle = handles.first else {
+            ListSharing.shared.refresh()
+            return
+        }
+        APIService.shared.addListEditor(listID: listID, handle: handle) { message in
+            if let message { print("Couldn't invite @\(handle):", message) }
+            inviteEditors(Array(handles.dropFirst()), to: listID)
         }
     }
-    
+
+    func resetNewList() {
+        listName = ""
+        newListVisibility = .public
+        newListEditors = []
+    }
+
     /// Every list in one ZIP, laid out like Letterboxd's data export
     func exportAllLists() {
         Haptics.tap()
@@ -330,30 +351,80 @@ private extension Home {
     }
     
     var newListSheet: some View {
-        ZStack {
-            Theme.surface.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 18) {
-                Text("New List")
-                    .font(.title2.weight(.bold))
-                    .foregroundColor(Theme.textPrimary)
-                HStack(spacing: 12) {
-                    Image(systemName: "list.star")
-                        .foregroundStyle(Theme.accentGradient)
+        NavigationStack {
+            Form {
+                Section("Name") {
                     TextField("e.g. Christmas Classics", text: $listName)
                         .disableAutocorrection(true)
                         .submitLabel(.done)
-                        .onSubmit { addNewList() }
                 }
-                .padding(16)
-                .background(Theme.surfaceRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                Button("Create List") { addNewList() }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(listName.isEmpty)
-                    .opacity(listName.isEmpty ? 0.5 : 1)
-                    .animation(.easeOut(duration: 0.2), value: listName.isEmpty)
+                .listRowBackground(Theme.surface)
+                Section {
+                    Picker("Who Can See It", selection: $newListVisibility) {
+                        ForEach(ListVisibility.allCases) { option in
+                            Label(option.title, systemImage: option.icon).tag(option)
+                        }
+                    }
+                } header: {
+                    Text("Visibility")
+                } footer: {
+                    Text(newListVisibility.explanation)
+                }
+                .listRowBackground(Theme.surface)
+                Section {
+                    if social.following.isEmpty {
+                        Text("Follow some friends to make lists together.")
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    ForEach(social.following) { person in
+                        Button {
+                            Haptics.tap()
+                            if newListEditors.contains(person.handle) {
+                                newListEditors.remove(person.handle)
+                            } else {
+                                newListEditors.insert(person.handle)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Avatar(name: person.display_name, size: 32, handle: person.handle, version: person.avatar_version)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("@\(person.handle)")
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text(person.display_name)
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: newListEditors.contains(person.handle) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(newListEditors.contains(person.handle) ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+                            }
+                        }
+                        .accessibilityAddTraits(newListEditors.contains(person.handle) ? .isSelected : [])
+                    }
+                } header: {
+                    Text("Contributors (Optional)")
+                } footer: {
+                    Text("Contributors can add, rank and remove films with you. You can add more later from the list's share menu.")
+                }
+                .listRowBackground(Theme.surface)
             }
-            .padding(24)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle(newListEditors.isEmpty ? "New List" : "New Shared List")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showPopup = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") { addNewList() }
+                        .bold()
+                        .disabled(listName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear {
+                if social.following.isEmpty { social.load() }
+            }
         }
     }
 }

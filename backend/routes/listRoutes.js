@@ -12,11 +12,14 @@ const router = express.Router();
 
 router.post("/create", async (req, res) => {
     try {
-        const { name, overview, is_ranked } = req.body;
+        const { name, overview, is_ranked, visibility } = req.body;
         if (!name) {
             return res.status(400).json({ error: "Name is required." });
         }
-        const newList = await createList(req.user.uid, name, overview, is_ranked);
+        if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
+            return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
+        }
+        const newList = await createList(req.user.uid, name, overview, is_ranked, visibility);
         res.status(201).json(newList);
     } catch (error) {
         console.error("Error creating list:", error);

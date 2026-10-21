@@ -128,7 +128,7 @@ extension CDMovieList {
 }
 
 
-/// Who can see a list. New and existing lists are Followers until the owner changes it
+/// Who can see a list. New lists are Everyone unless the owner picks otherwise
 enum ListVisibility: String, CaseIterable, Identifiable {
     case `public`, followers, `private`
 
@@ -163,7 +163,7 @@ enum ListVisibility: String, CaseIterable, Identifiable {
     /// The visibility of one of the user's lists, as last synced or changed on this phone
     static func of(_ listID: Int64) -> ListVisibility {
         let saved = UserDefaults.standard.dictionary(forKey: storageKey) as? [String: String]
-        return saved?[String(listID)].flatMap(ListVisibility.init) ?? .followers
+        return saved?[String(listID)].flatMap(ListVisibility.init) ?? .public
     }
 
     static func remember(_ visibility: ListVisibility, for listID: Int64) {

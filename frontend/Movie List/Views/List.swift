@@ -399,7 +399,7 @@ private extension ListView {
                         showSharing = true
                     } label: {
                         if sharing.isOwner(movieList.id) {
-                            Label(sharing.isShared(movieList.id) ? "Edit Together…" : "Edit Together with Friends…", systemImage: "person.2")
+                            Label(sharing.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
                         } else {
                             Label("Who Can Edit", systemImage: "person.2")
                         }
@@ -460,7 +460,7 @@ private extension ListView {
     var genreFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // Only offered while some films were placed by Claude and not yet approved
+                // Only offered while some films were placed by the AI and not yet approved
                 if viewModel.hasAIPlacedFilms || viewModel.showAIPlacedOnly {
                     Button {
                         Haptics.tap()

@@ -321,7 +321,7 @@ struct MovieDetailView: View {
                 if let onApprovePlacement, !placementApproved {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
-                        Text("Placed by Claude")
+                        Text("Placed by AI")
                         Text("·")
                         Button("Keep This Spot") {
                             Haptics.tap()

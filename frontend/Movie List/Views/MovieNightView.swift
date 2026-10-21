@@ -10,7 +10,7 @@ import SwiftUI
 import CoreData
 
 /// Films the user and the people they're watching with would all enjoy, each saying why it suits the group,
-/// that can be added straight to the user's lists. AI Picks come from Claude reading everyone's lists, and are
+/// that can be added straight to the user's lists. AI Picks come from the AI reading everyone's lists, and are
 /// only offered when everyone allows AI; Classic picks come from TMDb's recommendations for everyone's
 /// favourites, plus films on several people's watchlists. Either can be narrowed by genre, language and
 /// streaming service
@@ -182,7 +182,7 @@ struct MovieNightView: View {
             }
         } else {
             Text(usesAI
-                 ? "Picked by Claude from your lists and \(names)'s. None of these are in anyone's lists yet."
+                 ? "Picked by AI from your lists and \(names)'s. None of these are in anyone's lists yet."
                  : "Recommended by TMDb from your favourites and \(names)'s, plus anything on more than one watchlist.")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
