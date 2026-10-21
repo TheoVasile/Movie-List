@@ -112,6 +112,40 @@ const createTables = async () => {
                 PRIMARY KEY (poll_id, tmdb_id, user_id)
             );
 
+            -- A group's movie night shortlist: films recommended for it (suggested_by null) and films people in it
+            -- suggested, with everyone's likes and dislikes. Films everyone disliked are kept in group_dismissed so
+            -- they're never recommended to the group again
+            CREATE TABLE IF NOT EXISTS group_picks (
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                poster_path VARCHAR(255),
+                release_date VARCHAR(20),
+                overview TEXT,
+                original_language VARCHAR(10),
+                popularity DOUBLE PRECISION,
+                reason TEXT,
+                suggested_by VARCHAR(255) REFERENCES users(firebase_uid) ON DELETE SET NULL,
+                position INT NOT NULL DEFAULT 0,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (group_id, tmdb_id)
+            );
+            CREATE TABLE IF NOT EXISTS group_pick_reactions (
+                group_id INT NOT NULL,
+                tmdb_id INT NOT NULL,
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                reaction SMALLINT NOT NULL CHECK (reaction IN (-1, 1)),
+                reacted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (group_id, tmdb_id, user_id),
+                FOREIGN KEY (group_id, tmdb_id) REFERENCES group_picks(group_id, tmdb_id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS group_dismissed (
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                title VARCHAR(255),
+                PRIMARY KEY (group_id, tmdb_id)
+            );
+
             -- People the owner of a list has invited to edit it with them: they can add, rank and remove its films
             CREATE TABLE IF NOT EXISTS list_editors (
                 list_id INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,

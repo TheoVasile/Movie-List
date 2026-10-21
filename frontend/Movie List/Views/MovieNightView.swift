@@ -9,21 +9,14 @@ import Foundation
 import SwiftUI
 import CoreData
 
-/// Films the user and the people they're watching with would all enjoy, each saying why it suits the group,
-/// that can be added straight to the user's lists. AI Picks come from the AI reading everyone's lists, and are
-/// only offered when everyone allows AI; Classic picks come from TMDb's recommendations for everyone's
-/// favourites, plus films on several people's watchlists. Either can be narrowed by genre, language and
-/// streaming service
+/// Films the user and the people they're watching with would all enjoy, each saying why it suits them, that can
+/// be added straight to the user's lists. For people the user follows, without a saved group (groups have their
+/// own shortlist: GroupMovieNightView). AI Picks come from the AI reading everyone's lists, and are only offered
+/// when everyone allows AI; Classic picks come from TMDb's recommendations for everyone's favourites, plus films on
+/// several people's watchlists. Either can be narrowed by genre, language and streaming service
 struct MovieNightView: View {
     // Everyone coming besides the user
-    @State private var people: [UserSummary]
-    // A saved group, when it's for one
-    var groupID: Int64? = nil
-    var groupName: String? = nil
-    // The group as it is now, after anyone is added or removed
-    @State private var group: MovieGroup?
-    @State private var showMembers = false
-    @ObservedObject private var social = SocialStore.shared
+    let people: [UserSummary]
     // Whether everyone, the user included, allows AI features, which AI Picks need
     let canUseAI: Bool
 
@@ -40,48 +33,21 @@ struct MovieNightView: View {
     // The film waiting for the user to choose lists, and the films already added
     @State private var adding: Movie? = nil
     @State private var added: Set<Int64> = []
-    // Groups only: the vote that's open or just closed, and films being picked for a new one
-    @State private var poll: GroupPoll? = nil
-    @State private var choosingVote = false
-    @State private var chosenForVote: [Int64] = []
-    @State private var pollLength = PollLength.threeHours
-    @State private var sendingVote = false
-    @State private var voteFailed = false
 
-    private var pollIsOpen: Bool { poll.map { !$0.closed } ?? false }
-
-    init(people: [UserSummary], groupID: Int64? = nil, groupName: String? = nil, group: MovieGroup? = nil, canUseAI: Bool) {
-        _people = State(initialValue: people)
-        self.groupID = groupID ?? group?.id
-        self.groupName = groupName ?? group?.name
-        _group = State(initialValue: group)
+    init(people: [UserSummary], canUseAI: Bool) {
+        self.people = people
         self.canUseAI = canUseAI
         _usesAI = State(initialValue: canUseAI)
-    }
-
-    // "@sam", "@sam and @ana", "@sam, @ana and @lee"
-    private var names: String {
-        let all = people.map { "@\($0.handle)" }
-        guard all.count > 1 else { return all.first ?? "" }
-        return all.dropLast().joined(separator: ", ") + " and " + (all.last ?? "")
-    }
-
-    private var title: String {
-        groupName ?? "Movie Night with \(names)"
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if let group {
-                    membersCard(group)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                }
-                sourcePicker
+                MovieNightSourcePicker(usesAI: $usesAI, canUseAI: canUseAI, isLoading: isLoading, people: people)
+                    .onChange(of: usesAI) { _ in load() }
                 ZStack {
                     Theme.background.ignoresSafeArea()
-                    if isLoading && poll == nil {
+                    if isLoading {
                         VStack(spacing: 14) {
                             ProgressView()
                                 .tint(Theme.accent)
@@ -89,31 +55,29 @@ struct MovieNightView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Theme.textSecondary)
                         }
-                    } else if let errorMessage, poll == nil {
+                    } else if let errorMessage {
                         EmptyStateView(icon: "ticket", title: "Couldn't plan a movie night", message: errorMessage,
                                        actionTitle: "Try Again", action: load)
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 14) {
-                                if let groupID, let binding = Binding($poll) {
-                                    PollCard(groupID: groupID, poll: binding, onAddWinner: { adding = $0 }) {
-                                        withAnimation(Theme.spring) { poll = nil }
-                                        if picks.isEmpty { load() }
-                                    }
-                                    .transition(.opacity)
+                                Text(usesAI
+                                     ? "Picked by AI from your lists and \(MovieNightNames.of(people))'s. None of these are in anyone's lists yet."
+                                     : "Recommended by TMDb from your favourites and \(MovieNightNames.of(people))'s, plus anything on more than one watchlist.")
+                                    .font(.subheadline)
+                                    .foregroundColor(Theme.textSecondary)
+                                ForEach(Array(picks.enumerated()), id: \.element.id) { index, movie in
+                                    pickRow(movie)
+                                        .appearAnimation(delay: Double(min(index, 8)) * 0.05)
                                 }
-                                picksSection
                             }
                             .padding(16)
-                        }
-                        .safeAreaInset(edge: .bottom) {
-                            if choosingVote { sendVoteBar }
                         }
                     }
                 }
             }
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle(title)
+            .navigationTitle("Movie Night with \(MovieNightNames.of(people))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -144,19 +108,6 @@ struct MovieNightView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showMembers) {
-                if let current = group {
-                    GroupMembersSheet(group: current) { updated in
-                        let changed = Set(updated.members.map(\.handle)) != Set(people.map(\.handle))
-                        group = updated
-                        people = updated.members
-                        // New picks for the new line-up, unless a vote is going on
-                        if changed && !pollIsOpen { load() }
-                    }
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                }
-            }
             .sheet(isPresented: $showFilters) {
                 MovieNightFiltersSheet(filters: filters) { chosen in
                     filters = chosen
@@ -166,208 +117,7 @@ struct MovieNightView: View {
             }
         }
         .onAppear {
-            guard picks.isEmpty else { return }
-            guard let groupID else { return load() }
-            // A group with a vote going on opens on the vote, without spending a request on new picks
-            APIService.shared.fetchPoll(groupID: groupID) { result in
-                if case .success(let current) = result { poll = current }
-                if !pollIsOpen { load() } else { isLoading = false }
-            }
-        }
-        .alert("Couldn't send the vote", isPresented: $voteFailed) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Check your connection and try again.")
-        }
-    }
-
-    @ViewBuilder
-    private var picksSection: some View {
-        if isLoading {
-            HStack(spacing: 10) {
-                ProgressView()
-                Text("Finding more films…")
-                    .font(.subheadline)
-                    .foregroundColor(Theme.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 30)
-        } else if let errorMessage {
-            Text(errorMessage)
-                .font(.subheadline)
-                .foregroundColor(Theme.textSecondary)
-        } else if picks.isEmpty {
-            if pollIsOpen {
-                Button("See More Picks", action: load)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accentGradient)
-                    .frame(maxWidth: .infinity)
-            }
-        } else {
-            Text(usesAI
-                 ? "Picked by AI from your lists and \(names)'s. None of these are in anyone's lists yet."
-                 : "Recommended by TMDb from your favourites and \(names)'s, plus anything on more than one watchlist.")
-                .font(.subheadline)
-                .foregroundColor(Theme.textSecondary)
-            if groupID != nil {
-                startVoteButton
-            }
-            ForEach(Array(picks.enumerated()), id: \.element.id) { index, movie in
-                pickRow(movie)
-                    .appearAnimation(delay: Double(min(index, 8)) * 0.05)
-            }
-        }
-    }
-
-    // Groups only: everyone in it, so it's clear who the picks are for. Opens the full list, where the person who
-    // made the group can add and remove people
-    private func membersCard(_ group: MovieGroup) -> some View {
-        Button {
-            Haptics.tap()
-            showMembers = true
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("WHO'S IN · \(group.members.count + 1)")
-                        .font(.caption2.weight(.heavy))
-                        .tracking(1.2)
-                        .foregroundColor(Theme.textSecondary)
-                    Spacer()
-                    Text(group.is_owner ? "Add or Remove" : "See All")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.accentGradient)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 14) {
-                        memberBubble(label: "You", name: social.profile?.display_name ?? "You", handle: social.profile?.handle,
-                                     version: social.profile?.avatar_version, isOwner: group.is_owner)
-                        ForEach(group.members) { person in
-                            memberBubble(label: "@\(person.handle)", name: person.display_name, handle: person.handle,
-                                         version: person.avatar_version, isOwner: person.is_owner == true)
-                        }
-                    }
-                }
-                .allowsHitTesting(false)
-            }
-            .padding(12)
-            .cardStyle(cornerRadius: 16)
-        }
-        .buttonStyle(PressableButtonStyle(scale: 0.98))
-        .accessibilityLabel("Who's in: You, \(group.members.map { "@\($0.handle)" }.joined(separator: ", "))")
-    }
-
-    private func memberBubble(label: String, name: String, handle: String?, version: Double?, isOwner: Bool) -> some View {
-        VStack(spacing: 4) {
-            Avatar(name: name, size: 44, handle: handle, version: version)
-                .overlay(alignment: .topTrailing) {
-                    if isOwner {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Theme.onAccent)
-                            .padding(4)
-                            .background(Theme.accentGradient, in: Circle())
-                            .offset(x: 4, y: -4)
-                    }
-                }
-            Text(label)
-                .font(.caption2.weight(.semibold))
-                .foregroundColor(Theme.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: 64)
-        }
-    }
-
-    // Groups only: picks 2 to 5 of these films for everyone to vote on
-    private var startVoteButton: some View {
-        Button {
-            Haptics.tap()
-            withAnimation(Theme.spring) {
-                choosingVote.toggle()
-                chosenForVote = []
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: choosingVote ? "xmark" : "checkmark.seal.fill")
-                    .foregroundStyle(Theme.accentGradient)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(choosingVote ? "Cancel Vote" : pollIsOpen ? "Start a New Vote" : "Can't Decide? Start a Vote")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(Theme.textPrimary)
-                    Text(choosingVote ? "Tap 2 to 5 films below." : "Pick 2 to 5 of these and everyone votes 👍 or 👎.")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                }
-                Spacer()
-            }
-            .padding(12)
-            .cardStyle(cornerRadius: 16)
-        }
-        .buttonStyle(PressableButtonStyle(scale: 0.98))
-    }
-
-    private var sendVoteBar: some View {
-        HStack(spacing: 12) {
-            Menu {
-                Picker("Closes After", selection: $pollLength) {
-                    ForEach(PollLength.allCases) { Text($0.label).tag($0) }
-                }
-            } label: {
-                Label(pollLength.label, systemImage: "clock")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(Theme.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Theme.surfaceRaised, in: Capsule())
-            }
-            Button(action: sendVote) {
-                Group {
-                    if sendingVote {
-                        ProgressView().tint(Theme.onAccent)
-                    } else {
-                        Text(chosenForVote.count < 2 ? "Pick \(2 - chosenForVote.count) More" : "Send Vote · \(chosenForVote.count) Films")
-                    }
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundColor(Theme.onAccent)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Theme.accentGradient, in: Capsule())
-                .opacity(chosenForVote.count < 2 ? 0.5 : 1)
-            }
-            .disabled(chosenForVote.count < 2 || sendingVote)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-    }
-
-    private func toggleForVote(_ movie: Movie) {
-        Haptics.tap()
-        if let index = chosenForVote.firstIndex(of: movie.id) {
-            chosenForVote.remove(at: index)
-        } else if chosenForVote.count < 5 {
-            chosenForVote.append(movie.id)
-        }
-    }
-
-    private func sendVote() {
-        guard let groupID else { return }
-        let films = chosenForVote.compactMap { id in picks.first { $0.id == id } }
-        sendingVote = true
-        APIService.shared.startPoll(groupID: groupID, films: films, hours: pollLength.rawValue) { result in
-            sendingVote = false
-            switch result {
-            case .success(let started):
-                Haptics.success()
-                withAnimation(Theme.spring) {
-                    poll = started
-                    choosingVote = false
-                    chosenForVote = []
-                }
-            case .failure:
-                voteFailed = true
-            }
+            if picks.isEmpty { load() }
         }
     }
 
@@ -389,87 +139,30 @@ struct MovieNightView: View {
                         .foregroundColor(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Button {
-                    Haptics.tap()
-                    adding = movie
-                } label: {
-                    Label(added.contains(movie.id) ? "Added" : "Add to Lists",
-                          systemImage: added.contains(movie.id) ? "checkmark" : "plus")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(added.contains(movie.id) ? Theme.textSecondary : Theme.onAccent)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(added.contains(movie.id) ? AnyShapeStyle(Theme.surfaceRaised) : AnyShapeStyle(Theme.accentGradient),
-                                    in: Capsule())
-                }
-                .disabled(added.contains(movie.id))
-                .padding(.top, 2)
+                AddToListsButton(added: added.contains(movie.id)) { adding = movie }
+                    .padding(.top, 2)
             }
             Spacer(minLength: 0)
-            if choosingVote {
-                let chosen = chosenForVote.contains(movie.id)
-                Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(chosen ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-                    .transition(.scale.combined(with: .opacity))
-            }
         }
         .padding(14)
         .cardStyle(cornerRadius: 18)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if choosingVote { toggleForVote(movie) }
-        }
-        .accessibilityAddTraits(choosingVote && chosenForVote.contains(movie.id) ? .isSelected : [])
     }
 
     private func load() {
         isLoading = true
         errorMessage = nil
-        APIService.shared.movieNight(handles: people.map(\.handle), groupID: groupID, usesAI: usesAI && canUseAI, filters: filters) { result in
+        APIService.shared.movieNight(handles: people.map(\.handle), usesAI: usesAI && canUseAI, filters: filters) { result in
             isLoading = false
             switch result {
             case .success(let movies):
                 picks = movies
                 if movies.isEmpty {
-                    errorMessage = !filters.isEmpty
-                        ? "Nothing fits these filters this time. Try fewer of them."
-                        : usesAI
-                        ? "The AI didn't find anything new for everyone this time."
-                        : "Not enough to go on yet. Movie Night works best when everyone has ranked a few films."
+                    errorMessage = MovieNightMessages.empty(filtered: !filters.isEmpty, usesAI: usesAI)
                 }
             case .failure(let error):
-                switch (error as NSError).code {
-                case 403: errorMessage = (error as NSError).userInfo[NSLocalizedDescriptionKey] as? String
-                    ?? "Everyone needs to allow AI features for AI Picks."
-                case 429: errorMessage = "You've used today's AI picks. Try again tomorrow."
-                case 503: errorMessage = "AI picks aren't available right now."
-                default: errorMessage = "Something went wrong. Check your connection and try again."
-                }
+                errorMessage = MovieNightMessages.failure(error)
             }
         }
-    }
-
-    // AI Picks or Classic, like Discover. AI Picks only when everyone allows AI
-    private var sourcePicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Picker("Recommendations", selection: $usesAI) {
-                Text("AI Picks").tag(true)
-                Text("Classic").tag(false)
-            }
-            .pickerStyle(.segmented)
-            .disabled(!canUseAI || isLoading)
-            .onChange(of: usesAI) { _ in load() }
-            if !canUseAI {
-                Text(people.count > 1
-                     ? "AI Picks need everyone in the group to allow AI features in Settings."
-                     : "AI Picks need you and \(names) to both allow AI features in Settings.")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     private func add(_ movie: Movie, to lists: [CDMovieList]) {
@@ -482,6 +175,84 @@ struct MovieNightView: View {
                 }
             }
         }
+    }
+}
+
+/// "@sam", "@sam and @ana", "@sam, @ana and @lee"
+enum MovieNightNames {
+    static func of(_ people: [UserSummary]) -> String {
+        let all = people.map { "@\($0.handle)" }
+        guard all.count > 1 else { return all.first ?? "" }
+        return all.dropLast().joined(separator: ", ") + " and " + (all.last ?? "")
+    }
+}
+
+/// What to say when a movie night finds nothing or fails, for friends and groups alike
+enum MovieNightMessages {
+    static func empty(filtered: Bool, usesAI: Bool) -> String {
+        filtered ? "Nothing fits these filters this time. Try fewer of them."
+            : usesAI ? "The AI didn't find anything new for everyone this time."
+            : "Not enough to go on yet. Movie Night works best when everyone has ranked a few films."
+    }
+
+    static func failure(_ error: Error) -> String {
+        switch (error as NSError).code {
+        case 403: return (error as NSError).userInfo[NSLocalizedDescriptionKey] as? String
+            ?? "Everyone needs to allow AI features for AI Picks."
+        case 429: return "You've used today's AI picks. Try again tomorrow."
+        case 503: return "AI picks aren't available right now."
+        default: return "Something went wrong. Check your connection and try again."
+        }
+    }
+}
+
+/// AI Picks or Classic, like Discover. AI Picks only when everyone allows AI
+struct MovieNightSourcePicker: View {
+    @Binding var usesAI: Bool
+    let canUseAI: Bool
+    let isLoading: Bool
+    let people: [UserSummary]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("Recommendations", selection: $usesAI) {
+                Text("AI Picks").tag(true)
+                Text("Classic").tag(false)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!canUseAI || isLoading)
+            if !canUseAI {
+                Text(people.count > 1
+                     ? "AI Picks need everyone in the group to allow AI features in Settings."
+                     : "AI Picks need you and \(MovieNightNames.of(people)) to both allow AI features in Settings.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
+
+/// "Add to Lists", or "Added" once it's in one
+struct AddToListsButton: View {
+    let added: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            Label(added ? "Added" : "Add to Lists", systemImage: added ? "checkmark" : "plus")
+                .font(.caption.weight(.bold))
+                .foregroundColor(added ? Theme.textSecondary : Theme.onAccent)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(added ? AnyShapeStyle(Theme.surfaceRaised) : AnyShapeStyle(Theme.accentGradient), in: Capsule())
+        }
+        .buttonStyle(.borderless)
+        .disabled(added)
     }
 }
 
@@ -697,8 +468,8 @@ struct MovieNightGroupsSection: View {
             }
         }
         .sheet(item: $openGroup, onDismiss: load) { group in
-            MovieNightView(people: group.members, group: group,
-                           canUseAI: group.ai_possible && aiAllowed && ageRange != Personalization.under18)
+            GroupMovieNightView(group: group,
+                                canUseAI: group.ai_possible && aiAllowed && ageRange != Personalization.under18)
         }
         .sheet(isPresented: $showNewGroup, onDismiss: load) {
             NewGroupSheet()

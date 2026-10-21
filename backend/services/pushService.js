@@ -8,6 +8,7 @@ const PREFERENCE = {
     follow_new: "notify_requests",
     list_invite: "notify_requests",
     group_added: "notify_requests",
+    group_suggestion: "notify_activity",
     activity: "notify_activity",
     streaming: "notify_streaming",
 };

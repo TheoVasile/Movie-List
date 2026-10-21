@@ -1,12 +1,12 @@
 const pool = require("../config/db");
 const { notifyUser } = require("../services/pushService");
 
-// Movie night votes: someone in a group sends 2 to 5 films, everyone votes 👍 or 👎 on each, and the poll closes
-// once everyone has voted on every film or its time runs out. The winner has the most 👍 minus 👎, then the most
-// 👍, then whichever was sent first. A group has one open poll at a time: starting a new one closes the last
+// Movie night votes: someone in a group starts a vote between the films the group liked, everyone votes for one,
+// and the poll closes once everyone has voted or its time runs out. The winner has the most votes, then whichever
+// was most liked. A group has one open poll at a time: starting a new one closes the last
 
 const MIN_FILMS = 2;
-const MAX_FILMS = 5;
+const MAX_FILMS = 10;
 // A closed poll stays on the group's screen this long, so everyone sees the winner
 const SHOW_RESULT_FOR_HOURS = 24;
 
@@ -50,7 +50,7 @@ async function startPoll(user_id, group_id, films, hours) {
     const group = await pool.query("SELECT name FROM watch_groups WHERE id = $1", [group_id]);
     await Promise.all(people.filter((p) => p.firebase_uid !== user_id).map((p) => notifyUser(p.firebase_uid, "poll_started", {
         title: `Vote for ${group.rows[0].name}'s movie night`,
-        body: `${me.name} picked ${films.length} films. Vote 👍 or 👎 on each before ${hours === 1 ? "the hour" : `${hours} hours`} are up.`,
+        body: `${me.name} started a vote between the ${films.length} films you liked. Pick one before ${hours === 1 ? "the hour" : `${hours} hours`} are up.`,
         data: { group_id: String(group_id) },
     })));
     return id;
@@ -85,7 +85,7 @@ async function currentPoll(user_id, group_id) {
          ORDER BY o.position`,
         [poll.id, user_id]
     );
-    const voted = await pool.query("SELECT COUNT(DISTINCT user_id)::int AS n FROM poll_votes WHERE poll_id = $1", [poll.id]);
+    const voted = await pool.query("SELECT COUNT(DISTINCT user_id)::int AS n FROM poll_votes WHERE poll_id = $1 AND vote = 1", [poll.id]);
     return {
         id: poll.id,
         created_by_name: poll.created_by_name,
@@ -93,15 +93,15 @@ async function currentPoll(user_id, group_id) {
         closes_at: poll.closes_at,
         closed: Boolean(poll.closed_at),
         winner_tmdb_id: poll.winner_tmdb_id,
-        // How many people have voted on at least one film, out of everyone in the group
+        // How many people have voted, out of everyone in the group
         voters: voted.rows[0].n,
         people: people.length,
         options: options.rows.map((o) => ({ ...o, my_vote: o.my_vote ?? 0 })),
     };
 }
 
-/// Records the user's vote on one film (1, -1, or 0 to take it back). Returns false when the poll isn't open or
-/// isn't one of their group's. Closes the poll once everyone has voted on every film
+/// Records the user's vote for one film (1), replacing any other, or takes it back (0, or -1 from older builds).
+/// Returns false when the poll isn't open or isn't one of their group's. Closes the poll once everyone has voted
 async function vote(user_id, group_id, poll_id, tmdb_id, value) {
     const poll = await pool.query(
         "SELECT 1 FROM group_polls WHERE id = $1 AND group_id = $2 AND closed_at IS NULL AND closes_at > CURRENT_TIMESTAMP",
@@ -110,22 +110,19 @@ async function vote(user_id, group_id, poll_id, tmdb_id, value) {
     if (!poll.rowCount || !(await groupPeople(group_id)).some((p) => p.firebase_uid === user_id)) return false;
     const option = await pool.query("SELECT 1 FROM poll_options WHERE poll_id = $1 AND tmdb_id = $2", [poll_id, tmdb_id]);
     if (!option.rowCount) return false;
-    if (value === 0) {
-        await pool.query("DELETE FROM poll_votes WHERE poll_id = $1 AND tmdb_id = $2 AND user_id = $3", [poll_id, tmdb_id, user_id]);
-    } else {
+    if (value === 1) {
+        await pool.query("DELETE FROM poll_votes WHERE poll_id = $1 AND user_id = $2 AND tmdb_id <> $3", [poll_id, user_id, tmdb_id]);
         await pool.query(
-            `INSERT INTO poll_votes (poll_id, tmdb_id, user_id, vote) VALUES ($1, $2, $3, $4)
-             ON CONFLICT (poll_id, tmdb_id, user_id) DO UPDATE SET vote = $4`,
-            [poll_id, tmdb_id, user_id, value]
+            `INSERT INTO poll_votes (poll_id, tmdb_id, user_id, vote) VALUES ($1, $2, $3, 1)
+             ON CONFLICT (poll_id, tmdb_id, user_id) DO UPDATE SET vote = 1`,
+            [poll_id, tmdb_id, user_id]
         );
+    } else {
+        await pool.query("DELETE FROM poll_votes WHERE poll_id = $1 AND tmdb_id = $2 AND user_id = $3", [poll_id, tmdb_id, user_id]);
     }
-    const counts = await pool.query(
-        `SELECT (SELECT COUNT(*) FROM poll_options WHERE poll_id = $1)::int AS films,
-                (SELECT COUNT(*) FROM poll_votes WHERE poll_id = $1)::int AS votes`,
-        [poll_id]
-    );
+    const voters = await pool.query("SELECT COUNT(DISTINCT user_id)::int AS n FROM poll_votes WHERE poll_id = $1 AND vote = 1", [poll_id]);
     const people = (await groupPeople(group_id)).length;
-    if (counts.rows[0].votes >= counts.rows[0].films * people) await closePoll(poll_id);
+    if (voters.rows[0].n >= people) await closePoll(poll_id);
     return true;
 }
 
@@ -140,12 +137,11 @@ async function closePoll(poll_id) {
     if (!closed.rowCount) return;
     const group_id = closed.rows[0].group_id;
     const best = await pool.query(
-        `SELECT o.tmdb_id, o.title,
-                COALESCE(SUM(v.vote), 0)::int AS score, COUNT(v.*) FILTER (WHERE v.vote = 1)::int AS up
+        `SELECT o.tmdb_id, o.title, COUNT(v.*) FILTER (WHERE v.vote = 1)::int AS up
          FROM poll_options o LEFT JOIN poll_votes v ON v.poll_id = o.poll_id AND v.tmdb_id = o.tmdb_id
          WHERE o.poll_id = $1
          GROUP BY o.tmdb_id, o.title, o.position
-         ORDER BY score DESC, up DESC, o.position
+         ORDER BY up DESC, o.position
          LIMIT 1`,
         [poll_id]
     );
@@ -156,7 +152,7 @@ async function closePoll(poll_id) {
     const people = await groupPeople(group_id);
     await Promise.all(people.map((p) => notifyUser(p.firebase_uid, "poll_result", {
         title: `${group.rows[0]?.name ?? "Movie night"} picked ${winner.title} 🍿`,
-        body: winner.up ? `It won the vote with ${winner.up} 👍.` : "Nobody voted, so it's the first pick.",
+        body: winner.up ? `It won the vote with ${winner.up} ${winner.up === 1 ? "vote" : "votes"}.` : "Nobody voted, so it's the most liked film.",
         data: { group_id: String(group_id) },
     })));
 }
@@ -178,12 +174,11 @@ async function scheduleOpenPolls() {
     }
 }
 
-/// Which of the user's groups have an open poll, and whether the user still has films to vote on there
+/// Which of the user's groups have an open poll, and whether the user still has to vote there
 async function openPollsFor(user_id, group_ids) {
     const result = await pool.query(
         `SELECT p.group_id,
-                (SELECT COUNT(*) FROM poll_options o WHERE o.poll_id = p.id) >
-                (SELECT COUNT(*) FROM poll_votes v WHERE v.poll_id = p.id AND v.user_id = $1) AS needs_my_vote
+                NOT EXISTS (SELECT 1 FROM poll_votes v WHERE v.poll_id = p.id AND v.user_id = $1 AND v.vote = 1) AS needs_my_vote
          FROM group_polls p
          WHERE p.group_id = ANY($2::int[]) AND p.closed_at IS NULL AND p.closes_at > CURRENT_TIMESTAMP`,
         [user_id, group_ids]

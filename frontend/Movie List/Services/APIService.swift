@@ -163,7 +163,34 @@ struct MovieGroup: Decodable, Identifiable, Hashable {
     let needs_my_vote: Bool?
 }
 
-/// A movie night vote: 2 to 5 films someone in a group sent, with everyone's 👍 and 👎 so far
+/// A film on a group's movie night shortlist: recommended for the group, or suggested by someone in it
+/// (suggested_by), with everyone's likes and dislikes
+struct GroupPick: Decodable, Identifiable, Equatable {
+    var id: Int64 { tmdb_id }
+    let tmdb_id: Int64
+    let title: String
+    let poster_path: String?
+    let release_date: String?
+    let overview: String?
+    let original_language: String?
+    let popularity: Double?
+    let reason: String?
+    // @handle of whoever suggested it; nil for recommendations
+    let suggested_by: String?
+    let likes: Int
+    let dislikes: Int
+    // 1, -1, or 0 when the user hasn't reacted
+    let my_reaction: Int
+    // @handles of everyone who liked it
+    let liked_by: [String]
+
+    var movie: Movie {
+        Movie(id: tmdb_id, title: title, release_date: release_date ?? "", overview: overview ?? "", poster_path: poster_path,
+              original_language: original_language ?? "", popularity: popularity ?? 0, reason: reason)
+    }
+}
+
+/// A movie night vote between the films a group liked, with how many voted for each so far
 struct GroupPoll: Decodable, Equatable {
     let id: Int64
     let created_by_name: String?
@@ -856,16 +883,29 @@ class APIService {
     /// Films the user and a friend they follow would both enjoy, picked by the AI, each with a reason.
     /// A failure's code is the HTTP status (403 not following or AI not allowed by one of them, 429 daily
     /// limit, 503 AI not set up), and its description is the server's explanation when there is one
-    /// Films for a movie night with people the user follows (handles) or a saved group, optionally narrowed
-    /// to genres, languages and streaming services. usesAI false asks for Classic picks, from TMDb's
-    /// recommendations for everyone's favourites. A failure's code is the HTTP status (403 not following or AI
-    /// not allowed by someone, 429 daily limit, 503 AI not set up), and its description is the server's explanation
-    func movieNight(handles: [String], groupID: Int64? = nil, usesAI: Bool, filters: MovieNightFilters = MovieNightFilters(),
+    /// Films for a movie night with people the user follows, optionally narrowed to genres, languages and
+    /// streaming services. usesAI false asks for Classic picks, from TMDb's recommendations for everyone's
+    /// favourites. A failure's code is the HTTP status (403 not following or AI not allowed by someone, 429 daily
+    /// limit, 503 AI not set up), and its description is the server's explanation
+    func movieNight(handles: [String], usesAI: Bool, filters: MovieNightFilters = MovieNightFilters(),
                     completion: @escaping (Result<[Movie], Error>) -> Void) {
-        var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = [
+        var body = movieNightBody(usesAI: usesAI, filters: filters)
+        body["handles"] = handles
+        movieNightRequest(body, completion: completion)
+    }
+
+    /// New recommendations for a group: they replace the ones nobody has liked, and the reply is the group's whole
+    /// shortlist. Fails like movieNight
+    func refreshGroupPicks(groupID: Int64, usesAI: Bool, filters: MovieNightFilters = MovieNightFilters(),
+                           completion: @escaping (Result<[GroupPick], Error>) -> Void) {
+        var body = movieNightBody(usesAI: usesAI, filters: filters)
+        body["group_id"] = groupID
+        body["save"] = true
+        movieNightRequest(body, completion: completion)
+    }
+
+    private func movieNightBody(usesAI: Bool, filters: MovieNightFilters) -> [String: Any] {
+        [
             "count": 10,
             "mode": usesAI ? "ai" : "classic",
             "genres": filters.genres.sorted(),
@@ -875,15 +915,20 @@ class APIService {
             "provider_names": filters.services.map(\.name),
             "region": Locale.current.region?.identifier ?? "US",
         ]
-        if let groupID { body["group_id"] = groupID } else { body["handles"] = handles }
+    }
+
+    private func movieNightRequest<T: Decodable>(_ body: [String: Any], completion: @escaping (Result<T, Error>) -> Void) {
+        var request = URLRequest(url: URL(string: "\(baseURL)/movies/movie-night")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         // Reading several people's lists takes the AI a little while
         request.timeoutInterval = 90
         send(request) { data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let result: Result<[Movie], Error>
-            if let data, status == 200, let movies = try? JSONDecoder().decode([Movie].self, from: data) {
-                result = .success(movies)
+            let result: Result<T, Error>
+            if let data, status == 200, let decoded = try? JSONDecoder().decode(T.self, from: data) {
+                result = .success(decoded)
             } else {
                 let message = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
                 result = .failure(error ?? NSError(domain: "Movie night failed", code: status,
@@ -891,6 +936,29 @@ class APIService {
             }
             DispatchQueue.main.async { completion(result) }
         }
+    }
+
+    /// The group's shortlist, most liked first
+    func fetchGroupPicks(groupID: Int64, completion: @escaping (Result<[GroupPick], Error>) -> Void) {
+        sendJSON("GET", "/users/me/groups/\(groupID)/picks", completion: completion)
+    }
+
+    /// Likes (1) or dislikes (-1) a film on the shortlist, or takes it back (0); calls back with the shortlist
+    func reactToPick(groupID: Int64, tmdbID: Int64, reaction: Int, completion: @escaping (Result<[GroupPick], Error>) -> Void) {
+        sendJSON("PUT", "/users/me/groups/\(groupID)/picks/\(tmdbID)/reaction", body: ["reaction": reaction], completion: completion)
+    }
+
+    /// Suggests a film to the group, which counts as the user's like; calls back with the shortlist
+    func suggestPick(groupID: Int64, movie: Movie, completion: @escaping (Result<[GroupPick], Error>) -> Void) {
+        var body: [String: Any] = ["tmdb_id": movie.id, "title": movie.title, "release_date": movie.release_date,
+                                   "overview": movie.overview, "original_language": movie.original_language, "popularity": movie.popularity]
+        if let poster = movie.poster_path { body["poster_path"] = poster }
+        sendJSON("POST", "/users/me/groups/\(groupID)/picks", body: body, completion: completion)
+    }
+
+    /// Takes a suggestion off the shortlist (whoever suggested it, or the group's owner); calls back with the shortlist
+    func removePick(groupID: Int64, tmdbID: Int64, completion: @escaping (Result<[GroupPick], Error>) -> Void) {
+        sendJSON("DELETE", "/users/me/groups/\(groupID)/picks/\(tmdbID)", completion: completion)
     }
 
     func fetchGroups(completion: @escaping (Result<[MovieGroup], Error>) -> Void) {
@@ -906,18 +974,10 @@ class APIService {
         }
     }
 
-    /// Sends films for the group to vote on, closing after the given hours; calls back with the new poll
-    func startPoll(groupID: Int64, films: [Movie], hours: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
-        let body: [String: Any] = [
-            "hours": hours,
-            "films": films.map { film -> [String: Any] in
-                var item: [String: Any] = ["tmdb_id": film.id, "title": film.title, "release_date": film.release_date]
-                if let poster = film.poster_path { item["poster_path"] = poster }
-                if let reason = film.reason { item["reason"] = reason }
-                return item
-            },
-        ]
-        sendJSON("POST", "/users/me/groups/\(groupID)/polls", body: body, completion: completion)
+    /// Starts a vote between the films the group has liked, closing after the given hours; calls back with the
+    /// new poll. Fails with 400 when fewer than 2 films are liked
+    func startPoll(groupID: Int64, hours: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
+        sendJSON("POST", "/users/me/groups/\(groupID)/polls", body: ["hours": hours], completion: completion)
     }
 
     /// The group's open vote, or the last one for a day after it closes; nil when there's none
@@ -932,7 +992,7 @@ class APIService {
         }
     }
 
-    /// Votes 👍 (1) or 👎 (-1) on a film, or takes the vote back (0); calls back with the poll as it is now
+    /// Votes for a film (1), replacing the user's other vote, or takes it back (0); calls back with the poll as it is now
     func vote(groupID: Int64, pollID: Int64, tmdbID: Int64, vote: Int, completion: @escaping (Result<GroupPoll, Error>) -> Void) {
         sendJSON("PUT", "/users/me/groups/\(groupID)/polls/\(pollID)/votes", body: ["tmdb_id": tmdbID, "vote": vote], completion: completion)
     }

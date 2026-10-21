@@ -1,5 +1,6 @@
 const express = require("express");
-const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember } = require("../models/groupModel");
+const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember, groupParticipants } = require("../models/groupModel");
+const { fetchPicks, suggestPick, reactToPick, removePick, likedPicks } = require("../models/groupPicksModel");
 const { yearReview } = require("../models/yearReviewModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
@@ -182,25 +183,101 @@ router.delete("/me/groups/:id/members/:handle", async (req, res) => {
     }
 });
 
-// Sends 2 to 5 films for the group to vote on, e.g. { "films": [{ "tmdb_id": 329865, "title": "Arrival",
-// "poster_path": "/x.jpg", "release_date": "2016-11-10", "reason": "..." }], "hours": 3 }. Everyone else gets a push
-router.post("/me/groups/:id/polls", async (req, res) => {
+// The group's shortlist: recommendations and suggestions, most liked first, with everyone's likes and dislikes.
+// New recommendations come from POST /movies/movie-night with "save": true
+router.get("/me/groups/:id/picks", async (req, res) => {
+    try {
+        const picks = await fetchPicks(req.user.uid, Number(req.params.id));
+        if (!picks) return res.status(404).json({ error: "Group not found." });
+        res.json(picks);
+    } catch (error) {
+        console.error("Error fetching group picks:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Suggests a film to the group, e.g. { "tmdb_id": 949, "title": "Heat", "poster_path": "/x.jpg",
+// "release_date": "1995-12-15", "overview": "...", "original_language": "en", "popularity": 30.1 }. It counts
+// as the user's like, and everyone else hears about it. Returns the shortlist
+router.post("/me/groups/:id/picks", async (req, res) => {
     const groupId = Number(req.params.id);
-    const seen = new Set();
-    const films = (Array.isArray(req.body.films) ? req.body.films : [])
-        .map((film) => ({
-            tmdb_id: Number(film?.tmdb_id),
-            title: typeof film?.title === "string" ? film.title.trim().slice(0, 255) : "",
-            poster_path: typeof film?.poster_path === "string" ? film.poster_path.slice(0, 255) : null,
-            release_date: typeof film?.release_date === "string" ? film.release_date.slice(0, 20) : null,
-            reason: typeof film?.reason === "string" ? film.reason.slice(0, 500) : null,
-        }))
-        .filter((film) => Number.isInteger(film.tmdb_id) && film.tmdb_id > 0 && film.title && !seen.has(film.tmdb_id) && seen.add(film.tmdb_id));
-    const hours = Math.min(24, Math.max(1, Math.round(Number(req.body.hours) || 3)));
-    if (!Number.isInteger(groupId) || films.length < MIN_FILMS || films.length > MAX_FILMS) {
-        return res.status(400).json({ error: `Pick ${MIN_FILMS} to ${MAX_FILMS} films to vote on.` });
+    const body = req.body ?? {};
+    const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+    const film = {
+        tmdb_id: Number(body.tmdb_id),
+        title: text(body.title, 255),
+        poster_path: text(body.poster_path, 255) || null,
+        release_date: text(body.release_date, 20),
+        overview: text(body.overview, 2000),
+        original_language: text(body.original_language, 10),
+        popularity: Number(body.popularity) || 0,
+    };
+    if (!Number.isInteger(groupId) || !Number.isInteger(film.tmdb_id) || film.tmdb_id <= 0 || !film.title) {
+        return res.status(400).json({ error: "A tmdb_id and title are required." });
     }
     try {
+        if (!(await suggestPick(req.user.uid, groupId, film))) return res.status(404).json({ error: "Group not found." });
+        const me = await getProfile(req.user.uid);
+        const group = (await fetchGroups(req.user.uid)).find((g) => g.id === groupId);
+        for (const person of await groupParticipants(req.user.uid, groupId)) {
+            if (person.firebase_uid === req.user.uid) continue;
+            notifyUser(person.firebase_uid, "group_suggestion", {
+                title: group?.name ?? "Movie night",
+                body: `${me?.handle ? `@${me.handle}` : me?.display_name ?? "Someone"} suggested ${film.title}. Like it or pass?`,
+                data: { group_id: String(groupId) },
+            });
+        }
+        res.status(201).json(await fetchPicks(req.user.uid, groupId));
+    } catch (error) {
+        console.error("Error suggesting film:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Likes (1) or dislikes (-1) a film on the shortlist, or takes it back (0), e.g. { "reaction": 1 }. A film
+// everyone dislikes leaves the shortlist for good. Returns the shortlist
+router.put("/me/groups/:id/picks/:tmdbId/reaction", async (req, res) => {
+    const groupId = Number(req.params.id), tmdbId = Number(req.params.tmdbId), reaction = Number(req.body?.reaction);
+    if (!Number.isInteger(groupId) || !Number.isInteger(tmdbId) || ![1, 0, -1].includes(reaction)) {
+        return res.status(400).json({ error: "A reaction of 1, 0 or -1 is required." });
+    }
+    try {
+        const result = await reactToPick(req.user.uid, groupId, tmdbId, reaction);
+        if (result === null) return res.status(404).json({ error: "Group not found." });
+        if (!result) return res.status(404).json({ error: "That film isn't on the shortlist anymore." });
+        res.json(await fetchPicks(req.user.uid, groupId));
+    } catch (error) {
+        console.error("Error reacting to pick:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Takes a suggestion off the shortlist: whoever suggested it, or the group's owner. Returns the shortlist
+router.delete("/me/groups/:id/picks/:tmdbId", async (req, res) => {
+    const groupId = Number(req.params.id), tmdbId = Number(req.params.tmdbId);
+    try {
+        if (!(await removePick(req.user.uid, groupId, tmdbId))) {
+            return res.status(404).json({ error: "Only whoever suggested it or the group's owner can remove it." });
+        }
+        res.json(await fetchPicks(req.user.uid, groupId));
+    } catch (error) {
+        console.error("Error removing pick:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Starts a vote between the films the group has liked (the most liked, up to MAX_FILMS), e.g. { "hours": 3 }.
+// Each person votes for one. Everyone else gets a push
+router.post("/me/groups/:id/polls", async (req, res) => {
+    const groupId = Number(req.params.id);
+    const hours = Math.min(24, Math.max(1, Math.round(Number(req.body?.hours) || 3)));
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Group not found." });
+    try {
+        if (!(await groupParticipants(req.user.uid, groupId))) return res.status(404).json({ error: "Group not found." });
+        const films = await likedPicks(groupId, MAX_FILMS);
+        if (films.length < MIN_FILMS) {
+            return res.status(400).json({ error: `Like at least ${MIN_FILMS} films to start a vote.` });
+        }
         const id = await startPoll(req.user.uid, groupId, films, hours);
         if (!id) return res.status(404).json({ error: "Group not found." });
         res.status(201).json(await currentPoll(req.user.uid, groupId));
@@ -222,7 +299,8 @@ router.get("/me/groups/:id/polls/current", async (req, res) => {
     }
 });
 
-// Votes on one film, e.g. { "tmdb_id": 329865, "vote": 1 } (1 👍, -1 👎, 0 takes it back). Returns the poll as it is now
+// Votes for one film, e.g. { "tmdb_id": 329865, "vote": 1 }. Each person has one vote, so this replaces any
+// other; 0 (or -1, from older builds) takes it back. Returns the poll as it is now
 router.put("/me/groups/:id/polls/:pollId/votes", async (req, res) => {
     const groupId = Number(req.params.id), pollId = Number(req.params.pollId), tmdbId = Number(req.body.tmdb_id);
     const value = Number(req.body.vote);
