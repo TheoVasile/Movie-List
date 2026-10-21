@@ -10,16 +10,20 @@ import SwiftUI
 import CoreData
 
 /// Films the user and the people they're watching with would all enjoy, each saying why it suits the group,
-/// that can be added straight to the user's lists. AI Picks come from Claude reading everyone's lists, and are
+/// that can be added straight to the user's lists. AI Picks come from the AI reading everyone's lists, and are
 /// only offered when everyone allows AI; Classic picks come from TMDb's recommendations for everyone's
 /// favourites, plus films on several people's watchlists. Either can be narrowed by genre, language and
 /// streaming service
 struct MovieNightView: View {
     // Everyone coming besides the user
-    let people: [UserSummary]
+    @State private var people: [UserSummary]
     // A saved group, when it's for one
     var groupID: Int64? = nil
     var groupName: String? = nil
+    // The group as it is now, after anyone is added or removed
+    @State private var group: MovieGroup?
+    @State private var showMembers = false
+    @ObservedObject private var social = SocialStore.shared
     // Whether everyone, the user included, allows AI features, which AI Picks need
     let canUseAI: Bool
 
@@ -46,10 +50,11 @@ struct MovieNightView: View {
 
     private var pollIsOpen: Bool { poll.map { !$0.closed } ?? false }
 
-    init(people: [UserSummary], groupID: Int64? = nil, groupName: String? = nil, canUseAI: Bool) {
-        self.people = people
-        self.groupID = groupID
-        self.groupName = groupName
+    init(people: [UserSummary], groupID: Int64? = nil, groupName: String? = nil, group: MovieGroup? = nil, canUseAI: Bool) {
+        _people = State(initialValue: people)
+        self.groupID = groupID ?? group?.id
+        self.groupName = groupName ?? group?.name
+        _group = State(initialValue: group)
         self.canUseAI = canUseAI
         _usesAI = State(initialValue: canUseAI)
     }
@@ -68,6 +73,11 @@ struct MovieNightView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if let group {
+                    membersCard(group)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                }
                 sourcePicker
                 ZStack {
                     Theme.background.ignoresSafeArea()
@@ -134,6 +144,19 @@ struct MovieNightView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showMembers) {
+                if let current = group {
+                    GroupMembersSheet(group: current) { updated in
+                        let changed = Set(updated.members.map(\.handle)) != Set(people.map(\.handle))
+                        group = updated
+                        people = updated.members
+                        // New picks for the new line-up, unless a vote is going on
+                        if changed && !pollIsOpen { load() }
+                    }
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                }
+            }
             .sheet(isPresented: $showFilters) {
                 MovieNightFiltersSheet(filters: filters) { chosen in
                     filters = chosen
@@ -182,7 +205,7 @@ struct MovieNightView: View {
             }
         } else {
             Text(usesAI
-                 ? "Picked by Claude from your lists and \(names)'s. None of these are in anyone's lists yet."
+                 ? "Picked by AI from your lists and \(names)'s. None of these are in anyone's lists yet."
                  : "Recommended by TMDb from your favourites and \(names)'s, plus anything on more than one watchlist.")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
@@ -193,6 +216,65 @@ struct MovieNightView: View {
                 pickRow(movie)
                     .appearAnimation(delay: Double(min(index, 8)) * 0.05)
             }
+        }
+    }
+
+    // Groups only: everyone in it, so it's clear who the picks are for. Opens the full list, where the person who
+    // made the group can add and remove people
+    private func membersCard(_ group: MovieGroup) -> some View {
+        Button {
+            Haptics.tap()
+            showMembers = true
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("WHO'S IN · \(group.members.count + 1)")
+                        .font(.caption2.weight(.heavy))
+                        .tracking(1.2)
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Text(group.is_owner ? "Add or Remove" : "See All")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accentGradient)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        memberBubble(label: "You", name: social.profile?.display_name ?? "You", handle: social.profile?.handle,
+                                     version: social.profile?.avatar_version, isOwner: group.is_owner)
+                        ForEach(group.members) { person in
+                            memberBubble(label: "@\(person.handle)", name: person.display_name, handle: person.handle,
+                                         version: person.avatar_version, isOwner: person.is_owner == true)
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            .padding(12)
+            .cardStyle(cornerRadius: 16)
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
+        .accessibilityLabel("Who's in: You, \(group.members.map { "@\($0.handle)" }.joined(separator: ", "))")
+    }
+
+    private func memberBubble(label: String, name: String, handle: String?, version: Double?, isOwner: Bool) -> some View {
+        VStack(spacing: 4) {
+            Avatar(name: name, size: 44, handle: handle, version: version)
+                .overlay(alignment: .topTrailing) {
+                    if isOwner {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Theme.onAccent)
+                            .padding(4)
+                            .background(Theme.accentGradient, in: Circle())
+                            .offset(x: 4, y: -4)
+                    }
+                }
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 64)
         }
     }
 
@@ -563,9 +645,14 @@ struct MovieNightGroupsSection: View {
                                 .font(.headline)
                                 .foregroundColor(Theme.textPrimary)
                                 .lineLimit(1)
-                            Text(group.members.map(\.display_name).joined(separator: ", "))
+                            Text((["You"] + group.members.map { "@\($0.handle)" }).joined(separator: ", "))
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
+                                .lineLimit(2)
+                            Label("\(group.members.count + 1) people · made by \(group.is_owner ? "you" : group.members.first { $0.is_owner == true }.map { "@\($0.handle)" } ?? "a friend")",
+                                  systemImage: "person.2.fill")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(Theme.textTertiary)
                                 .lineLimit(1)
                         }
                         Spacer()
@@ -610,7 +697,7 @@ struct MovieNightGroupsSection: View {
             }
         }
         .sheet(item: $openGroup, onDismiss: load) { group in
-            MovieNightView(people: group.members, groupID: group.id, groupName: group.name,
+            MovieNightView(people: group.members, group: group,
                            canUseAI: group.ai_possible && aiAllowed && ageRange != Personalization.under18)
         }
         .sheet(isPresented: $showNewGroup, onDismiss: load) {
@@ -628,6 +715,166 @@ struct MovieNightGroupsSection: View {
         groups.removeAll { $0.id == group.id }
         APIService.shared.leaveGroup(group.id) { left in
             if !left { load() }
+        }
+    }
+}
+
+/// Everyone in a group, with who made it. The person who made it can add people they follow and remove anyone
+struct GroupMembersSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var social = SocialStore.shared
+    @State var group: MovieGroup
+    let onChange: (MovieGroup) -> Void
+    @State private var busy: Set<String> = []
+    @State private var failed = false
+
+    private static let maxMembers = 7
+
+    // People the user follows who aren't in the group yet
+    private var addable: [UserSummary] {
+        let inGroup = Set(group.members.map(\.handle))
+        return social.following.filter { !inGroup.contains($0.handle) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    row(name: social.profile?.display_name ?? "You", handle: social.profile?.handle, version: social.profile?.avatar_version,
+                        isMe: true, isOwner: group.is_owner)
+                    ForEach(group.members) { person in
+                        row(name: person.display_name, handle: person.handle, version: person.avatar_version,
+                            isMe: false, isOwner: person.is_owner == true)
+                            .swipeActions {
+                                if group.is_owner {
+                                    Button("Remove", role: .destructive) { remove(person) }
+                                }
+                            }
+                    }
+                } header: {
+                    Text("In This Group · \(group.members.count + 1)")
+                } footer: {
+                    if group.is_owner {
+                        Text("Swipe left on someone to remove them.")
+                    } else {
+                        Text("Only the person who made the group can add or remove people.")
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
+                if group.is_owner {
+                    Section {
+                        if addable.isEmpty {
+                            Text("Everyone you follow is already in this group.")
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        ForEach(addable) { person in
+                            HStack(spacing: 12) {
+                                Avatar(name: person.display_name, size: 32, handle: person.handle, version: person.avatar_version)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("@\(person.handle)")
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text(person.display_name)
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                Spacer()
+                                if busy.contains(person.handle) {
+                                    ProgressView()
+                                } else {
+                                    Button {
+                                        add(person)
+                                    } label: {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(Theme.accentGradient)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(group.members.count >= Self.maxMembers)
+                                    .accessibilityLabel("Add @\(person.handle)")
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Add People You Follow")
+                    } footer: {
+                        Text(group.members.count >= Self.maxMembers
+                             ? "Groups can have up to \(Self.maxMembers + 1) people, you included."
+                             : "They'll get a notification that they're in.")
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle(group.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .bold()
+                }
+            }
+            .alert("Couldn't change the group", isPresented: $failed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Check your connection and try again.")
+            }
+            .onAppear {
+                if social.following.isEmpty { social.load() }
+            }
+        }
+    }
+
+    private func row(name: String, handle: String?, version: Double?, isMe: Bool, isOwner: Bool) -> some View {
+        HStack(spacing: 12) {
+            Avatar(name: name, size: 36, handle: handle, version: version)
+            VStack(alignment: .leading, spacing: 1) {
+                let shown = handle.map { "@\($0)" } ?? name
+                Text(isMe ? "\(shown) (you)" : shown)
+                    .foregroundColor(Theme.textPrimary)
+                if handle != nil {
+                    Text(name)
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            Spacer()
+            if busy.contains(handle ?? "") {
+                ProgressView()
+            } else if isOwner {
+                Label("Made the group", systemImage: "crown.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.accentGradient)
+            }
+        }
+    }
+
+    private func add(_ person: UserSummary) {
+        Haptics.tap()
+        busy.insert(person.handle)
+        APIService.shared.addGroupMembers(group.id, handles: [person.handle]) { result in
+            busy.remove(person.handle)
+            apply(result)
+        }
+    }
+
+    private func remove(_ person: UserSummary) {
+        busy.insert(person.handle)
+        APIService.shared.removeGroupMember(group.id, handle: person.handle) { result in
+            busy.remove(person.handle)
+            apply(result)
+        }
+    }
+
+    private func apply(_ result: Result<MovieGroup, Error>) {
+        switch result {
+        case .success(let updated):
+            Haptics.success()
+            withAnimation(Theme.spring) { group = updated }
+            onChange(updated)
+        case .failure:
+            failed = true
         }
     }
 }

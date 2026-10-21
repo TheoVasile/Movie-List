@@ -61,7 +61,7 @@ struct SharedListBanner: View {
     }
 }
 
-/// Who can edit a list. The owner can invite people they follow and take people off; anyone else can leave
+/// A list's contributors: who can edit it. The owner can invite people they follow and take people off; anyone else can leave
 struct ShareListSheet: View {
     let listID: Int64
     let listName: String
@@ -92,7 +92,7 @@ struct ShareListSheet: View {
                             memberRow(person)
                         }
                     } header: {
-                        Text("Can Edit")
+                        Text("Contributors")
                     } footer: {
                         Text("Everyone here can add, rank and remove films. Only the owner can rename or delete the list.")
                     }
@@ -120,7 +120,7 @@ struct ShareListSheet: View {
                                 if busy.contains(person.handle) {
                                     ProgressView()
                                 } else {
-                                    Button("Invite") { invite(person) }
+                                    Button("Add") { invite(person) }
                                         .font(.subheadline.weight(.bold))
                                         .foregroundStyle(Theme.accentGradient)
                                         .buttonStyle(.borderless)
@@ -128,7 +128,7 @@ struct ShareListSheet: View {
                             }
                         }
                     } header: {
-                        Text("Invite People You Follow")
+                        Text("Add Contributors You Follow")
                     } footer: {
                         Text("They'll get a notification, and the list shows up with their own lists.")
                     }

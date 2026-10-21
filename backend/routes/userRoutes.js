@@ -1,5 +1,5 @@
 const express = require("express");
-const { fetchGroups, createGroup, leaveOrDeleteGroup } = require("../models/groupModel");
+const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember } = require("../models/groupModel");
 const { yearReview } = require("../models/yearReviewModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
@@ -137,6 +137,47 @@ router.post("/me/groups", async (req, res) => {
         res.status(201).json({ id });
     } catch (error) {
         console.error("Error creating group:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The group's owner adds people they follow, e.g. { "handles": ["lee"] }. Each one gets a push
+router.post("/me/groups/:id/members", async (req, res) => {
+    const groupId = Number(req.params.id);
+    const handles = (Array.isArray(req.body.handles) ? req.body.handles : []).map((h) => String(h).toLowerCase()).slice(0, 20);
+    if (!Number.isInteger(groupId) || !handles.length) {
+        return res.status(400).json({ error: "Pick at least one person to add." });
+    }
+    try {
+        const added = await addGroupMembers(req.user.uid, groupId, handles);
+        if (!added) return res.status(403).json({ error: "Only the person who made the group can add people." });
+        if (added.length) {
+            const me = await getProfile(req.user.uid);
+            const group = (await fetchGroups(req.user.uid)).find((g) => g.id === groupId);
+            for (const uid of added) {
+                notifyUser(uid, "group_added", {
+                    title: "You're in a movie night group",
+                    body: `${me?.display_name ?? "Someone"} added you to ${group?.name ?? "their group"}`,
+                    data: { group_id: String(groupId) },
+                });
+            }
+        }
+        res.json((await fetchGroups(req.user.uid)).find((g) => g.id === groupId));
+    } catch (error) {
+        console.error("Error adding to group:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The group's owner removes someone
+router.delete("/me/groups/:id/members/:handle", async (req, res) => {
+    try {
+        if (!(await removeGroupMember(req.user.uid, Number(req.params.id), req.params.handle.toLowerCase()))) {
+            return res.status(404).json({ error: "They aren't in a group of yours." });
+        }
+        res.json((await fetchGroups(req.user.uid)).find((g) => g.id === Number(req.params.id)));
+    } catch (error) {
+        console.error("Error removing from group:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

@@ -842,6 +842,11 @@ struct FriendListView: View {
     // nil until loaded from the list, then whatever the user last chose
     @State private var followed: Bool? = nil
     @State private var saving = false
+    // The film whose info screen is open, and the one waiting for the user to pick lists to add it to
+    @State private var details: CDMovie? = nil
+    @State private var adding: Movie? = nil
+    @Environment(\.managedObjectContext) private var context
+    @EnvironmentObject private var authViewModel: AuthenticationViewModel
 
     private var isFollowed: Bool { followed ?? list.followed ?? false }
 
@@ -855,31 +860,41 @@ struct FriendListView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(list.movies) { film in
-                HStack(spacing: 12) {
-                    Text("\(film.rank)")
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-                        .frame(width: 40)
-                        .minimumScaleFactor(0.5)
-                    PosterImage(path: film.poster_path, cornerRadius: 6, size: .small)
-                        .frame(width: 40, height: 60)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(film.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(Theme.textPrimary)
-                            .lineLimit(2)
-                        Text(Theme.year(from: film.release_date))
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
+                Button {
+                    Haptics.tap()
+                    details = PersistenceController.preview(of: film.movie)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text("\(film.rank)")
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+                            .frame(width: 40)
+                            .minimumScaleFactor(0.5)
+                        PosterImage(path: film.poster_path, cornerRadius: 6, size: .small)
+                            .frame(width: 40, height: 60)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(film.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(Theme.textPrimary)
+                                .lineLimit(2)
+                            Text(Theme.year(from: film.release_date))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if film.watched {
+                            Image(systemName: "eye.fill")
+                                .foregroundColor(Theme.accent)
+                                .accessibilityLabel("\(owner) has watched this")
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(Theme.textTertiary)
                     }
-                    Spacer()
-                    if film.watched {
-                        Image(systemName: "eye.fill")
-                            .foregroundColor(Theme.accent)
-                            .accessibilityLabel("\(owner) has watched this")
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
             }
         }
@@ -887,6 +902,26 @@ struct FriendListView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(list.name)
+        .sheet(item: $details) { preview in
+            // Add to Lists closes the info screen and asks which lists
+            MovieDetailView(movie: preview, onAddToLists: {
+                let film = list.movies.first { Int64($0.tmdb_id) == Int64(preview.tmdb_id) }
+                details = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = film?.movie }
+            })
+        }
+        .sheet(item: $adding) { movie in
+            ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
+                for chosen in lists {
+                    chosen.addMovie(movie, context: context) { _ in }
+                }
+                if !lists.isEmpty { Haptics.success() }
+            }
+            .environmentObject(authViewModel)
+            .environment(\.managedObjectContext, context)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .toolbar {
             // Following a list adds films added to it to the daily digest
             if list.owner_handle != SocialStore.shared.profile?.handle {
