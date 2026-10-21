@@ -144,6 +144,11 @@ struct ListView: View {
                     }
                     .bold()
                 }
+            } else {
+                // In the navigation bar, so they stay put while the list scrolls
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    toolbarActions
+                }
             }
         }
         .sheet(isPresented: $editingDetails) {
@@ -350,7 +355,7 @@ private extension ListView {
         }
     }
     
-    // How many films are watched, with the bulk watched actions, and the list's actions
+    // How many films are watched, with the bulk watched actions
     var listActions: some View {
         HStack {
             Menu {
@@ -371,77 +376,65 @@ private extension ListView {
             }
             .accessibilityLabel("Watched Options")
             Spacer()
-            // The list's actions live here rather than in the navigation bar, where a long list name
-            // pushed them into a "more" (•••) menu
-            HStack(spacing: 10) {
-                iconButton("dice.fill", label: "Recommend a Film") {
-                    // The recommendation card is hidden while searching or filtering
-                    viewModel.searchText = ""
-                    viewModel.selectedGenres = []
-                    viewModel.showAIPlacedOnly = false
-                    withAnimation(Theme.spring) { viewModel.recommendMovie() }
-                    recommendationScrollRequest += 1
-                }
-                .disabled(viewModel.movies.count < 2)
-                Menu {
-                    Button {
-                        shareImage()
-                    } label: {
-                        Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
-                    }
-                    Button {
-                        exportZip()
-                    } label: {
-                        Label("Export List (ZIP)", systemImage: "doc.zipper")
-                    }
-                    Divider()
-                    Button {
-                        showSharing = true
-                    } label: {
-                        if sharing.isOwner(movieList.id) {
-                            Label(sharing.isShared(movieList.id) ? "Edit Together…" : "Edit Together with Friends…", systemImage: "person.2")
-                        } else {
-                            Label("Who Can Edit", systemImage: "person.2")
-                        }
-                    }
-                } label: {
-                    iconCircle(isPreparingShare ? nil : "square.and.arrow.up")
-                }
-                .disabled(isPreparingShare)
-                .accessibilityLabel("Share or Export List")
-                iconButton("plus", label: "Add a Film", highlighted: true) {
-                    viewModel.showPopup = true
-                }
-            }
         }
         .padding(.horizontal, 16)
     }
 
-    func iconButton(_ icon: String, label: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
+    // Recommend, share/export and add, at the top right
+    @ViewBuilder
+    var toolbarActions: some View {
         Button {
             Haptics.tap()
-            action()
+            // The recommendation card is hidden while searching or filtering
+            viewModel.searchText = ""
+            viewModel.selectedGenres = []
+            viewModel.showAIPlacedOnly = false
+            withAnimation(Theme.spring) { viewModel.recommendMovie() }
+            recommendationScrollRequest += 1
         } label: {
-            iconCircle(icon, highlighted: highlighted)
+            Image(systemName: "dice")
         }
-        .buttonStyle(PressableButtonStyle(scale: 0.9))
-        .accessibilityLabel(label)
-    }
-
-    // A round icon button; no icon shows a spinner
-    func iconCircle(_ icon: String?, highlighted: Bool = false) -> some View {
-        Group {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(highlighted ? Theme.onAccent : Theme.textPrimary)
-            } else {
+        .disabled(viewModel.movies.count < 2)
+        .accessibilityLabel("Recommend a Film")
+        Menu {
+            Button {
+                shareImage()
+            } label: {
+                Label(viewModel.movies.count > ListShareImage.maxFilms ? "Share Top \(ListShareImage.maxFilms) as Image" : "Share as Image", systemImage: "photo")
+            }
+            .disabled(viewModel.movies.isEmpty)
+            Button {
+                exportZip()
+            } label: {
+                Label("Export List (ZIP)", systemImage: "doc.zipper")
+            }
+            Divider()
+            Button {
+                showSharing = true
+            } label: {
+                if sharing.isOwner(movieList.id) {
+                    Label(sharing.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
+                } else {
+                    Label("Who Can Edit", systemImage: "person.2")
+                }
+            }
+        } label: {
+            if isPreparingShare {
                 ProgressView()
+            } else {
+                Image(systemName: "square.and.arrow.up")
             }
         }
-        .frame(width: 38, height: 38)
-        .background(highlighted ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface), in: Circle())
-        .overlay(Circle().stroke(highlighted ? Color.clear : Theme.stroke, lineWidth: 1))
+        .disabled(isPreparingShare)
+        .accessibilityLabel("Share or Export List")
+        Button {
+            Haptics.tap()
+            viewModel.showPopup = true
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .foregroundStyle(Theme.accentGradient)
+        }
+        .accessibilityLabel("Add a Film")
     }
 
     func actionChip(_ title: String, systemImage: String) -> some View {
