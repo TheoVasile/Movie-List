@@ -144,11 +144,6 @@ struct ListView: View {
                     }
                     .bold()
                 }
-            } else {
-                // In the navigation bar, so they stay put while the list scrolls
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    toolbarActions
-                }
             }
         }
         .sheet(isPresented: $editingDetails) {
@@ -238,10 +233,6 @@ private extension ListView {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 } else {
-                    listActions
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     genreFilterBar
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -304,6 +295,11 @@ private extension ListView {
             .environment(\.editMode, $editMode)
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            // Pinned under the navigation bar rather than in it, where iOS folds buttons into a ••• menu when
+            // the title is long. They never scroll away
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !editMode.isEditing { actionBar }
+            }
             .onChange(of: viewModel.movedMovieID) { movieID in
                 guard let movieID else { return }
                 scrollToMovedMovie(movieID, proxy: proxy)
@@ -356,41 +352,49 @@ private extension ListView {
         }
     }
     
-    // How many films are watched, with the bulk watched actions
-    var listActions: some View {
-        HStack {
-            Menu {
-                Button {
-                    pendingBulkWatched = true
-                } label: {
-                    Label("Mark All as Watched", systemImage: "eye")
-                }
-                .disabled(viewModel.watchedCount == viewModel.movies.count)
-                Button {
-                    pendingBulkWatched = false
-                } label: {
-                    Label("Mark All as Unwatched", systemImage: "eye.slash")
-                }
-                .disabled(viewModel.watchedCount == 0)
-            } label: {
-                actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
-            }
-            .accessibilityLabel("Watched Options")
-            Spacer()
+    // How many films are watched (with the bulk watched actions) on the left; Recommend, Export and Add on the
+    // right, each its own button
+    var actionBar: some View {
+        HStack(spacing: 10) {
+            if !viewModel.movies.isEmpty { watchedMenu }
             // A quiet reminder that the order here isn't a ranking
             if !viewModel.isRanked {
-                Label("Unranked", systemImage: "circle.grid.2x2")
+                Image(systemName: "circle.grid.2x2")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(Theme.textTertiary)
                     .accessibilityLabel("Unranked list: the order doesn't matter")
             }
+            Spacer(minLength: 0)
+            recommendButton
+            exportMenu
+            addButton
         }
         .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Theme.background.opacity(0.94))
     }
 
-    // Recommend, share/export and add, at the top right
-    @ViewBuilder
-    var toolbarActions: some View {
+    var watchedMenu: some View {
+        Menu {
+            Button {
+                pendingBulkWatched = true
+            } label: {
+                Label("Mark All as Watched", systemImage: "eye")
+            }
+            .disabled(viewModel.watchedCount == viewModel.movies.count)
+            Button {
+                pendingBulkWatched = false
+            } label: {
+                Label("Mark All as Unwatched", systemImage: "eye.slash")
+            }
+            .disabled(viewModel.watchedCount == 0)
+        } label: {
+            actionChip("\(viewModel.watchedCount) of \(viewModel.movies.count) watched", systemImage: "eye")
+        }
+        .accessibilityLabel("Watched Options")
+    }
+
+    var recommendButton: some View {
         Button {
             Haptics.tap()
             // The recommendation card is hidden while searching or filtering
@@ -400,10 +404,16 @@ private extension ListView {
             withAnimation(Theme.spring) { viewModel.recommendMovie() }
             recommendationScrollRequest += 1
         } label: {
-            Image(systemName: "dice")
+            actionCircle("dice.fill")
         }
+        .buttonStyle(PressableButtonStyle(scale: 0.9))
         .disabled(viewModel.movies.count < 2)
+        .opacity(viewModel.movies.count < 2 ? 0.45 : 1)
         .accessibilityLabel("Recommend a Film")
+    }
+
+    // Sharing as an image, exporting a ZIP and who can edit
+    var exportMenu: some View {
         Menu {
             Button {
                 shareImage()
@@ -427,22 +437,37 @@ private extension ListView {
                 }
             }
         } label: {
-            if isPreparingShare {
-                ProgressView()
-            } else {
-                Image(systemName: "square.and.arrow.up")
-            }
+            actionCircle(isPreparingShare ? nil : "square.and.arrow.up")
         }
         .disabled(isPreparingShare)
         .accessibilityLabel("Share or Export List")
+    }
+
+    var addButton: some View {
         Button {
             Haptics.tap()
             viewModel.showPopup = true
         } label: {
-            Image(systemName: "plus.circle.fill")
-                .foregroundStyle(Theme.accentGradient)
+            actionCircle("plus", highlighted: true)
         }
+        .buttonStyle(PressableButtonStyle(scale: 0.9))
         .accessibilityLabel("Add a Film")
+    }
+
+    // A round button; no icon shows a spinner
+    func actionCircle(_ icon: String?, highlighted: Bool = false) -> some View {
+        Group {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(highlighted ? Theme.onAccent : Theme.textPrimary)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 40, height: 40)
+        .background(highlighted ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface), in: Circle())
+        .overlay(Circle().stroke(highlighted ? Color.clear : Theme.stroke, lineWidth: 1))
     }
 
     func actionChip(_ title: String, systemImage: String) -> some View {
