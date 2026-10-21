@@ -42,6 +42,8 @@ struct ListView: View {
     // Who's on the list, for shared lists and inviting people
     @ObservedObject private var sharing = ListSharing.shared
     @State private var showSharing = false
+    // Whether the big title at the top of the list has scrolled away, so the bar shows a small one
+    @State private var showBarTitle = false
     @Environment(\.dismiss) private var dismiss
     
     // Search and genre filters only change which rows are shown; ranks stay as they are
@@ -114,28 +116,29 @@ struct ListView: View {
                 addToOtherLists(movie, lists)
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "Search this list")
         .onAppear { viewModel.loadInfo() }
-        .navigationTitle(movieList.name ?? "No Movie Name")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarTitleMenu {
-            // Only the owner can rename a shared list
-            if sharing.isOwner(movieList.id) {
-                Button {
-                    editingDetails = true
-                } label: {
-                    Label("Edit Details", systemImage: "pencil")
-                }
-            }
-            if viewModel.movies.count > 1 {
-                Button {
-                    startReordering()
-                } label: {
-                    Label("Reorder Films", systemImage: "arrow.up.arrow.down")
-                }
-            }
-        }
+        // The list's name is shown by the view itself rather than by the bar, so a long name wraps onto more lines
+        // instead of being cut short or squeezing Recommend, Export and Add
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                // Keeps the system title out of the bar; the name is shown by titleHeader and barTitle
+                Color.clear.frame(width: 1, height: 1)
+                    .accessibilityHidden(true)
+            }
+            if showBarTitle && !editMode.isEditing {
+                if #available(iOS 26.0, *) {
+                    // Plain text, not in a button's glass capsule
+                    ToolbarItem(placement: .topBarLeading) {
+                        barTitle
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .topBarLeading) {
+                        barTitle
+                    }
+                }
+            }
             if editMode.isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") {
@@ -215,6 +218,19 @@ private extension ListView {
     var MovieListSection: some View {
         ScrollViewReader { proxy in
             List {
+                titleHeader
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 6, trailing: 20))
+                    // Once it scrolls away, a small copy shows in the bar
+                    .onAppear { withAnimation(.easeOut(duration: 0.2)) { showBarTitle = false } }
+                    .onDisappear { withAnimation(.easeOut(duration: 0.2)) { showBarTitle = true } }
+                if !editMode.isEditing {
+                    searchField
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                }
                 if let overview = movieList.overview, !overview.isEmpty, !editMode.isEditing {
                     Text(overview)
                         .font(.subheadline)
@@ -391,6 +407,90 @@ private extension ListView {
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    var listTitle: String { movieList.name ?? "No Movie Name" }
+
+    // Edit Details (owner only) and Reorder Films, from the list's name
+    @ViewBuilder
+    var titleMenuItems: some View {
+        // Only the owner can rename a shared list
+        if sharing.isOwner(movieList.id) {
+            Button {
+                editingDetails = true
+            } label: {
+                Label("Edit Details", systemImage: "pencil")
+            }
+        }
+        if viewModel.movies.count > 1 {
+            Button {
+                startReordering()
+            } label: {
+                Label("Reorder Films", systemImage: "arrow.up.arrow.down")
+            }
+        }
+    }
+
+    // The list's name at the top, large, wrapping onto as many lines as it needs
+    var titleHeader: some View {
+        Menu {
+            titleMenuItems
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(listTitle)
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundColor(Theme.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "chevron.down.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .disabled(!sharing.isOwner(movieList.id) && viewModel.movies.count < 2)
+        .accessibilityLabel("\(listTitle), list options")
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // The name in the bar once the big one has scrolled away: up to two lines, in a fixed width that always leaves
+    // room for the back button and the three actions
+    var barTitle: some View {
+        Text(listTitle)
+            .font(.footnote.weight(.semibold))
+            .foregroundColor(Theme.textPrimary)
+            .multilineTextAlignment(.leading)
+            .lineLimit(2)
+            .minimumScaleFactor(0.85)
+            .frame(width: max(80, UIScreen.main.bounds.width - 270), alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    // Narrows the list to films whose title matches
+    var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(Theme.textSecondary)
+            TextField("Search this list", text: $viewModel.searchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .foregroundColor(Theme.textPrimary)
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(Theme.textTertiary)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Clear Search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Theme.surface, in: Capsule())
     }
 
     // Recommend, share/export and add, at the top right
