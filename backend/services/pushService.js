@@ -6,6 +6,7 @@ const PREFERENCE = {
     follow_request: "notify_requests",
     follow_accepted: "notify_requests",
     list_invite: "notify_requests",
+    group_added: "notify_requests",
     activity: "notify_activity",
     streaming: "notify_streaming",
 };
