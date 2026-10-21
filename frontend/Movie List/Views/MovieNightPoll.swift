@@ -8,14 +8,14 @@
 import Foundation
 import SwiftUI
 
-/// A group's movie night vote: 👍 or 👎 on each film while it's open, then the winner. Votes show everyone's tallies
-/// as they come in
+/// A group's movie night vote between the films it liked: everyone picks one while it's open, then the winner.
+/// Shows how many votes each film has as they come in
 struct PollCard: View {
     let groupID: Int64
     @Binding var poll: GroupPoll
     // Adds the winner to the user's lists
     var onAddWinner: (Movie) -> Void = { _ in }
-    // Picks films for a new vote
+    // Starts a new vote
     var onNewVote: () -> Void = {}
 
     // The film whose vote is being saved
@@ -34,7 +34,7 @@ struct PollCard: View {
             HStack {
                 Text(poll.closed
                      ? "\(poll.voters) of \(poll.people) voted"
-                     : "\(poll.voters) of \(poll.people) have voted. It closes once everyone has voted on every film.")
+                     : "\(poll.voters) of \(poll.people) have voted. It closes once everyone has.")
                     .font(.caption)
                     .foregroundColor(Theme.textTertiary)
                 Spacer()
@@ -61,7 +61,7 @@ struct PollCard: View {
                 .tracking(1.2)
                 .foregroundStyle(Theme.accentGradient)
             if !poll.closed {
-                Text(poll.started_by_me ? "You picked these. Vote too!" : "\(poll.created_by_name ?? "Someone") wants to pick tonight's film")
+                Text(poll.started_by_me ? "Your vote is open. Pick one too!" : "\(poll.created_by_name ?? "Someone") wants to pick tonight's film. Pick one!")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                 if let closesAt = poll.closesAt {
@@ -124,49 +124,34 @@ struct PollCard: View {
             if !poll.closed {
                 if saving == option.tmdb_id {
                     ProgressView()
-                        .frame(width: 92)
+                        .frame(width: 44)
                 } else {
-                    HStack(spacing: 8) {
-                        voteButton(option, value: 1, icon: "hand.thumbsup.fill")
-                        voteButton(option, value: -1, icon: "hand.thumbsdown.fill")
-                    }
+                    voteButton(option)
                 }
             }
         }
     }
 
     private func tally(_ option: PollOption) -> some View {
-        HStack(spacing: 10) {
-            Label("\(option.up)", systemImage: "hand.thumbsup")
-            Label("\(option.down)", systemImage: "hand.thumbsdown")
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundColor(Theme.textTertiary)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(option.up) up, \(option.down) down")
+        Label("\(option.up) \(option.up == 1 ? "vote" : "votes")", systemImage: "checkmark.circle")
+            .font(.caption.weight(.semibold))
+            .foregroundColor(Theme.textTertiary)
     }
 
-    private func voteButton(_ option: PollOption, value: Int, icon: String) -> some View {
-        let chosen = option.my_vote == value
+    // One vote each: choosing a film moves the user's vote to it, and tapping it again takes it back
+    private func voteButton(_ option: PollOption) -> some View {
+        let chosen = option.my_vote == 1
         return Button {
             Haptics.select()
-            // Tapping the vote already given takes it back
-            cast(option, chosen ? 0 : value)
+            cast(option, chosen ? 0 : 1)
         } label: {
-            Image(systemName: icon)
-                .font(.body.weight(.semibold))
-                .foregroundColor(chosen ? Theme.onAccent : Theme.textSecondary)
-                .frame(width: 42, height: 42)
-                .background {
-                    if chosen {
-                        Circle().fill(value > 0 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.red.opacity(0.8)))
-                    } else {
-                        Circle().fill(Theme.surfaceRaised)
-                    }
-                }
+            Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(chosen ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(PressableButtonStyle(scale: 0.9))
-        .accessibilityLabel(value > 0 ? "Vote for \(option.title)" : "Vote against \(option.title)")
+        .accessibilityLabel(chosen ? "Your vote: \(option.title)" : "Vote for \(option.title)")
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 

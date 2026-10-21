@@ -174,7 +174,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
             case "follow_request", "follow_accepted", "follow_new", "activity":
                 SocialStore.shared.load()
                 self.destination = .profile
-            case "poll_started", "poll_result", "group_added":
+            case "poll_started", "poll_result", "group_added", "group_suggestion":
                 if let id = (info["group_id"] as? String).flatMap(Int64.init) {
                     self.destination = .group(id: id)
                 }

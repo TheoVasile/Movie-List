@@ -238,6 +238,12 @@ async function recommendForGroup(user_id, people, count, constraints = {}) {
     if (constraints.services?.length) {
         limits.push(`Every film must be streaming now on ${constraints.services.join(" or ")}${constraints.region ? ` in ${constraints.region}` : ""}.`);
     }
+    // A saved group's shortlist so far: what they liked shows what to find more of, films everyone turned down
+    // show what to steer away from, and nothing already on it should come back
+    const titles = (list) => list.slice(0, 60).join("; ");
+    if (constraints.liked?.length) limits.push(`The group liked these, so find more films in their spirit: ${titles(constraints.liked)}.`);
+    if (constraints.dismissed?.length) limits.push(`Everyone in the group turned these down, so steer away from films like them: ${titles(constraints.dismissed)}.`);
+    if (constraints.shortlist?.length) limits.push(`These are already on the group's shortlist, so don't recommend them again: ${titles(constraints.shortlist)}.`);
     const names = people.slice(1).map((p) => p.name);
     const response = await anthropic.messages.create({
         model: MODEL,

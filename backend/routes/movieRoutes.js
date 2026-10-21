@@ -9,6 +9,7 @@ const { mapWithConcurrency, createLimiter } = require("../services/letterboxdSer
 const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
 const { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = require("../models/groupModel");
+const { fetchPicks, pickHistory, saveRecommendations } = require("../models/groupPicksModel");
 const pool = require("../config/db");
 const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
 
@@ -336,7 +337,9 @@ async function classicMovieNight(people, count, filters, genres) {
 // Films the user and the people coming would all enjoy. Either a saved group ({ "group_id": 3 }) or people
 // the user follows ({ "handles": ["sam", "ana"] }, or the older { "handle": "sam" }), with optional
 // { "mode": "classic", "languages", "providers", "provider_names", "region", "genres": [ids], "genre_names" }.
-// "ai" (the default) asks the AI and needs everyone, the user included, to allow AI; "classic" uses TMDb
+// "ai" (the default) asks the AI and needs everyone, the user included, to allow AI; "classic" uses TMDb.
+// With a group and "save": true, the picks replace the group's recommendations nobody has liked (leaving out
+// anything already on its shortlist or turned down by everyone), and the reply is the group's whole shortlist
 router.post("/movie-night", async (req, res) => {
     try {
         const body = req.body ?? {};
@@ -364,9 +367,18 @@ router.post("/movie-night", async (req, res) => {
         }
         if (!others.length) return res.status(400).json({ error: "Nobody else is in this group." });
         const people = [{ ...me, me: true }, ...others.map((p) => ({ ...p, name: p.name || `@${p.handle}`, me: false }))];
+        const saving = body.save === true && Number.isInteger(body.group_id);
+        const history = saving ? await pickHistory(body.group_id) : { exclude: new Set(), liked: [], dismissed: [], shortlist: [] };
+        // Sends the picks, or saves them to the group's shortlist and sends that
+        const reply = async (movies) => {
+            const fresh = movies.filter((movie) => !history.exclude.has(movie.id)).slice(0, count);
+            if (!saving) return res.json(fresh);
+            await saveRecommendations(body.group_id, fresh);
+            res.json(await fetchPicks(req.user.uid, body.group_id));
+        };
 
         if (body.mode === "classic") {
-            return res.json(await classicMovieNight(people, count, filters, genres));
+            return await reply(await classicMovieNight(people, count + history.exclude.size, filters, genres));
         }
         // Everyone's lists go to the AI, so everyone has to have allowed it
         if (!me.ai_allowed) {
@@ -388,6 +400,9 @@ router.post("/movie-night", async (req, res) => {
             languages: filters.languages,
             services: cleanStrings(body.provider_names, 20),
             region: filters.region,
+            liked: history.liked,
+            dismissed: history.dismissed,
+            shortlist: history.shortlist,
         };
         const wanted = new Set(genres);
         // Extra picks, since some turn out to be in someone's lists, can't be found or don't fit the filters
@@ -406,7 +421,7 @@ router.post("/movie-night", async (req, res) => {
         });
         const seen = new Set();
         const fresh = found.filter((movie) => movie && !listedByAnyone.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
-        res.json(fresh.slice(0, count));
+        await reply(fresh);
     } catch (error) {
         if (error instanceof AIUnavailableError) {
             return res.status(503).json({ error: "AI recommendations aren't set up." });
