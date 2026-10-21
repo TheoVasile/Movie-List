@@ -307,6 +307,8 @@ struct UserProfile: Decodable {
     let notify_activity: Bool?
     // Whether they've added a phone number so contacts can find them
     let has_phone: Bool?
+    // Private profiles approve each follower and can't have lists everyone can see
+    let is_private: Bool?
 }
 
 /// Follow requests waiting on the user, and the @usernames the user has asked to follow
@@ -381,6 +383,8 @@ struct FriendLists: Decodable {
     var following: Bool
     // The user has asked to follow them and is waiting for them to accept
     let requested: Bool?
+    // Private profiles approve each follower; public ones can be followed straight away
+    let is_private: Bool?
     // How many people follow them and how many they follow
     let follower_count: Int?
     let following_count: Int?
@@ -790,6 +794,15 @@ class APIService {
     }
 
     /// Saves whether the user allows AI features on the server
+    private struct PrivacyResponse: Decodable { let `private`: Bool }
+
+    /// Makes the user's profile private or public. Going public accepts everyone waiting to follow
+    func setProfilePrivate(_ isPrivate: Bool, completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/users/me/privacy", body: ["private": isPrivate]) { (result: Result<PrivacyResponse, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
     func setAIAllowed(_ allowed: Bool, completion: @escaping (Bool) -> Void) {
         sendJSON("PUT", "/users/me/ai", body: ["allowed": allowed]) { (result: Result<AIAllowedResponse, Error>) in
             completion((try? result.get()) != nil)

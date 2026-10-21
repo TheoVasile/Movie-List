@@ -17,6 +17,10 @@ struct UserSettingsView : View {
     @State private var nameMessage: String? = nil
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var social = SocialStore.shared
+    // Shown straight away while it saves; nil means whatever the server last said
+    @State private var pendingPrivate: Bool? = nil
+    @State private var savingPrivacy = false
+    @State private var confirmPublic = false
     @State private var showUsernameSetup = false
     @State private var confirmDeactivate = false
     @ObservedObject private var appearance = AppearanceSettings.shared
@@ -110,6 +114,25 @@ struct UserSettingsView : View {
                             Text(option).tag(option)
                         }
                     }
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
+                    Toggle("Private Profile", isOn: Binding(get: { isPrivate }, set: setPrivate))
+                        .tint(Theme.accent)
+                        .disabled(savingPrivacy || social.profile == nil)
+                        .confirmationDialog("Make your profile public?", isPresented: $confirmPublic, titleVisibility: .visible) {
+                            Button("Make Public") { savePrivacy(false) }
+                        } message: {
+                            let waiting = social.profile?.requests ?? 0
+                            Text("The \(waiting) \(waiting == 1 ? "person" : "people") waiting to follow you will be accepted.")
+                        }
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text(isPrivate
+                         ? "You approve each follower. Lists can be seen by your followers or only you."
+                         : "Anyone can follow you without asking. Each list can still be seen by everyone, your followers or only you.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -342,6 +365,30 @@ extension UserSettingsView {
     private var nameChanged: Bool {
         let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return !typed.isEmpty && typed != savedName
+    }
+
+    private var isPrivate: Bool { pendingPrivate ?? social.profile?.is_private ?? false }
+
+    private func setPrivate(_ wanted: Bool) {
+        // Going public lets in everyone waiting, so that's checked first
+        if !wanted, (social.profile?.requests ?? 0) > 0 {
+            confirmPublic = true
+        } else {
+            savePrivacy(wanted)
+        }
+    }
+
+    private func savePrivacy(_ wanted: Bool) {
+        pendingPrivate = wanted
+        savingPrivacy = true
+        APIService.shared.setProfilePrivate(wanted) { saved in
+            savingPrivacy = false
+            if saved { Haptics.success() }
+            // Lists made followers-only and requests accepted show once these reload
+            social.load()
+            ListSharing.shared.refresh()
+            pendingPrivate = saved ? wanted : nil
+        }
     }
 
     private func saveName() {

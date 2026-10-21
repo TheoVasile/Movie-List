@@ -15,7 +15,7 @@ function isValidHandle(handle) {
 async function getProfile(user_id) {
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.notify_requests, u.notify_activity,
-                u.phone_hash IS NOT NULL AS has_phone,
+                u.phone_hash IS NOT NULL AS has_phone, u.is_private,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests
@@ -109,25 +109,49 @@ async function searchUsers(user_id, query) {
     return result.rows;
 }
 
-// Following someone sends them a request; unfollowing also cancels a request. Returns null when there's no
-// one with that @username (or it's the user's own), otherwise { followee_id, following, requested, isNewRequest }
+// Following a public profile is immediate; following a private one sends a request. Unfollowing also cancels a
+// request. Returns null when there's no one with that @username (or it's the user's own), otherwise
+// { followee_id, following, requested, isNewRequest, isNewFollow }
 async function setFollowing(user_id, handle, follow) {
-    const target = await pool.query("SELECT firebase_uid FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
+    const target = await pool.query("SELECT firebase_uid, is_private FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
     if (!target.rows.length) return null;
     const followee_id = target.rows[0].firebase_uid;
     if (!follow) {
         await pool.query("DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2", [user_id, followee_id]);
-        return { followee_id, following: false, requested: false, isNewRequest: false };
+        return { followee_id, following: false, requested: false, isNewRequest: false, isNewFollow: false };
     }
     const inserted = await pool.query(
-        `INSERT INTO follows (follower_id, followee_id, accepted) VALUES ($1, $2, false)
+        `INSERT INTO follows (follower_id, followee_id, accepted) VALUES ($1, $2, $3)
          ON CONFLICT DO NOTHING RETURNING accepted`,
-        [user_id, followee_id]
+        [user_id, followee_id, !target.rows[0].is_private]
     );
     const row = inserted.rows[0] ?? (await pool.query(
         "SELECT accepted FROM follows WHERE follower_id = $1 AND followee_id = $2", [user_id, followee_id]
     )).rows[0];
-    return { followee_id, following: row.accepted, requested: !row.accepted, isNewRequest: inserted.rowCount > 0 };
+    const isNew = inserted.rowCount > 0;
+    return { followee_id, following: row.accepted, requested: !row.accepted, isNewRequest: isNew && !row.accepted, isNewFollow: isNew && row.accepted };
+}
+
+// Makes the user's profile private or public. Going public accepts everyone waiting (returned as account ids, to
+// tell them); going private makes their public lists followers-only, since only followers can see a private
+// profile's lists
+async function setPrivate(user_id, isPrivate) {
+    await pool.query("UPDATE users SET is_private = $2 WHERE firebase_uid = $1", [user_id, isPrivate]);
+    if (isPrivate) {
+        await pool.query("UPDATE lists SET visibility = 'followers' WHERE user_id = $1 AND visibility = 'public'", [user_id]);
+        return [];
+    }
+    const accepted = await pool.query(
+        "UPDATE follows SET accepted = true WHERE followee_id = $1 AND NOT accepted RETURNING follower_id",
+        [user_id]
+    );
+    return accepted.rows.map((row) => row.follower_id);
+}
+
+/// Whether the user's profile is private
+async function isPrivate(user_id) {
+    const result = await pool.query("SELECT is_private FROM users WHERE firebase_uid = $1", [user_id]);
+    return result.rows[0]?.is_private === true;
 }
 
 // People asking to follow the user (newest first), and the @usernames of people the user has asked to follow
@@ -210,7 +234,7 @@ async function fetchConnections(viewer_id, { handle, which }) {
 // user doesn't follow them
 async function fetchUserLists(user_id, handle) {
     const target = await pool.query(
-        `SELECT u.firebase_uid, u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed,
+        `SELECT u.firebase_uid, u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.is_private,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested,
                 (SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.firebase_uid AND f.accepted)::int AS follower_count,
@@ -221,6 +245,7 @@ async function fetchUserLists(user_id, handle) {
     const person = target.rows[0];
     if (!person) return null;
     const profile = { handle: person.handle, display_name: person.display_name, avatar_version: person.avatar_version, following: person.following, requested: person.requested,
+                      is_private: person.is_private,
                       follower_count: person.follower_count, following_count: person.following_count, lists: [] };
     // Only followers learn whether someone allows AI, since it decides whether they can plan a Movie Night
     if (person.following) profile.ai_allowed = person.ai_allowed;
@@ -298,4 +323,4 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { setPrivate, isPrivate, isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };

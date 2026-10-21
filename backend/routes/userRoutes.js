@@ -5,7 +5,7 @@ const { setStreamingPreferences, streamingPreferences } = require("../services/s
 const { availableServices } = require("../services/filmFilters");
 const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { setPrivate, isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -306,6 +306,31 @@ router.put("/me/streaming", async (req, res) => {
     }
 });
 
+// Makes the user's profile private (followers need approving) or public (anyone can follow straight away),
+// e.g. { "private": true }. Going public accepts everyone waiting, and they're told
+router.put("/me/privacy", async (req, res) => {
+    if (typeof req.body.private !== "boolean") {
+        return res.status(400).json({ error: "A true/false private is required." });
+    }
+    try {
+        const accepted = await setPrivate(req.user.uid, req.body.private);
+        if (accepted.length) {
+            const me = await getProfile(req.user.uid);
+            for (const follower of accepted) {
+                notifyUser(follower, "follow_accepted", {
+                    title: "Follow request accepted",
+                    body: `${me?.display_name ?? "Someone"} accepted your request. You can now see their lists.`,
+                    data: { handle: me?.handle ?? "" },
+                });
+            }
+        }
+        res.json({ private: req.body.private, accepted: accepted.length });
+    } catch (error) {
+        console.error("Error saving privacy:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Turns AI features on or off for the user, e.g. { "allowed": true }. The app sends this whenever the
 // setting changes, and Movie Night checks it for both people
 router.put("/me/ai", async (req, res) => {
@@ -447,6 +472,13 @@ async function follow(req, res, follow) {
             notifyUser(result.followee_id, "follow_request", {
                 title: "New follow request",
                 body: `${me?.display_name ?? "Someone"}${me?.handle ? ` (@${me.handle})` : ""} wants to follow you`,
+                data: { handle: me?.handle ?? "" },
+            });
+        } else if (result.isNewFollow) {
+            const me = await getProfile(req.user.uid);
+            notifyUser(result.followee_id, "follow_new", {
+                title: "New follower",
+                body: `${me?.display_name ?? "Someone"}${me?.handle ? ` (@${me.handle})` : ""} started following you`,
                 data: { handle: me?.handle ?? "" },
             });
         }

@@ -464,6 +464,8 @@ struct EditListSheet: View {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var isPrivateProfile: Bool { SocialStore.shared.profile?.is_private == true }
+
     private var hasChanges: Bool {
         trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "") || visibility != ListVisibility.of(movieList.id)
     }
@@ -487,14 +489,14 @@ struct EditListSheet: View {
                 .listRowBackground(Theme.surface)
                 Section {
                     Picker("Who Can See It", selection: $visibility) {
-                        ForEach(ListVisibility.allCases) { option in
-                            Label(option.title, systemImage: option.icon).tag(option)
+                        ForEach(ListVisibility.options(isPrivate: isPrivateProfile)) { option in
+                            Label(option.title(isPrivate: isPrivateProfile), systemImage: option.icon).tag(option)
                         }
                     }
                 } header: {
                     Text("Visibility")
                 } footer: {
-                    Text(visibility.explanation)
+                    Text(visibility.explanation(isPrivate: isPrivateProfile))
                 }
                 .listRowBackground(Theme.surface)
             }
