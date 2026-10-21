@@ -145,9 +145,14 @@ struct ListView: View {
                     .bold()
                 }
             } else {
-                // In the navigation bar, so they stay put while the list scrolls
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    toolbarActions
+                // In the navigation bar, so they stay put while the list scrolls. One item that can't shrink rather
+                // than three: iOS folds separate items into a ••• menu when a long list name leaves no room, but
+                // this way the name is cut short instead
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 18) {
+                        toolbarActions
+                    }
+                    .fixedSize()
                 }
             }
         }
