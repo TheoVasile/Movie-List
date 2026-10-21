@@ -49,6 +49,9 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS streaming_services INT[] NOT NULL DEFAULT '{}';
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_streaming BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS last_streaming_alert_at TIMESTAMP;
+            -- Private profiles approve each follower; public ones (the default, and every account from before
+            -- this existed) are followed straight away
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (
@@ -146,6 +149,10 @@ const createTables = async () => {
             -- existed were already approved in effect, so they start accepted; new ones start pending
             ALTER TABLE follows ADD COLUMN IF NOT EXISTS accepted BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE follows ALTER COLUMN accepted SET DEFAULT false;
+            -- Public profiles don't approve followers, so requests to them (from before profiles could be public)
+            -- are accepted
+            UPDATE follows SET accepted = true
+            WHERE NOT accepted AND followee_id IN (SELECT firebase_uid FROM users WHERE NOT is_private);
 
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,

@@ -171,7 +171,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         DispatchQueue.main.async {
             switch info["type"] as? String {
-            case "follow_request", "follow_accepted", "activity":
+            case "follow_request", "follow_accepted", "follow_new", "activity":
                 SocialStore.shared.load()
                 self.destination = .profile
             case "poll_started", "poll_result", "group_added":

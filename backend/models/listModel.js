@@ -135,9 +135,12 @@ async function updateList(list_id, { name, overview, visibility }) {
 }
 
 // SQL condition: the list aliased l can be seen by the user whose id is the given parameter. Owners see all
-// their lists; others see public ones, and followers-only ones once their follow is accepted
-const visibleTo = (param) => `(l.user_id = ${param} OR l.visibility = 'public' OR (l.visibility = 'followers' AND EXISTS (
-    SELECT 1 FROM follows vf WHERE vf.follower_id = ${param} AND vf.followee_id = l.user_id AND vf.accepted)))`;
+// their lists; others see public ones, and followers-only ones once their follow is accepted. A private
+// profile's lists are only ever for followers, even one still marked public
+const visibleTo = (param) => `(l.user_id = ${param}
+    OR (l.visibility = 'public' AND NOT EXISTS (SELECT 1 FROM users vo WHERE vo.firebase_uid = l.user_id AND vo.is_private))
+    OR (l.visibility IN ('followers', 'public') AND EXISTS (
+        SELECT 1 FROM follows vf WHERE vf.follower_id = ${param} AND vf.followee_id = l.user_id AND vf.accepted)))`;
 
 // Follows or unfollows someone else's list the user can see. Returns false when there's no such list,
 // it's the user's own, or they can't see it

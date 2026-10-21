@@ -5,6 +5,7 @@ const pool = require("../config/db");
 const PREFERENCE = {
     follow_request: "notify_requests",
     follow_accepted: "notify_requests",
+    follow_new: "notify_requests",
     list_invite: "notify_requests",
     group_added: "notify_requests",
     activity: "notify_activity",

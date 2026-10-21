@@ -307,6 +307,8 @@ private extension Home {
         }
     }
 
+    var isPrivateProfile: Bool { social.profile?.is_private == true }
+
     func resetNewList() {
         listName = ""
         newListVisibility = .public
@@ -361,14 +363,14 @@ private extension Home {
                 .listRowBackground(Theme.surface)
                 Section {
                     Picker("Who Can See It", selection: $newListVisibility) {
-                        ForEach(ListVisibility.allCases) { option in
-                            Label(option.title, systemImage: option.icon).tag(option)
+                        ForEach(ListVisibility.options(isPrivate: isPrivateProfile)) { option in
+                            Label(option.title(isPrivate: isPrivateProfile), systemImage: option.icon).tag(option)
                         }
                     }
                 } header: {
                     Text("Visibility")
                 } footer: {
-                    Text(newListVisibility.explanation)
+                    Text(newListVisibility.explanation(isPrivate: isPrivateProfile))
                 }
                 .listRowBackground(Theme.surface)
                 Section {
@@ -424,6 +426,8 @@ private extension Home {
             }
             .onAppear {
                 if social.following.isEmpty { social.load() }
+                // A private profile's lists can't be seen by everyone, so they start as Friends
+                if isPrivateProfile && newListVisibility == .public { newListVisibility = .followers }
             }
         }
     }
@@ -535,6 +539,8 @@ struct EditListSheet: View {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var isPrivateProfile: Bool { SocialStore.shared.profile?.is_private == true }
+
     private var hasChanges: Bool {
         trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "") || visibility != ListVisibility.of(movieList.id)
     }
@@ -558,14 +564,14 @@ struct EditListSheet: View {
                 .listRowBackground(Theme.surface)
                 Section {
                     Picker("Who Can See It", selection: $visibility) {
-                        ForEach(ListVisibility.allCases) { option in
-                            Label(option.title, systemImage: option.icon).tag(option)
+                        ForEach(ListVisibility.options(isPrivate: isPrivateProfile)) { option in
+                            Label(option.title(isPrivate: isPrivateProfile), systemImage: option.icon).tag(option)
                         }
                     }
                 } header: {
                     Text("Visibility")
                 } footer: {
-                    Text(visibility.explanation)
+                    Text(visibility.explanation(isPrivate: isPrivateProfile))
                 }
                 .listRowBackground(Theme.surface)
             }

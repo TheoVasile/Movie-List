@@ -7,6 +7,7 @@ const { requireListEditor } = requireListOwner;
 const { notifyUser } = require("../services/pushService");
 const pool = require("../config/db");
 const { setListWatched } = require("../models/watchedModel");
+const { isPrivate } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -19,7 +20,9 @@ router.post("/create", async (req, res) => {
         if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
             return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
         }
-        const newList = await createList(req.user.uid, name, overview, is_ranked, visibility);
+        // Only followers can see a private profile's lists, so a public one starts followers-only instead
+        const allowed = (visibility ?? "public") === "public" && (await isPrivate(req.user.uid)) ? "followers" : visibility;
+        const newList = await createList(req.user.uid, name, overview, is_ranked, allowed);
         res.status(201).json(newList);
     } catch (error) {
         console.error("Error creating list:", error);
@@ -63,6 +66,10 @@ router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) =>
         }
         if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
             return res.status(400).json({ error: "Visibility must be public, followers or private." });
+        }
+        // Only followers can see a private profile's lists, so they can't be made public
+        if (visibility === "public" && (await isPrivate(req.user.uid))) {
+            return res.status(400).json({ error: "Your profile is private, so lists can be seen by followers or only you." });
         }
         if (name === undefined && overview === undefined && visibility === undefined) {
             return res.status(400).json({ error: "Nothing to update." });

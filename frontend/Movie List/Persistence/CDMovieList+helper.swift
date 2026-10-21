@@ -158,6 +158,19 @@ enum ListVisibility: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The choices a user has: a private profile's lists are only ever for followers ("Friends") or the owner
+    static func options(isPrivate: Bool) -> [ListVisibility] {
+        isPrivate ? [.followers, .private] : allCases
+    }
+
+    func title(isPrivate: Bool) -> String {
+        isPrivate && self == .followers ? "Friends" : title
+    }
+
+    func explanation(isPrivate: Bool) -> String {
+        isPrivate && self == .followers ? "Only people you've accepted as followers can see and follow this list." : explanation
+    }
+
     private static let storageKey = "listVisibility"
 
     /// The visibility of one of the user's lists, as last synced or changed on this phone

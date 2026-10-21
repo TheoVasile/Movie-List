@@ -67,8 +67,8 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    /// Sends a follow request, or unfollows / cancels a request, showing the change straight away and undoing
-    /// it if the server says no. Following only starts once they accept
+    /// Follows someone (straight away for a public profile, as a request for a private one), or unfollows /
+    /// cancels a request, showing the change straight away and undoing it if the server says no
     func setFollowing(_ person: UserSummary, _ follow: Bool, completion: @escaping (Bool) -> Void = { _ in }) {
         let previous = (following, requested)
         if follow {
@@ -79,7 +79,14 @@ final class SocialStore: ObservableObject {
         }
         APIService.shared.setFollowing(person.handle, follow) { result in
             switch result {
-            case .success:
+            case .success(let nowFollowing):
+                // A public profile: following already, not waiting on a request
+                if follow && nowFollowing {
+                    self.requested.remove(person.handle)
+                    var followed = person
+                    followed.following = true
+                    if !self.isFollowing(person.handle) { self.following.insert(followed, at: 0) }
+                }
                 self.load()
                 completion(true)
             case .failure(let error):
@@ -262,7 +269,7 @@ struct FollowingSection: View {
             if social.hasLoaded && social.profile?.handle == nil {
                 EmptyView()
             } else if social.following.isEmpty {
-                Text("Follow friends to see their lists, rankings and what they thought of each film. They'll get a request to accept.")
+                Text("Follow friends to see their lists, rankings and what they thought of each film.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
             } else {
@@ -716,7 +723,9 @@ struct FriendProfileView: View {
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if !social.isFollowing(person.handle) {
-                    Text("Follow @\(person.handle) to see their lists, rankings and watched films. They'll get a request to accept.")
+                    Text(lists?.is_private == true
+                         ? "Follow @\(person.handle) to see their lists, rankings and watched films. Their profile is private, so they'll get a request to accept."
+                         : "Follow @\(person.handle) to see their lists, rankings and watched films.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {
