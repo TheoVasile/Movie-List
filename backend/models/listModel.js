@@ -1,11 +1,12 @@
 const pool = require("../config/db");
 const { fetchNotes } = require("./notesModel");
 
-// visibility is "public", "followers" or "private"; left out, the list starts public
+// visibility is "public", "followers" or "private"; left out, the list starts public. is_ranked left out makes
+// a ranked list
 async function createList(user_id, name, overview, is_ranked, visibility) {
     const result = await pool.query(
         "INSERT INTO lists (user_id, name, overview, is_ranked, visibility) VALUES ($1, $2, $3, $4, COALESCE($5, 'public')) RETURNING *",
-        [user_id, name, overview, is_ranked, visibility ?? null]
+        [user_id, name, overview, is_ranked ?? true, visibility ?? null]
     );
     return result.rows[0];
 }
@@ -122,14 +123,14 @@ async function deleteList(list_id) {
 // Renames a list and/or changes its description. Fields left undefined keep their current value
 const VISIBILITIES = ["public", "followers", "private"];
 
-async function updateList(list_id, { name, overview, visibility }) {
+async function updateList(list_id, { name, overview, visibility, is_ranked }) {
     const result = await pool.query(
         `UPDATE lists
          SET name = COALESCE($2, name), overview = COALESCE($3, overview), visibility = COALESCE($4, visibility),
-             date_modified = CURRENT_TIMESTAMP
+             is_ranked = COALESCE($5, is_ranked), date_modified = CURRENT_TIMESTAMP
          WHERE id = $1
          RETURNING *`,
-        [list_id, name ?? null, overview ?? null, visibility ?? null]
+        [list_id, name ?? null, overview ?? null, visibility ?? null, typeof is_ranked === "boolean" ? is_ranked : null]
     );
     return result.rows[0];
 }

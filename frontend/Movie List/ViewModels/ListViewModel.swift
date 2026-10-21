@@ -186,12 +186,16 @@ class ListViewModel: ObservableObject {
             withAnimation(Theme.spring) {
                 self.movies = Array(self.movieList.movies).sorted(by: { $0.rank < $1.rank })
             }
-            // New films land at the bottom, so ask where it belongs, unless it's the only film
-            if self.movies.count > 1 {
+            // New films land at the bottom, so ask where it belongs, unless it's the only film or the list is
+            // unranked, where the end is where it belongs
+            if self.movies.count > 1 && self.isRanked {
                 self.promptToRank(newMovie)
             }
         }
     }
+
+    /// Unranked lists are collections in no particular order: no comparing, set ranks or Smart Placement
+    var isRanked: Bool { ListRanking.isRanked(movieList.id) }
 
     func promptToRank(_ movie: CDMovie) {
         selectedMovie = movie

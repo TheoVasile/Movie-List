@@ -570,6 +570,10 @@ router.post("/smart-place", editsBodyList, async (req, res) => {
         if (!allowed.rows[0]?.ai_allowed) {
             return res.status(403).json({ error: "Allow AI features in Settings to use Smart Placement." });
         }
+        const ranked = await pool.query("SELECT is_ranked FROM lists WHERE id = $1", [listId]);
+        if (ranked.rows[0]?.is_ranked === false) {
+            return res.status(400).json({ error: "This list is unranked, so films just go at the end." });
+        }
         const rows = (await pool.query(
             `SELECT l.name, lm.movie_id, lm.rank, m.title, m.release_date
              FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id

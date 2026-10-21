@@ -55,6 +55,7 @@ struct PersistenceController {
         }
         for response in responses {
             ListVisibility.remember(response.visibility.flatMap(ListVisibility.init) ?? .followers, for: response.id)
+            ListRanking.remember(response.is_ranked ?? true, for: response.id)
             if let list = listsByID[response.id] {
                 Self.update(list, from: response, in: context)
             } else {

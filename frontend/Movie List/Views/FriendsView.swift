@@ -874,12 +874,19 @@ struct FriendListView: View {
                     details = PersistenceController.preview(of: film.movie)
                 } label: {
                     HStack(spacing: 12) {
-                        Text("\(film.rank)")
-                            .font(.system(size: 18, weight: .heavy, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-                            .frame(width: 40)
-                            .minimumScaleFactor(0.5)
+                        // Unranked lists are in no particular order, so they get a dot instead of a number
+                        Group {
+                            if list.is_ranked == false {
+                                Circle().fill(Theme.textTertiary).frame(width: 6, height: 6)
+                            } else {
+                                Text("\(film.rank)")
+                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+                                    .minimumScaleFactor(0.5)
+                            }
+                        }
+                        .frame(width: 40)
                         PosterImage(path: film.poster_path, cornerRadius: 6, size: .small)
                             .frame(width: 40, height: 60)
                         VStack(alignment: .leading, spacing: 2) {

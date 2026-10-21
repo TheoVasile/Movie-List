@@ -17,6 +17,9 @@ router.post("/create", async (req, res) => {
         if (!name) {
             return res.status(400).json({ error: "Name is required." });
         }
+        if (is_ranked !== undefined && typeof is_ranked !== "boolean") {
+            return res.status(400).json({ error: "is_ranked must be true or false." });
+        }
         if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
             return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
         }
@@ -57,7 +60,10 @@ router.put("/:id/watched", requireListEditor((req) => req.params.id), async (req
 // Renames a list and/or changes its description, e.g. { "name": "Best of 2026", "overview": "..." }
 router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) => {
     try {
-        const { name, overview, visibility } = req.body;
+        const { name, overview, visibility, is_ranked } = req.body;
+        if (is_ranked !== undefined && typeof is_ranked !== "boolean") {
+            return res.status(400).json({ error: "is_ranked must be true or false." });
+        }
         if (name !== undefined && (typeof name !== "string" || !name.trim() || name.length > 100)) {
             return res.status(400).json({ error: "A name must be 1 to 100 characters." });
         }
@@ -71,10 +77,10 @@ router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) =>
         if (visibility === "public" && (await isPrivate(req.user.uid))) {
             return res.status(400).json({ error: "Your profile is private, so lists can be seen by followers or only you." });
         }
-        if (name === undefined && overview === undefined && visibility === undefined) {
+        if (name === undefined && overview === undefined && visibility === undefined && is_ranked === undefined) {
             return res.status(400).json({ error: "Nothing to update." });
         }
-        const list = await updateList(Number(req.params.id), { name: name?.trim(), overview, visibility });
+        const list = await updateList(Number(req.params.id), { name: name?.trim(), overview, visibility, is_ranked });
         res.status(200).json(list);
     } catch (error) {
         console.error("Error updating list:", error);

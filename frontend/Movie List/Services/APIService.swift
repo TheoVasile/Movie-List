@@ -110,6 +110,8 @@ struct ListDetailsResponse: Codable {
     let skipped: [String]?
     // "public", "followers" or "private"
     let visibility: String?
+    // False for unranked lists, whose order means nothing; nil from servers before lists could be unranked
+    let is_ranked: Bool?
     // False for lists someone else owns and invited the user to edit; nil from servers before shared lists
     let is_owner: Bool?
     // Everyone on a shared list, owner first; empty when it isn't shared
@@ -413,6 +415,8 @@ struct FriendLists: Decodable {
         let overview: String
         let movies: [Film]
         let visibility: String?
+        // False for unranked lists, shown without rank numbers
+        let is_ranked: Bool?
         let owner_handle: String?
         let owner_name: String?
         // Whether the user follows this list, and how many people do
@@ -1563,12 +1567,14 @@ class APIService {
     }
 
     /// Renames a list and/or changes its description; nil leaves that field as it is
-    func updateList(listID: Int64, name: String?, overview: String?, visibility: ListVisibility? = nil, completion: @escaping (Result<Void, Error>) -> Void) {
+    func updateList(listID: Int64, name: String?, overview: String?, visibility: ListVisibility? = nil, isRanked: Bool? = nil,
+                    completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/\(listID)") else { return }
         var body: [String: Any] = [:]
         if let name { body["name"] = name }
         if let overview { body["overview"] = overview }
         if let visibility { body["visibility"] = visibility.rawValue }
+        if let isRanked { body["is_ranked"] = isRanked }
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
