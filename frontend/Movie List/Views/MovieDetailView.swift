@@ -11,6 +11,8 @@ import SwiftUI
 struct MovieDetailView: View {
     @ObservedObject var movie: CDMovie
     var listName: String? = nil
+    // False for a film in an unranked list, which has no rank to show
+    var ranked = true
     // Opens the list picker to add this film to other lists
     var onAddToLists: (() -> Void)? = nil
     var onCompare: (() -> Void)? = nil
@@ -303,7 +305,12 @@ struct MovieDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
-                    if movie.rank > 0 {
+                    if !ranked, let listName {
+                        Text("IN \(listName.uppercased())")
+                            .font(.caption.weight(.heavy))
+                            .tracking(1.5)
+                            .foregroundStyle(Theme.accentGradient)
+                    } else if ranked && movie.rank > 0 {
                         Text(listName.map { "#\(movie.rank) IN \($0.uppercased())" } ?? "#\(movie.rank)")
                             .font(.caption.weight(.heavy))
                             .tracking(1.5)

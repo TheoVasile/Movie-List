@@ -128,6 +128,24 @@ extension CDMovieList {
 }
 
 
+/// Which of the user's lists are unranked: collections in no particular order, like a watchlist, where films go
+/// on the end and a film's place says nothing about how much anyone liked it. Kept on the phone (Core Data has no
+/// field for it) and refreshed from the server on every sync
+enum ListRanking {
+    private static let storageKey = "unrankedLists"
+
+    static func isRanked(_ listID: Int64) -> Bool {
+        let unranked = UserDefaults.standard.array(forKey: storageKey) as? [String] ?? []
+        return !unranked.contains(String(listID))
+    }
+
+    static func remember(_ ranked: Bool, for listID: Int64) {
+        var unranked = Set(UserDefaults.standard.array(forKey: storageKey) as? [String] ?? [])
+        if ranked { unranked.remove(String(listID)) } else { unranked.insert(String(listID)) }
+        UserDefaults.standard.set(Array(unranked), forKey: storageKey)
+    }
+}
+
 /// Who can see a list. New lists are Everyone unless the owner picks otherwise
 enum ListVisibility: String, CaseIterable, Identifiable {
     case `public`, followers, `private`

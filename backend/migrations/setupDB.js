@@ -186,6 +186,9 @@ const createTables = async () => {
             -- Who can see a list: everyone signed in (public), the owner's accepted followers (followers, how all
             -- lists worked before), or only the owner (private)
             ALTER TABLE lists ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'followers';
+            -- Unranked lists (is_ranked false) are collections in no particular order, like a watchlist: their order
+            -- says nothing about how much the owner liked a film, so it's never used as a sign of taste
+            ALTER TABLE lists ALTER COLUMN is_ranked SET DEFAULT true;
             -- New lists start public; lists made before keep the visibility they have
             ALTER TABLE lists ALTER COLUMN visibility SET DEFAULT 'public';
 

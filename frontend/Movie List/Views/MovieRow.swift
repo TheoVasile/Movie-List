@@ -18,6 +18,8 @@ struct MovieRow: View {
     var aiPlaced = false
     // On shared lists, who added it when it wasn't the user
     var addedBy: String? = nil
+    // Unranked lists show no rank and offer no ranking actions
+    var ranked = true
     var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
     
@@ -27,7 +29,7 @@ struct MovieRow: View {
                 .frame(width: 58, height: 87)
                 .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 3)
                 // Rank sits on the poster's top-left corner, overhanging it slightly
-                .overlay(alignment: .topLeading) { rankBadge.offset(x: -8, y: -8) }
+                .overlay(alignment: .topLeading) { if ranked { rankBadge.offset(x: -8, y: -8) } }
                 .overlay(alignment: .bottomTrailing) {
                     if aiPlaced {
                         // A quiet reminder, not a badge: the spot was suggested, not chosen
@@ -79,16 +81,17 @@ struct MovieRow: View {
                     .font(.subheadline.weight(.bold))
             }
             Menu {
-                Button {
-                    present { showSetRank = true }
-                } label: {
-                    Label("Set Rank", systemImage: "number")
-                }
-                Button {
-                    print("Compare Tapped")
-                    present { showCompareMovieView = true }
-                } label: {
-                    Label("Compare", systemImage: "arrow.left.arrow.right")
+                if ranked {
+                    Button {
+                        present { showSetRank = true }
+                    } label: {
+                        Label("Set Rank", systemImage: "number")
+                    }
+                    Button {
+                        present { showCompareMovieView = true }
+                    } label: {
+                        Label("Compare", systemImage: "arrow.left.arrow.right")
+                    }
                 }
                 if let onAddToLists {
                     Button {
@@ -120,7 +123,7 @@ struct MovieRow: View {
         .background(
             ZStack {
                 Theme.surface
-                if movie.rank == 1 {
+                if ranked && movie.rank == 1 {
                     Theme.accentGradient.opacity(0.12)
                 }
             }

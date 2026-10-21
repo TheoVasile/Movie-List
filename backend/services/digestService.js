@@ -36,7 +36,8 @@ async function fetchFriendActivity(user_id) {
              FROM watch_log wl
              WHERE wl.user_id IN (SELECT id FROM friends) AND wl.created_at > NOW() - INTERVAL '24 hours'
              UNION ALL
-             SELECT l.user_id, lm.movie_id, 'ranked', lm.added_at, lm.rank, l.name
+             -- An unranked list's films have no rank to brag about, so they're just "added"
+             SELECT l.user_id, lm.movie_id, 'ranked', lm.added_at, CASE WHEN l.is_ranked THEN lm.rank END, l.name
              FROM list_movies lm JOIN lists l ON l.id = lm.list_id
              WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - INTERVAL '24 hours'
                AND l.visibility <> 'private'
