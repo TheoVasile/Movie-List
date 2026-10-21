@@ -366,7 +366,9 @@ router.post("/movie-night", async (req, res) => {
             others = (await pool.query("SELECT firebase_uid, handle, username AS name, ai_allowed FROM users WHERE firebase_uid = ANY($1)", [followed.map((f) => f.firebase_uid)])).rows;
         }
         if (!others.length) return res.status(400).json({ error: "Nobody else is in this group." });
-        const people = [{ ...me, me: true }, ...others.map((p) => ({ ...p, name: p.name || `@${p.handle}`, me: false }))];
+        // Everyone else goes by their @handle, like everywhere else in the app (display names can be anything,
+        // even "no name" from a Google sign-in)
+        const people = [{ ...me, me: true }, ...others.map((p) => ({ ...p, name: p.handle ? `@${p.handle}` : p.name, me: false }))];
         const saving = body.save === true && Number.isInteger(body.group_id);
         const history = saving ? await pickHistory(body.group_id) : { exclude: new Set(), liked: [], dismissed: [], shortlist: [] };
         // Sends the picks, or saves them to the group's shortlist and sends that
