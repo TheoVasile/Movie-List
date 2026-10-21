@@ -401,7 +401,7 @@ async function respond(req, res, accept) {
             const me = await getProfile(req.user.uid);
             notifyUser(requester, "follow_accepted", {
                 title: "Follow request accepted",
-                body: `${me?.display_name ?? "Someone"} accepted your request. You can now see their lists.`,
+                body: `${me?.handle ? `@${me.handle}` : me?.display_name ?? "Someone"} accepted your request. You can now see their lists.`,
                 data: { handle: me?.handle ?? "" },
             });
         }
@@ -487,7 +487,7 @@ async function follow(req, res, follow) {
             const me = await getProfile(req.user.uid);
             notifyUser(result.followee_id, "follow_request", {
                 title: "New follow request",
-                body: `${me?.display_name ?? "Someone"}${me?.handle ? ` (@${me.handle})` : ""} wants to follow you`,
+                body: `${me?.handle ? `@${me.handle}` : me?.display_name ?? "Someone"} wants to follow you`,
                 data: { handle: me?.handle ?? "" },
             });
         }

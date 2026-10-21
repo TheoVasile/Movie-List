@@ -14,7 +14,7 @@ const filmLabel = (row) => (yearOf(row.release_date) ? `${row.title} (${yearOf(r
 async function fetchFriendActivity(user_id) {
     const result = await pool.query(
         `WITH friends AS (
-             SELECT f.followee_id AS id, u.username AS name, u.handle
+             SELECT f.followee_id AS id, COALESCE('@' || u.handle, u.username) AS name, u.handle
              FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
              WHERE f.follower_id = $1 AND f.accepted
          ), bulk AS (
@@ -58,7 +58,7 @@ async function fetchFriendActivity(user_id) {
 async function fetchFollowedListUpdates(user_id) {
     const result = await pool.query(
         `WITH followed AS (
-             SELECT l.id, l.name, l.user_id, o.username AS owner, o.handle
+             SELECT l.id, l.name, l.user_id, COALESCE('@' || o.handle, o.username) AS owner, o.handle
              FROM list_follows lf JOIN lists l ON l.id = lf.list_id JOIN users o ON o.firebase_uid = l.user_id
              WHERE lf.user_id = $1 AND l.user_id <> $1 AND ${visibleTo("$1")}
          ), added AS (

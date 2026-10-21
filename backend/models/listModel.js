@@ -25,7 +25,7 @@ async function fetchLists(user_id) {
     );
     const films = await pool.query(
         `SELECT lm.list_id, lm.rank, lm.ai_placed, m.*, (w.movie_id IS NOT NULL) AS watched,
-                CASE WHEN lm.added_by IS NOT NULL AND lm.added_by <> $1 THEN COALESCE(adder.username, adder.handle) END AS added_by_name
+                CASE WHEN lm.added_by IS NOT NULL AND lm.added_by <> $1 THEN COALESCE('@' || adder.handle, adder.username) END AS added_by_name
          FROM lists l
          JOIN list_movies lm ON lm.list_id = l.id
          JOIN movies m ON m.id = lm.movie_id

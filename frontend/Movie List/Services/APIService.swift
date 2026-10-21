@@ -62,6 +62,8 @@ struct UserRequest: Codable {
     let firebase_id: String
     let email: String
     let username: String
+    // The @username picked at sign-up; saved with the account when it's still free
+    var handle: String? = nil
 }
 
 struct MovieDetailsResponse: Codable {
@@ -544,14 +546,28 @@ class APIService {
         }
     }
 
-    func createUser(firebase_id: String, email: String, name: String, completion: @escaping (Result<UserResponse, Error>) -> Void) {
+    /// Whether an @username is free, checked before the account exists. nil when it couldn't be checked
+    func isHandleAvailable(_ handle: String, completion: @escaping (Bool?) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/auth/handle-available")
+        components?.queryItems = [URLQueryItem(name: "handle", value: handle)]
+        guard let url = components?.url else { return completion(nil) }
+        struct Availability: Decodable { let available: Bool }
+        // No account yet, so this one goes without a token
+        URLSession.shared.dataTask(with: url) { data, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+            let available = ok ? data.flatMap { try? JSONDecoder().decode(Availability.self, from: $0) }?.available : nil
+            DispatchQueue.main.async { completion(available) }
+        }.resume()
+    }
+
+    func createUser(firebase_id: String, email: String, name: String, handle: String? = nil, completion: @escaping (Result<UserResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/create") else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body = UserRequest(firebase_id: firebase_id, email: email, username: name)
+        let body = UserRequest(firebase_id: firebase_id, email: email, username: name, handle: handle)
 
         do {
             request.httpBody = try JSONEncoder().encode(body)

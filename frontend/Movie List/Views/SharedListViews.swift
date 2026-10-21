@@ -18,11 +18,11 @@ struct SharedListBanner: View {
     private var text: String {
         let others = sharing.others(on: listID)
         if !sharing.isOwner(listID), let owner = others.first(where: \.is_owner) {
-            let rest = others.filter { !$0.is_owner }.map(\.display_name)
-            return rest.isEmpty ? "\(owner.display_name)'s list, shared with you"
-                : "\(owner.display_name)'s list, shared with you and \(Self.names(rest))"
+            let rest = others.filter { !$0.is_owner }.map { "@\($0.handle)" }
+            return rest.isEmpty ? "@\(owner.handle)'s list, shared with you"
+                : "@\(owner.handle)'s list, shared with you and \(Self.names(rest))"
         }
-        return "Shared with \(Self.names(others.map(\.display_name)))"
+        return "Shared with \(Self.names(others.map { "@\($0.handle)" }))"
     }
 
     // "Sam", "Sam and Ana", "Sam, Ana and Lee"
@@ -110,9 +110,9 @@ struct ShareListSheet: View {
                             HStack(spacing: 12) {
                                 Avatar(name: person.display_name, size: 34, handle: person.handle, version: person.avatar_version)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(person.display_name)
-                                        .foregroundColor(Theme.textPrimary)
                                     Text("@\(person.handle)")
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text(person.display_name)
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                 }
@@ -168,9 +168,9 @@ struct ShareListSheet: View {
         HStack(spacing: 12) {
             Avatar(name: person.display_name, size: 34, handle: person.is_me ? nil : person.handle, version: person.avatar_version)
             VStack(alignment: .leading, spacing: 1) {
-                Text(person.is_me ? "\(person.display_name) (you)" : person.display_name)
+                Text(person.is_me ? "@\(person.handle) (you)" : "@\(person.handle)")
                     .foregroundColor(Theme.textPrimary)
-                Text(person.is_owner ? "Owner" : "@\(person.handle)")
+                Text(person.is_owner ? "Owner · \(person.display_name)" : person.display_name)
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
             }
@@ -204,7 +204,7 @@ struct ShareListSheet: View {
         APIService.shared.removeListEditor(listID: listID, handle: person.handle) { ok in
             if !ok {
                 busy.remove(person.handle)
-                errorMessage = "Couldn't remove \(person.display_name). Check your connection and try again."
+                errorMessage = "Couldn't remove @\(person.handle). Check your connection and try again."
                 return
             }
             sharing.refresh { busy.remove(person.handle) }

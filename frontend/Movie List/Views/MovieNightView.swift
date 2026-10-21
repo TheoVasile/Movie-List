@@ -59,9 +59,9 @@ struct MovieNightView: View {
         _usesAI = State(initialValue: canUseAI)
     }
 
-    // "Sam", "Sam and Ana", "Sam, Ana and Lee"
+    // "@sam", "@sam and @ana", "@sam, @ana and @lee"
     private var names: String {
-        let all = people.map(\.display_name)
+        let all = people.map { "@\($0.handle)" }
         guard all.count > 1 else { return all.first ?? "" }
         return all.dropLast().joined(separator: ", ") + " and " + (all.last ?? "")
     }
@@ -910,9 +910,9 @@ struct NewGroupSheet: View {
                             HStack(spacing: 12) {
                                 Avatar(name: person.display_name, size: 32, handle: person.handle, version: person.avatar_version)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(person.display_name)
-                                        .foregroundColor(Theme.textPrimary)
                                     Text("@\(person.handle)")
+                                        .foregroundColor(Theme.textPrimary)
+                                    Text(person.display_name)
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                 }
