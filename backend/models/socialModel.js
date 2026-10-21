@@ -230,13 +230,14 @@ async function fetchUserLists(user_id, handle) {
 }
 
 // Lists matching a condition that the viewer ($1) can see, each with its films in rank order, which the owner
-// has watched, its visibility, how many follow it and whether the viewer does. $2 onwards are params
+// has watched (with each film's overview, for its info screen), its visibility, how many follow it and whether the viewer does. $2 onwards are params
 async function fetchListsWithFilms(viewer_id, condition, params) {
     const rows = await pool.query(
         `SELECT l.id AS list_id, l.name, l.overview, l.visibility, o.handle AS owner_handle, o.username AS owner_name,
                 EXISTS (SELECT 1 FROM list_follows lf WHERE lf.user_id = $1 AND lf.list_id = l.id) AS followed,
                 (SELECT COUNT(*) FROM list_follows lf WHERE lf.list_id = l.id)::int AS follower_count,
                 m.tmdb_id, m.title, m.release_date, m.poster_path, lm.rank,
+                m.overview AS film_overview, m.original_language, m.popularity,
                 (w.movie_id IS NOT NULL) AS watched
          FROM lists l
          JOIN users o ON o.firebase_uid = l.user_id
@@ -264,6 +265,10 @@ async function fetchListsWithFilms(viewer_id, condition, params) {
                 poster_path: row.poster_path || null,
                 rank: row.rank,
                 watched: row.watched,
+                // For the film info screen
+                overview: row.film_overview ?? "",
+                original_language: row.original_language ?? "",
+                popularity: row.popularity ?? 0,
             });
         }
     }
