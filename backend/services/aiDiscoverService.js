@@ -7,7 +7,7 @@ const DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 40;
 
 const SYSTEM_PROMPT = `You recommend films for the Discover tab of a film-ranking app. The user swipes through your picks one at a time and adds the ones they like to their lists.
 
-You'll get the user's lists (films in rank order, best first, where ✓ marks films they've watched) with a summary of their eras and languages, and sometimes films they've liked, skipped or marked "not for me" in Discover, genres they lean towards or away from, how often they like what Discover shows them, their country and language, and an age range or pronouns they chose to share. Lists are the strongest signal: weigh highly ranked films most, and notice the patterns across the whole collection (directors, eras, countries, tone, themes), not just the top few. A list's name can say what it's for, such as a watchlist or a holiday list. When there are no lists, rely on the swipes and anything else provided, and if there's nothing at all, pick widely loved films across genres, eras and countries.
+You'll get the user's lists (films in rank order, best first, where ✓ marks films they've watched) with a summary of their eras and languages, and sometimes films they've liked, skipped or marked "not for me" in Discover, genres they lean towards or away from, how often they like what Discover shows them, their country and language, and an age range or pronouns they chose to share. Lists are the strongest signal: weigh highly ranked films most (a list marked unranked is in no particular order, so never read a film's place in it as liking or disliking it), and notice the patterns across the whole collection (directors, eras, countries, tone, themes), not just the top few. A list's name can say what it's for, such as a watchlist or a holiday list. When there are no lists, rely on the swipes and anything else provided, and if there's nothing at all, pick widely loved films across genres, eras and countries.
 
 Recommend real, released feature films. Never recommend a film that's in the user's lists, that they liked, skipped or marked "not for me" in Discover, or that's in the already-suggested list: check each pick against them, and if it's there, choose a different film instead. Never include a film only to say it should be skipped. Always return the full number of films asked for. Liked films show what to find more of, and "not for me" films show what to steer away from. A skip only means "not now" or "seen it": don't read it as dislike, and don't avoid similar films because of it. If they like few of the films Discover shows them, stay closer to their lists; if they like many, be more adventurous. Prefer films likely to be available in their country, and in their language or with subtitles. Mix close matches with a few adventurous picks so the deck doesn't repeat itself. If the user is under 18, only recommend films suitable for their age. Use the age range and pronouns only as soft hints, never as a stereotype.
 
@@ -83,8 +83,10 @@ function describeLists(lists, who = "The user", maxFilms = MAX_LIST_FILMS) {
         if (remaining <= 0) break;
         const films = list.films.slice(0, remaining);
         remaining -= films.length;
-        const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}${film.watched ? " ✓" : ""}`);
-        sections.push(`List "${list.name}" (${list.films.length} films, best first):\n${lines.join("\n")}`);
+        // An unranked list is only a collection: it's listed without numbers and says its order means nothing
+        const lines = films.map((film, i) => `${list.ranked === false ? "-" : `${i + 1}.`} ${filmLabel(film)}${film.watched ? " ✓" : ""}`);
+        const order = list.ranked === false ? "unranked: in no particular order, which says nothing about how much they liked any of them" : "best first";
+        sections.push(`List "${list.name}" (${list.films.length} films, ${order}):\n${lines.join("\n")}`);
     }
     if (!sections.length) return `${who} has no films in their lists yet.`;
 
@@ -212,7 +214,7 @@ async function recommendFilms(user_id, lists, signals, count, onPick = () => {})
 
 const MOVIE_NIGHT_PROMPT = `You pick films for a group of friends to watch together on a movie night, using each person's film-ranking lists (films in rank order, best first, where ✓ marks films they've watched).
 
-Find films everyone is likely to enjoy: look for overlaps in their tastes (directors, eras, countries, tone, themes, genres) and weigh highly ranked films most. Where tastes differ, pick films that bridge them rather than ones only one person would like.
+Find films everyone is likely to enjoy: look for overlaps in their tastes (directors, eras, countries, tone, themes, genres) and weigh highly ranked films most. A list marked unranked is in no particular order, so never read a film's place in it as liking or disliking it. Where tastes differ, pick films that bridge them rather than ones only one person would like.
 
 Recommend real, released feature films. Never recommend a film that's in anyone's lists, so it's new to all of them. Always return the full number of films asked for, and mix safe crowd-pleasers with a few bolder picks. Follow any limits on genre, language or streaming service exactly.
 

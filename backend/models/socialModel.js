@@ -258,7 +258,7 @@ async function fetchUserLists(user_id, handle) {
 // has watched (with each film's overview, for its info screen), its visibility, how many follow it and whether the viewer does. $2 onwards are params
 async function fetchListsWithFilms(viewer_id, condition, params) {
     const rows = await pool.query(
-        `SELECT l.id AS list_id, l.name, l.overview, l.visibility, o.handle AS owner_handle, o.username AS owner_name,
+        `SELECT l.id AS list_id, l.name, l.overview, l.visibility, l.is_ranked, o.handle AS owner_handle, o.username AS owner_name,
                 EXISTS (SELECT 1 FROM list_follows lf WHERE lf.user_id = $1 AND lf.list_id = l.id) AS followed,
                 (SELECT COUNT(*) FROM list_follows lf WHERE lf.list_id = l.id)::int AS follower_count,
                 m.tmdb_id, m.title, m.release_date, m.poster_path, lm.rank,
@@ -277,7 +277,7 @@ async function fetchListsWithFilms(viewer_id, condition, params) {
     for (const row of rows.rows) {
         if (!lists.has(row.list_id)) {
             lists.set(row.list_id, {
-                id: row.list_id, name: row.name, overview: row.overview ?? "", visibility: row.visibility,
+                id: row.list_id, name: row.name, overview: row.overview ?? "", visibility: row.visibility, is_ranked: row.is_ranked !== false,
                 owner_handle: row.owner_handle, owner_name: row.owner_name,
                 followed: row.followed, follower_count: row.follower_count, movies: [],
             });
@@ -317,7 +317,7 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
                 (SELECT n.note FROM movie_notes n WHERE n.user_id = u.firebase_uid AND n.movie_id IN (SELECT id FROM film)) AS note,
                 (SELECT json_build_object('list_name', l.name, 'rank', lm.rank, 'list_size', (SELECT COUNT(*) FROM list_movies c WHERE c.list_id = l.id))
                  FROM lists l JOIN list_movies lm ON lm.list_id = l.id
-                 WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film) AND l.visibility <> 'private'
+                 WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film) AND l.visibility <> 'private' AND l.is_ranked
                  ORDER BY lm.rank LIMIT 1) AS ranking
          FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
          WHERE f.follower_id = $1 AND f.accepted`,

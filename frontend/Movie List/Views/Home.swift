@@ -27,6 +27,7 @@ struct Home: View {
     @State private var sharingList: CDMovieList? = nil
     // A new list's visibility and the people (by @handle) who'll edit it with the user
     @State private var newListVisibility = ListVisibility.public
+    @State private var newListRanked = true
     @State private var newListEditors: Set<String> = []
     @ObservedObject private var social = SocialStore.shared
     
@@ -274,11 +275,13 @@ private extension Home {
         let editors = Array(newListEditors)
         let newList = CDMovieList(id: Int64(1), name: name, overview: "", context: context)
 
-        APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: true, visibility: visibility) { result in
+        let ranked = newListRanked
+        APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: ranked, visibility: visibility) { result in
             switch result {
             case .success(let serverList):
                 newList.id = serverList.id
                 ListVisibility.remember(visibility, for: serverList.id)
+                ListRanking.remember(ranked, for: serverList.id)
                 try? context.save()
                 inviteEditors(editors, to: serverList.id)
             case .failure(let error):
@@ -312,6 +315,7 @@ private extension Home {
     func resetNewList() {
         listName = ""
         newListVisibility = .public
+        newListRanked = true
         newListEditors = []
     }
 
@@ -359,6 +363,15 @@ private extension Home {
                     TextField("e.g. Christmas Classics", text: $listName)
                         .disableAutocorrection(true)
                         .submitLabel(.done)
+                }
+                .listRowBackground(Theme.surface)
+                Section {
+                    Toggle("Ranked", isOn: $newListRanked)
+                        .tint(Theme.accent)
+                } footer: {
+                    Text(newListRanked
+                         ? "Films are ranked best first, and you'll compare each new one to find its place."
+                         : "Films just go on the end, in no particular order, like a watchlist. Their order isn't treated as a ranking.")
                 }
                 .listRowBackground(Theme.surface)
                 Section {
@@ -457,6 +470,9 @@ private struct ListCard: View {
                     .lineLimit(1)
                 HStack(spacing: 4) {
                     Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
+                    if !ListRanking.isRanked(movieList.id) {
+                        Text("· unranked")
+                    }
                     // Followers is the usual case, so only the other two get a quiet marker
                     let visibility = ListVisibility.of(movieList.id)
                     if ListSharing.shared.isShared(movieList.id) {
@@ -525,6 +541,7 @@ struct EditListSheet: View {
     @State private var name: String
     @State private var overview: String
     @State private var visibility: ListVisibility
+    @State private var ranked: Bool
     @State private var isSaving = false
     @State private var saveFailed = false
 
@@ -533,6 +550,7 @@ struct EditListSheet: View {
         _name = State(initialValue: movieList.name ?? "")
         _overview = State(initialValue: movieList.overview ?? "")
         _visibility = State(initialValue: ListVisibility.of(movieList.id))
+        _ranked = State(initialValue: ListRanking.isRanked(movieList.id))
     }
 
     private var trimmedName: String {
@@ -543,6 +561,7 @@ struct EditListSheet: View {
 
     private var hasChanges: Bool {
         trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "") || visibility != ListVisibility.of(movieList.id)
+            || ranked != ListRanking.isRanked(movieList.id)
     }
 
     var body: some View {
@@ -560,6 +579,15 @@ struct EditListSheet: View {
                     Text("Description")
                 } footer: {
                     Text("Optional. Shown at the top of the list.")
+                }
+                .listRowBackground(Theme.surface)
+                Section {
+                    Toggle("Ranked", isOn: $ranked)
+                        .tint(Theme.accent)
+                } footer: {
+                    Text(ranked
+                         ? "Films are ranked best first."
+                         : "Films are in no particular order. New ones go on the end, and the order isn't treated as a ranking.")
                 }
                 .listRowBackground(Theme.surface)
                 Section {
@@ -604,12 +632,13 @@ struct EditListSheet: View {
 
     private func save() {
         isSaving = true
-        APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview, visibility: visibility) { result in
+        APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview, visibility: visibility, isRanked: ranked) { result in
             isSaving = false
             switch result {
             case .success:
                 Haptics.success()
                 ListVisibility.remember(visibility, for: movieList.id)
+                ListRanking.remember(ranked, for: movieList.id)
                 movieList.name = trimmedName
                 movieList.overview = overview
                 try? context.save()

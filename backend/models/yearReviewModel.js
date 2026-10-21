@@ -35,9 +35,9 @@ async function closestFriend(user_id) {
     // A film they both rank highly, to name in the review
     const example = await pool.query(
         `SELECT m.title FROM movies m
-         JOIN (SELECT lm.movie_id, MIN(lm.rank) AS rank FROM lists l JOIN list_movies lm ON lm.list_id = l.id WHERE l.user_id = $1 GROUP BY 1) a ON a.movie_id = m.id
+         JOIN (SELECT lm.movie_id, MIN(lm.rank) AS rank FROM lists l JOIN list_movies lm ON lm.list_id = l.id WHERE l.user_id = $1 AND l.is_ranked GROUP BY 1) a ON a.movie_id = m.id
          JOIN (SELECT lm.movie_id, MIN(lm.rank) AS rank FROM lists l JOIN list_movies lm ON lm.list_id = l.id
-               WHERE l.user_id = $2 AND ${visibleTo("$1")} GROUP BY 1) b ON b.movie_id = m.id
+               WHERE l.user_id = $2 AND l.is_ranked AND ${visibleTo("$1")} GROUP BY 1) b ON b.movie_id = m.id
          ORDER BY a.rank + b.rank LIMIT 1`,
         [user_id, friend.user_id]
     );
@@ -72,8 +72,8 @@ async function yearReview(user_id, year) {
     }
     const [rewatchedId, rewatchedCount] = [...timesWatched].sort((a, b) => b[1] - a[1])[0] ?? [];
 
-    // The year's film ranked highest in any of the user's lists, relative to the list's length, among lists with
-    // at least 5 films so a 2-film list's #1 doesn't win
+    // The year's film ranked highest in any of the user's ranked lists, relative to the list's length, among lists
+    // with at least 5 films so a 2-film list's #1 doesn't win
     let newFavourite = null;
     if (films.length) {
         const best = await pool.query(
@@ -81,7 +81,7 @@ async function yearReview(user_id, year) {
              FROM lists l
              JOIN (SELECT list_id, COUNT(*)::int AS n FROM list_movies GROUP BY list_id) sizes ON sizes.list_id = l.id
              JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
-             WHERE l.user_id = $1 AND sizes.n >= 5 AND m.tmdb_id = ANY($2::text[])
+             WHERE l.user_id = $1 AND l.is_ranked AND sizes.n >= 5 AND m.tmdb_id = ANY($2::text[])
              ORDER BY lm.rank::float / sizes.n, lm.rank
              LIMIT 1`,
             [user_id, films.map((f) => String(f.tmdb_id))]

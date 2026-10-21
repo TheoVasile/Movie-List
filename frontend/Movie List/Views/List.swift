@@ -192,9 +192,10 @@ struct ListView: View {
                 MovieDetailView(
                     movie: detailMovie,
                     listName: viewModel.movieList.name,
+                    ranked: viewModel.isRanked,
                     onAddToLists: { addingToLists = detailMovie },
-                    onCompare: viewModel.movies.count > 1 ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
-                    onSetRank: { rankFromDetail(detailMovie) { viewModel.showSetRank = true } },
+                    onCompare: viewModel.movies.count > 1 && viewModel.isRanked ? { rankFromDetail(detailMovie) { viewModel.showCompareMovieView = true } } : nil,
+                    onSetRank: viewModel.isRanked ? { rankFromDetail(detailMovie) { viewModel.showSetRank = true } } : nil,
                     onToggleWatched: { viewModel.setWatched(detailMovie, !detailMovie.watched) },
                     onSaveNote: { note, done in viewModel.setNote(detailMovie, note, completion: done) },
                     onApprovePlacement: viewModel.isAIPlaced(detailMovie) ? { viewModel.approvePlacement(detailMovie) } : nil
@@ -247,7 +248,7 @@ private extension ListView {
                         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
                 }
                 if !isFiltering, let spotlight = viewModel.recommendedMovie {
-                    SpotlightCard(movie: spotlight)
+                    SpotlightCard(movie: spotlight, ranked: viewModel.isRanked)
                         // Prefixed so it can't collide with the ranked row of the same movie when scrolling
                         .id("spotlight-\(spotlight.id)")
                         .transition(.asymmetric(
@@ -269,7 +270,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), onAddToLists: { addingToLists = movie }) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), ranked: viewModel.isRanked, onAddToLists: { addingToLists = movie }) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())
@@ -376,6 +377,13 @@ private extension ListView {
             }
             .accessibilityLabel("Watched Options")
             Spacer()
+            // A quiet reminder that the order here isn't a ranking
+            if !viewModel.isRanked {
+                Label("Unranked", systemImage: "circle.grid.2x2")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+                    .accessibilityLabel("Unranked list: the order doesn't matter")
+            }
         }
         .padding(.horizontal, 16)
     }
@@ -680,12 +688,13 @@ private extension ListView {
 
 private struct SpotlightCard: View {
     @ObservedObject var movie: CDMovie
+    var ranked = true
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 16) {
             PosterImage(path: movie.poster_path, cornerRadius: 14, size: .medium)
                 .frame(width: 112, height: 168)
-                .overlay(alignment: .topLeading) { rankBadge }
+                .overlay(alignment: .topLeading) { if ranked { rankBadge } }
                 .shadow(color: Theme.shadow.opacity(0.6), radius: 14, y: 8)
             VStack(alignment: .leading, spacing: 8) {
                 Label("TONIGHT'S PICK", systemImage: "moon.fill")

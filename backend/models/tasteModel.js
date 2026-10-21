@@ -1,11 +1,11 @@
 const pool = require("../config/db");
 
 // Every film in the user's lists, grouped by list (largest list first) and in rank order, with
-// whether the user has marked it watched. Used to describe the user's taste to the AI. sharedOnly leaves out
+// whether the user has marked it watched, and whether the list is ranked (an unranked list's order means nothing). Used to describe the user's taste to the AI. sharedOnly leaves out
 // private lists, for when the lists are a friend's
 async function fetchListsForTaste(user_id, sharedOnly = false) {
     const result = await pool.query(
-        `SELECT l.id AS list_id, l.name AS list_name, m.title, m.release_date, m.original_language, lm.rank,
+        `SELECT l.id AS list_id, l.name AS list_name, l.is_ranked, m.title, m.release_date, m.original_language, lm.rank,
                 (w.movie_id IS NOT NULL) AS watched
          FROM lists l
          JOIN list_movies lm ON lm.list_id = l.id
@@ -18,7 +18,7 @@ async function fetchListsForTaste(user_id, sharedOnly = false) {
     const lists = new Map();
     for (const row of result.rows) {
         if (!lists.has(row.list_id)) {
-            lists.set(row.list_id, { id: row.list_id, name: row.list_name, films: [] });
+            lists.set(row.list_id, { id: row.list_id, name: row.list_name, ranked: row.is_ranked !== false, films: [] });
         }
         lists.get(row.list_id).films.push({
             title: row.title,
@@ -57,15 +57,15 @@ async function fetchFriend(user_id, handle) {
     return result.rows[0] ?? null;
 }
 
-// The films that best show someone's taste: the top of their biggest list that isn't a watchlist (and, with
-// sharedOnly, isn't private)
+// The films that best show someone's taste: the top of their biggest ranked list that isn't a watchlist (and,
+// with sharedOnly, isn't private). Unranked lists are left out, since their order isn't a ranking
 async function fetchTopFilms(user_id, limit, sharedOnly = false) {
     const result = await pool.query(
         `SELECT m.tmdb_id, m.title
          FROM list_movies lm JOIN movies m ON m.id = lm.movie_id
          WHERE lm.list_id = (
              SELECT l.id FROM lists l JOIN list_movies c ON c.list_id = l.id
-             WHERE l.user_id = $1 AND l.name NOT ILIKE '%watch%' AND (NOT $3 OR l.visibility <> 'private')
+             WHERE l.user_id = $1 AND l.is_ranked AND l.name NOT ILIKE '%watch%' AND (NOT $3 OR l.visibility <> 'private')
              GROUP BY l.id ORDER BY COUNT(*) DESC LIMIT 1
          )
          ORDER BY lm.rank NULLS LAST
