@@ -186,11 +186,13 @@ const createTables = async () => {
             -- Who can see a list: everyone signed in (public), the owner's accepted followers (followers, how all
             -- lists worked before), or only the owner (private)
             ALTER TABLE lists ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) NOT NULL DEFAULT 'followers';
+            -- New lists start public; lists made before keep the visibility they have
+            ALTER TABLE lists ALTER COLUMN visibility SET DEFAULT 'public';
 
             -- When a film was added, for friends' activity. Films added before this was kept have none
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS added_at TIMESTAMP;
             ALTER TABLE list_movies ALTER COLUMN added_at SET DEFAULT CURRENT_TIMESTAMP;
-            -- Placed by Smart Placement (Claude) rather than by the user. Cleared when the user approves the
+            -- Placed by Smart Placement (AI) rather than by the user. Cleared when the user approves the
             -- spot or moves the film themselves
             ALTER TABLE list_movies ADD COLUMN IF NOT EXISTS ai_placed BOOLEAN NOT NULL DEFAULT false;
             -- Who added a film, for shared lists. Null for films added before lists could be shared

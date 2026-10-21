@@ -77,6 +77,37 @@ async function leaveOrDeleteGroup(user_id, group_id) {
     return left.rowCount > 0;
 }
 
+/// The owner adds people they follow to the group, up to MAX_MEMBERS. Returns the account ids added, or null when
+/// the user doesn't own the group
+async function addGroupMembers(user_id, group_id, handles) {
+    const group = await pool.query("SELECT 1 FROM watch_groups WHERE id = $1 AND owner_id = $2", [group_id, user_id]);
+    if (!group.rowCount) return null;
+    const current = await pool.query("SELECT user_id FROM watch_group_members WHERE group_id = $1", [group_id]);
+    const already = new Set(current.rows.map((r) => r.user_id));
+    const room = MAX_MEMBERS - already.size;
+    const added = (await followedByHandle(user_id, handles))
+        .filter((m) => m.firebase_uid !== user_id && !already.has(m.firebase_uid))
+        .slice(0, Math.max(0, room));
+    if (added.length) {
+        await pool.query(
+            "INSERT INTO watch_group_members (group_id, user_id) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING",
+            [group_id, added.map((m) => m.firebase_uid)]
+        );
+    }
+    return added.map((m) => m.firebase_uid);
+}
+
+/// The owner removes someone from the group by @handle. Returns false when the user doesn't own the group or
+/// the person isn't in it
+async function removeGroupMember(user_id, group_id, handle) {
+    const result = await pool.query(
+        `DELETE FROM watch_group_members m USING watch_groups g, users u
+         WHERE m.group_id = g.id AND g.id = $1 AND g.owner_id = $2 AND m.user_id = u.firebase_uid AND u.handle = $3`,
+        [group_id, user_id, handle]
+    );
+    return result.rowCount > 0;
+}
+
 /// Everyone in a group except the user, as { firebase_uid, handle, name, ai_allowed }, with the user's own
 /// ai_allowed. null when the user isn't in the group
 async function groupParticipants(user_id, group_id) {
@@ -91,4 +122,4 @@ async function groupParticipants(user_id, group_id) {
     return result.rows;
 }
 
-module.exports = { MAX_MEMBERS, followedByHandle, fetchGroups, createGroup, leaveOrDeleteGroup, groupParticipants };
+module.exports = { MAX_MEMBERS, followedByHandle, fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember, groupParticipants };

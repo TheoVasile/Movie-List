@@ -16,7 +16,7 @@ const timers = new Map();
 /// Everyone in the group, as account ids and names. Empty when the group doesn't exist
 async function groupPeople(group_id) {
     const result = await pool.query(
-        `SELECT u.firebase_uid, COALESCE(u.username, u.handle) AS name
+        `SELECT u.firebase_uid, COALESCE('@' || u.handle, u.username) AS name
          FROM watch_groups g
          JOIN users u ON u.firebase_uid = g.owner_id OR u.firebase_uid IN (SELECT user_id FROM watch_group_members WHERE group_id = g.id)
          WHERE g.id = $1`,
@@ -62,7 +62,7 @@ async function currentPoll(user_id, group_id) {
     const people = await groupPeople(group_id);
     if (!people.some((p) => p.firebase_uid === user_id)) return null;
     const found = await pool.query(
-        `SELECT p.id, p.created_by, COALESCE(u.username, u.handle) AS created_by_name, p.created_at, p.closes_at, p.closed_at, p.winner_tmdb_id
+        `SELECT p.id, p.created_by, COALESCE('@' || u.handle, u.username) AS created_by_name, p.created_at, p.closes_at, p.closed_at, p.winner_tmdb_id
          FROM group_polls p LEFT JOIN users u ON u.firebase_uid = p.created_by
          WHERE p.group_id = $1 AND (p.closed_at IS NULL OR p.closed_at > CURRENT_TIMESTAMP - make_interval(hours => $2))
          ORDER BY p.created_at DESC LIMIT 1`,

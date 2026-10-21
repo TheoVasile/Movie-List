@@ -108,8 +108,12 @@ final class SocialStore: ObservableObject {
 
 // MARK: - Username
 
-/// Picks or changes the user's @username, which is how friends find them
+/// Picks or changes the user's @username, which is how friends find them. Required: the account has none yet
+/// and can't be used until it does, so there's no way out but saving one
 struct UsernameSetupView: View {
+    var required = false
+    // Required only: the way out for someone who doesn't want to pick one now
+    var onSignOut: (() -> Void)? = nil
     @ObservedObject private var social = SocialStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var handle = ""
@@ -129,7 +133,9 @@ struct UsernameSetupView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Friends find you by your username, and you find them by theirs.")
+                Text(required
+                     ? "One last step: pick a username. It's how people find you and how you're shown in groups and shared lists."
+                     : "Friends find you by your username, and you find them by theirs.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                 HStack(spacing: 4) {
@@ -160,7 +166,11 @@ struct UsernameSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(social.profile?.handle == nil ? "Not Now" : "Cancel") { dismiss() }
+                    if required {
+                        if let onSignOut { Button("Sign Out", action: onSignOut) }
+                    } else {
+                        Button("Cancel") { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
@@ -173,7 +183,8 @@ struct UsernameSetupView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents(required ? [.large] : [.medium])
+        .interactiveDismissDisabled(required)
         .onAppear {
             handle = social.profile?.handle ?? ""
             focused = true
@@ -278,7 +289,7 @@ struct FollowingSection: View {
     }
 }
 
-/// A person with their @username, and optionally a Follow button
+/// A person by their @username, with their name below, and optionally a Follow button
 struct PersonRow: View {
     @ObservedObject private var social = SocialStore.shared
     let person: UserSummary
@@ -286,16 +297,16 @@ struct PersonRow: View {
 
     private var detail: String {
         if let lists = person.list_count, let films = person.film_count {
-            return "@\(person.handle) · \(lists) \(lists == 1 ? "list" : "lists") · \(films) films"
+            return "\(person.display_name) · \(lists) \(lists == 1 ? "list" : "lists") · \(films) films"
         }
-        return "@\(person.handle)"
+        return person.display_name
     }
 
     var body: some View {
         HStack(spacing: 12) {
             Avatar(name: person.display_name, handle: person.handle, version: person.avatar_version)
             VStack(alignment: .leading, spacing: 2) {
-                Text(person.display_name)
+                Text("@\(person.handle)")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
@@ -351,11 +362,11 @@ struct FollowRequestRow: View {
         HStack(spacing: 12) {
             Avatar(name: person.display_name, handle: person.handle, version: person.avatar_version)
             VStack(alignment: .leading, spacing: 2) {
-                Text(person.display_name)
+                Text("@\(person.handle)")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
-                Text("@\(person.handle) wants to follow you")
+                Text("\(person.display_name) wants to follow you")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
                     .lineLimit(1)
@@ -691,10 +702,10 @@ struct FriendProfileView: View {
                     Avatar(name: person.display_name, size: 64, handle: person.handle,
                            version: lists?.avatar_version ?? person.avatar_version)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(person.display_name)
+                        Text("@\(person.handle)")
                             .font(.title2.weight(.heavy))
                             .foregroundColor(Theme.textPrimary)
-                        Text("@\(person.handle)")
+                        Text(person.display_name)
                             .font(.subheadline)
                             .foregroundColor(Theme.textSecondary)
                         // Only followers can open these lists
@@ -708,13 +719,13 @@ struct FriendProfileView: View {
                 }
 
                 if social.hasRequested(person.handle) && !social.isFollowing(person.handle) {
-                    Text("Request sent. You'll see \(person.display_name)'s lists, rankings and watched films once they accept.")
+                    Text("Request sent. You'll see @\(person.handle)'s lists, rankings and watched films once they accept.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if !social.isFollowing(person.handle) {
                     Text(lists?.is_private == true
-                         ? "Follow \(person.display_name) to see their lists, rankings and watched films. Their profile is private, so they'll get a request to accept."
-                         : "Follow \(person.display_name) to see their lists, rankings and watched films.")
+                         ? "Follow @\(person.handle) to see their lists, rankings and watched films. Their profile is private, so they'll get a request to accept."
+                         : "Follow @\(person.handle) to see their lists, rankings and watched films.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {
@@ -726,7 +737,7 @@ struct FriendProfileView: View {
                     }
                     ForEach(lists.lists) { list in
                         NavigationLink {
-                            FriendListView(list: list, owner: person.display_name)
+                            FriendListView(list: list, owner: "@\(person.handle)")
                         } label: {
                             friendListCard(list)
                         }
@@ -750,7 +761,7 @@ struct FriendProfileView: View {
                         .padding(.top, 6)
                     ForEach(lists.lists) { list in
                         NavigationLink {
-                            FriendListView(list: list, owner: person.display_name)
+                            FriendListView(list: list, owner: "@\(person.handle)")
                         } label: {
                             friendListCard(list)
                         }
@@ -788,7 +799,7 @@ struct FriendProfileView: View {
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
             } else if !friendAllowsAI {
-                Text("Uses Classic recommendations, since \(person.display_name) hasn't allowed AI features.")
+                Text("Uses Classic recommendations, since @\(person.handle) hasn't allowed AI features.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
             }
@@ -840,6 +851,11 @@ struct FriendListView: View {
     // nil until loaded from the list, then whatever the user last chose
     @State private var followed: Bool? = nil
     @State private var saving = false
+    // The film whose info screen is open, and the one waiting for the user to pick lists to add it to
+    @State private var details: CDMovie? = nil
+    @State private var adding: Movie? = nil
+    @Environment(\.managedObjectContext) private var context
+    @EnvironmentObject private var authViewModel: AuthenticationViewModel
 
     private var isFollowed: Bool { followed ?? list.followed ?? false }
 
@@ -853,31 +869,41 @@ struct FriendListView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(list.movies) { film in
-                HStack(spacing: 12) {
-                    Text("\(film.rank)")
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
-                        .frame(width: 40)
-                        .minimumScaleFactor(0.5)
-                    PosterImage(path: film.poster_path, cornerRadius: 6, size: .small)
-                        .frame(width: 40, height: 60)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(film.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(Theme.textPrimary)
-                            .lineLimit(2)
-                        Text(Theme.year(from: film.release_date))
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
+                Button {
+                    Haptics.tap()
+                    details = PersistenceController.preview(of: film.movie)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text("\(film.rank)")
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(film.rank <= 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+                            .frame(width: 40)
+                            .minimumScaleFactor(0.5)
+                        PosterImage(path: film.poster_path, cornerRadius: 6, size: .small)
+                            .frame(width: 40, height: 60)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(film.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(Theme.textPrimary)
+                                .lineLimit(2)
+                            Text(Theme.year(from: film.release_date))
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if film.watched {
+                            Image(systemName: "eye.fill")
+                                .foregroundColor(Theme.accent)
+                                .accessibilityLabel("\(owner) has watched this")
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(Theme.textTertiary)
                     }
-                    Spacer()
-                    if film.watched {
-                        Image(systemName: "eye.fill")
-                            .foregroundColor(Theme.accent)
-                            .accessibilityLabel("\(owner) has watched this")
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
             }
         }
@@ -885,6 +911,26 @@ struct FriendListView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(list.name)
+        .sheet(item: $details) { preview in
+            // Add to Lists closes the info screen and asks which lists
+            MovieDetailView(movie: preview, onAddToLists: {
+                let film = list.movies.first { Int64($0.tmdb_id) == Int64(preview.tmdb_id) }
+                details = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = film?.movie }
+            })
+        }
+        .sheet(item: $adding) { movie in
+            ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
+                for chosen in lists {
+                    chosen.addMovie(movie, context: context) { _ in }
+                }
+                if !lists.isEmpty { Haptics.success() }
+            }
+            .environmentObject(authViewModel)
+            .environment(\.managedObjectContext, context)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .toolbar {
             // Following a list adds films added to it to the daily digest
             if list.owner_handle != SocialStore.shared.profile?.handle {
@@ -944,7 +990,7 @@ struct FollowedListsSection: View {
                         .foregroundColor(Theme.textPrimary)
                     ForEach(store.lists) { list in
                         NavigationLink {
-                            FriendListView(list: list, owner: list.owner_name ?? "")
+                            FriendListView(list: list, owner: list.owner_handle.map { "@\($0)" } ?? list.owner_name ?? "")
                         } label: {
                             HStack(spacing: 12) {
                                 PosterImage(path: list.movies.first?.poster_path, cornerRadius: 6, size: .small)
@@ -954,7 +1000,7 @@ struct FollowedListsSection: View {
                                         .font(.headline)
                                         .foregroundColor(Theme.textPrimary)
                                         .lineLimit(1)
-                                    Text("by \(list.owner_name ?? "someone") · \(list.movies.count) films")
+                                    Text("by \(list.owner_handle.map { "@\($0)" } ?? list.owner_name ?? "someone") · \(list.movies.count) films")
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                         .lineLimit(1)
@@ -994,7 +1040,7 @@ struct FriendTakesSection: View {
                             Avatar(name: take.display_name, size: 34, handle: take.handle, version: take.avatar_version)
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
-                                    Text(take.display_name)
+                                    Text("@\(take.handle)")
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundColor(Theme.textPrimary)
                                     if take.watched {

@@ -315,7 +315,7 @@ struct YearSlideView: View {
                 Spacer()
             }
             .padding(.vertical, 12)
-            headline("\(friend.display_name) has the closest taste to yours")
+            headline("@\(friend.handle) has the closest taste to yours")
             Text("\(friend.shared) films in common\(friend.example_title.map { ", including \($0)" } ?? "").")
                 .font(.title3.weight(.semibold))
                 .foregroundColor(Theme.textSecondary)

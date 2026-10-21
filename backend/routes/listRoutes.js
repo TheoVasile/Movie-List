@@ -13,11 +13,16 @@ const router = express.Router();
 
 router.post("/create", async (req, res) => {
     try {
-        const { name, overview, is_ranked } = req.body;
+        const { name, overview, is_ranked, visibility } = req.body;
         if (!name) {
             return res.status(400).json({ error: "Name is required." });
         }
-        const newList = await createList(req.user.uid, name, overview, is_ranked);
+        if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
+            return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
+        }
+        // Only followers can see a private profile's lists, so a public one starts followers-only instead
+        const allowed = (visibility ?? "public") === "public" && (await isPrivate(req.user.uid)) ? "followers" : visibility;
+        const newList = await createList(req.user.uid, name, overview, is_ranked, allowed);
         res.status(201).json(newList);
     } catch (error) {
         console.error("Error creating list:", error);
@@ -89,7 +94,7 @@ router.post("/:id/editors", requireListOwner((req) => req.params.id), async (req
             case "full": return res.status(400).json({ error: `A list can have at most ${MAX_EDITORS} editors.` });
             case "already": return res.status(409).json({ error: "They can already edit this list." });
         }
-        const me = await pool.query("SELECT COALESCE(username, handle) AS name FROM users WHERE firebase_uid = $1", [req.user.uid]);
+        const me = await pool.query("SELECT COALESCE('@' || handle, username) AS name FROM users WHERE firebase_uid = $1", [req.user.uid]);
         await notifyUser(result.editor_id, "list_invite", {
             title: "New shared list",
             body: `${me.rows[0]?.name ?? "A friend"} added you to "${result.list_name}". You can add and rank films in it.`,
