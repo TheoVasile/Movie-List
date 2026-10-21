@@ -15,6 +15,8 @@ struct ListRequest: Codable {
     let name: String
     let overview: String
     let is_ranked: Bool
+    // "public", "followers" or "private"; left out, the server makes it public
+    var visibility: String? = nil
 }
 
 struct ListResponse: Codable {
@@ -326,6 +328,8 @@ struct UserSummary: Decodable, Identifiable, Hashable {
     let film_count: Int?
     // When their profile picture last changed; nil when they don't have one
     let avatar_version: Double?
+    // Only in a movie night group: whether they made it
+    var is_owner: Bool? = nil
 }
 
 /// A followed person's lists, read-only. lists is empty when the user doesn't follow them
@@ -644,6 +648,17 @@ class APIService {
 
     func fetchFollowedLists(completion: @escaping (Result<[FriendLists.List], Error>) -> Void) {
         sendJSON("GET", "/users/me/followed-lists", completion: completion)
+    }
+
+    /// The group's owner adds people they follow. Calls back with the group as it is now
+    func addGroupMembers(_ groupID: Int64, handles: [String], completion: @escaping (Result<MovieGroup, Error>) -> Void) {
+        sendJSON("POST", "/users/me/groups/\(groupID)/members", body: ["handles": handles], completion: completion)
+    }
+
+    /// The group's owner removes someone. Calls back with the group as it is now
+    func removeGroupMember(_ groupID: Int64, handle: String, completion: @escaping (Result<MovieGroup, Error>) -> Void) {
+        let who = handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle
+        sendJSON("DELETE", "/users/me/groups/\(groupID)/members/\(who)", completion: completion)
     }
 
     /// The user's Year in Review for a year
@@ -1307,7 +1322,7 @@ class APIService {
 
     private struct Placement: Decodable { let rank: Int; let reason: String }
 
-    /// Smart Placement: Claude decides where a film already in the list belongs, and the server moves it there.
+    /// Smart Placement: the AI decides where a film already in the list belongs, and the server moves it there.
     /// Calls back with the new rank and why, or an error whose code is the HTTP status
     func smartPlace(listID: Int64, movieID: Int64, completion: @escaping (Result<(rank: Int, reason: String), Error>) -> Void) {
         sendJSON("POST", "/movies/smart-place", body: ["list_id": listID, "movie_id": movieID]) { (result: Result<Placement, Error>) in
@@ -1480,14 +1495,15 @@ class APIService {
         }
     }
 
-    func createList(userID: String, name: String, overview: String, isRanked: Bool, completion: @escaping (Result<ListResponse, Error>) -> Void) {
+    func createList(userID: String, name: String, overview: String, isRanked: Bool, visibility: ListVisibility = .public,
+                    completion: @escaping (Result<ListResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/lists/create") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body = ListRequest(user_id: userID, name: name, overview: overview, is_ranked: isRanked)
+        let body = ListRequest(user_id: userID, name: name, overview: overview, is_ranked: isRanked, visibility: visibility.rawValue)
 
         do {
             request.httpBody = try JSONEncoder().encode(body)

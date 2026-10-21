@@ -23,7 +23,7 @@ struct CompareMovieView: View {
     var onCancel: (() -> Void)?
     var prompt: String
     var cancelTitle: String
-    // Offered when adding a film: let Claude choose its place instead of comparing
+    // Offered when adding a film: let the AI choose its place instead of comparing
     var onSmartPlace: (() -> Void)?
 
     private enum Side { case selected, other }
@@ -66,7 +66,7 @@ struct CompareMovieView: View {
             }
             if let onSmartPlace {
                 Button(action: onSmartPlace) {
-                    Label("Let Claude place it", systemImage: "sparkles")
+                    Label("Let AI place it", systemImage: "sparkles")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.accentGradient)
                 }

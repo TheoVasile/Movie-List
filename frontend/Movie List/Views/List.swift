@@ -453,7 +453,7 @@ private extension ListView {
     var genreFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // Only offered while some films were placed by Claude and not yet approved
+                // Only offered while some films were placed by the AI and not yet approved
                 if viewModel.hasAIPlacedFilms || viewModel.showAIPlacedOnly {
                     Button {
                         Haptics.tap()

@@ -14,7 +14,7 @@ struct MovieRow: View {
     @Binding var selectedMovie: CDMovie?
     @Binding var showSetRank: Bool
     var info: MovieInfo? = nil
-    // Placed by Claude rather than by hand, shown as a faint mark on the rank
+    // Placed by the AI rather than by hand, shown as a faint mark on the rank
     var aiPlaced = false
     // On shared lists, who added it when it wasn't the user
     var addedBy: String? = nil
@@ -37,7 +37,7 @@ struct MovieRow: View {
                             .padding(3)
                             .background(Theme.surface.opacity(0.85), in: Circle())
                             .offset(x: 4, y: 4)
-                            .accessibilityLabel("Placed by Claude")
+                            .accessibilityLabel("Placed by AI")
                     }
                 }
             VStack(alignment: .leading, spacing: 6) {

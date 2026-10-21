@@ -240,10 +240,10 @@ async function findOnTmdb(title, year) {
 
 const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": "They/Them" };
 
-// Films for the Discover tab chosen by Claude from everything in the user's lists, plus their Discover
+// Films for the Discover tab chosen by the AI from everything in the user's lists, plus their Discover
 // swipes and anything they chose to share (age range, pronouns) for when their lists are empty.
 // Answers 503 when AI isn't set up and 429 at the daily limit, so the app can fall back to /discover.
-// With "Accept: application/x-ndjson" the films stream back one JSON object per line as Claude picks them,
+// With "Accept: application/x-ndjson" the films stream back one JSON object per line as the AI picks them,
 // so the first card shows in seconds; otherwise (builds from before streaming) they come as one array
 // How many of each person's favourites seed Classic movie night picks, how many picks can come from any one
 // favourite (so one shared love doesn't fill the list), and how many TMDb votes a pick needs
@@ -336,7 +336,7 @@ async function classicMovieNight(people, count, filters, genres) {
 // Films the user and the people coming would all enjoy. Either a saved group ({ "group_id": 3 }) or people
 // the user follows ({ "handles": ["sam", "ana"] }, or the older { "handle": "sam" }), with optional
 // { "mode": "classic", "languages", "providers", "provider_names", "region", "genres": [ids], "genre_names" }.
-// "ai" (the default) asks Claude and needs everyone, the user included, to allow AI; "classic" uses TMDb
+// "ai" (the default) asks the AI and needs everyone, the user included, to allow AI; "classic" uses TMDb
 router.post("/movie-night", async (req, res) => {
     try {
         const body = req.body ?? {};
@@ -463,8 +463,8 @@ router.post("/ai-discover", async (req, res) => {
         if (chosenLists.length) signals.basedOnLists = chosenLists.map((list) => list.name);
         const streaming = req.accepts(["application/json", "application/x-ndjson"]) === "application/x-ndjson";
 
-        // Each pick is looked up on TMDb as soon as Claude writes it, so lookups overlap with the rest of the
-        // answer. Films are sent in Claude's order (it balances close matches with adventurous picks): a film
+        // Each pick is looked up on TMDb as soon as the AI writes it, so lookups overlap with the rest of the
+        // answer. Films are sent in the AI's order (it balances close matches with adventurous picks): a film
         // waits only for the lookups of the picks before it
         const lookup = createLimiter(10);
         const found = [];
@@ -543,7 +543,7 @@ router.post("/create", async (req, res) => {
     }
 });
 
-// Smart Placement: asks Claude where a film already in the user's list belongs, moves it there and marks it as
+// Smart Placement: asks the AI where a film already in the user's list belongs, moves it there and marks it as
 // placed by AI, e.g. { "list_id": 3, "movie_id": 120 } -> { rank, reason }. Needs the user to allow AI
 router.post("/smart-place", editsBodyList, async (req, res) => {
     try {

@@ -168,8 +168,8 @@ function createPickParser(onPick) {
     };
 }
 
-/// Asks Claude for films this user is likely to enjoy, streaming the answer. onPick, if given, gets each
-/// { title, year, reason } as soon as Claude has written it; the full list is also returned at the end.
+/// Asks the AI for films this user is likely to enjoy, streaming the answer. onPick, if given, gets each
+/// { title, year, reason } as soon as the AI has written it; the full list is also returned at the end.
 /// Fails before any pick arrives if AI isn't set up, the daily limit is reached, or the request fails
 async function recommendFilms(user_id, lists, signals, count, onPick = () => {}) {
     const anthropic = getClient();
@@ -221,7 +221,7 @@ For each film give its exact original release title as listed on TMDb, its relea
 // Everyone's lists together are cut to about this many films, so a movie night stays around half a cent
 const MOVIE_NIGHT_TOTAL_FILMS = 4000;
 
-/// Asks Claude for films a group would all enjoy and none of them has in their lists. people is
+/// Asks the AI for films a group would all enjoy and none of them has in their lists. people is
 /// [{ name, lists }], the first being the user ("you"). constraints may limit genres, languages and streaming
 /// services. Returns [{ title, year, reason }]. Counts against the user's daily limit
 async function recommendForGroup(user_id, people, count, constraints = {}) {
@@ -284,7 +284,7 @@ const PLACEMENT_SCHEMA = {
     additionalProperties: false,
 };
 
-/// Asks Claude where a film belongs in one of the user's ranked lists. films is the list in rank order (without
+/// Asks the AI where a film belongs in one of the user's ranked lists. films is the list in rank order (without
 /// the new film), as { title, year }. Returns { rank, reason } with rank clamped to 1...films.length + 1
 async function placeInList(user_id, listName, films, newFilm) {
     const anthropic = getClient();
