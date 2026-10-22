@@ -38,6 +38,7 @@ struct ListView: View {
     @ObservedObject private var movieList: CDMovieList
     // Active while the user drags films into a new order
     @State private var editMode: EditMode = .inactive
+    @State private var confirmingRatingSort = false
     @State private var editingDetails = false
     // Who's on the list, for shared lists and inviting people
     @ObservedObject private var sharing = ListSharing.shared
@@ -147,6 +148,19 @@ struct ListView: View {
                     }
                     .bold()
                 }
+                // A quick way to start from TMDb's order instead of dragging every film
+                ToolbarItem(placement: .topBarTrailing) {
+                    if viewModel.isSorting {
+                        ProgressView()
+                    } else {
+                        Button {
+                            confirmingRatingSort = true
+                        } label: {
+                            Label("Sort by TMDb Rating", systemImage: "star.leadinghalf.filled")
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
+                }
             } else {
                 // In the navigation bar, so they stay put while the list scrolls. One item that can't shrink rather
                 // than three: iOS folds separate items into a ••• menu when a long list name leaves no room, but
@@ -167,6 +181,15 @@ struct ListView: View {
                 dismiss()
             }
             .presentationDetents([.medium, .large])
+        }
+        .confirmationDialog("Sort by TMDb rating?", isPresented: $confirmingRatingSort, titleVisibility: .visible) {
+            Button("Sort, Highest Rated First") {
+                Haptics.success()
+                viewModel.sortByRating()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This replaces the current order of all \(viewModel.movies.count) films. You can still drag films afterwards.")
         }
         .alert("Couldn't save the new order", isPresented: $viewModel.reorderFailed) {
             Button("OK", role: .cancel) {}
