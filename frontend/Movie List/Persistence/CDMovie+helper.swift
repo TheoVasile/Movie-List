@@ -35,6 +35,9 @@ extension CDMovie {
         self.init(id: id, tmdb_id: tmdb_id, title: title, release_date: formattedDate, overview: overview, rank: rank, poster_path: poster_path, original_language: original_language, popularity: popularity, context: context)
     }
     
+    /// TV shows are stored with negative TMDb ids, since TMDb's film and TV ids overlap
+    var isTV: Bool { tmdb_id < 0 }
+
     func get_date() -> String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd" // Ensures only the date is shown

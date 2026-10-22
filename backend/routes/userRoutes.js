@@ -552,8 +552,9 @@ router.get("/:handle/following", (req, res) => sendConnections(req, res, "follow
 
 // What the people the user follows think of a film: watched, note and best list placing, e.g. /me/following/films/771
 router.get("/me/following/films/:tmdb_id", async (req, res) => {
+    // Negative for a TV show (services/tmdbMedia.js)
     const tmdbId = Number(req.params.tmdb_id);
-    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    if (!Number.isInteger(tmdbId) || tmdbId === 0) {
         return res.status(400).json({ error: "A TMDb id is required." });
     }
     try {

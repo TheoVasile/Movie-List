@@ -5,7 +5,7 @@ const pool = require("../config/db");
 // private lists, for when the lists are a friend's
 async function fetchListsForTaste(user_id, sharedOnly = false) {
     const result = await pool.query(
-        `SELECT l.id AS list_id, l.name AS list_name, l.is_ranked, m.title, m.release_date, m.original_language, lm.rank,
+        `SELECT l.id AS list_id, l.name AS list_name, l.is_ranked, m.tmdb_id, m.title, m.release_date, m.original_language, lm.rank,
                 (w.movie_id IS NOT NULL) AS watched
          FROM lists l
          JOIN list_movies lm ON lm.list_id = l.id
@@ -25,6 +25,8 @@ async function fetchListsForTaste(user_id, sharedOnly = false) {
             year: String(row.release_date ?? "").slice(0, 4),
             language: row.original_language ?? "",
             watched: row.watched,
+            // TV shows are stored with negative ids (services/tmdbMedia.js)
+            tv: Number(row.tmdb_id) < 0,
         });
     }
     return [...lists.values()].sort((a, b) => b.films.length - a.films.length);

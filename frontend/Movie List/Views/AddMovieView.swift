@@ -26,7 +26,7 @@ struct AddMovieView: View {
                     results
                 }
             }
-            .navigationTitle("Add a Film")
+            .navigationTitle("Add a Movie or Show")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -48,7 +48,7 @@ struct AddMovieView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(Theme.textSecondary)
-            TextField("Search movies...", text: $viewModel.newMovieSearchText)
+            TextField("Search movies and TV shows…", text: $viewModel.newMovieSearchText)
                 .focused($searchFocused)
                 .disableAutocorrection(true)
                 .submitLabel(.search)
@@ -126,9 +126,14 @@ struct AddMovieView: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                Text(Theme.year(from: apiMovie.release_date))
-                    .font(.caption2)
-                    .foregroundColor(Theme.textSecondary)
+                HStack(spacing: 4) {
+                    if apiMovie.isTV {
+                        TVBadge()
+                    }
+                    Text(Theme.year(from: apiMovie.release_date))
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
             }
         }
         .buttonStyle(PressableButtonStyle())

@@ -79,6 +79,29 @@ enum Personalization {
 
 /// What Discover is limited to, beyond genres: films in some languages, streaming on some services, or
 /// recommended from one list only. Kept on this device
+/// What Discover deals: films, TV shows or both
+enum DiscoverKind: String, CaseIterable, Identifiable {
+    case all, movie, tv
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "Movies & TV"
+        case .movie: return "Movies"
+        case .tv: return "TV Shows"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: return "rectangle.stack"
+        case .movie: return "film"
+        case .tv: return "tv"
+        }
+    }
+}
+
 struct DiscoverFilters: Codable, Equatable {
     var languages: [String] = []
     var services: [StreamingService] = []
@@ -254,6 +277,7 @@ class DiscoverViewModel: ObservableObject {
     // Genres the user chose to see; empty means automatic, tuned to their taste. Kept across launches
     @Published private(set) var genreFilter: Set<Int>
     @Published private(set) var filters: DiscoverFilters
+    @Published private(set) var kind: DiscoverKind
     // The genres the lists Discover is based on have most of, top first. Used as Automatic's genres until the
     // swipes have taught it some
     @Published private(set) var listGenres: [Int] = []
@@ -265,6 +289,9 @@ class DiscoverViewModel: ObservableObject {
     private static let dislikedKey = "discover.dislikedMovieIDs"
     private static let genreFilterKey = "discover.genreFilter"
     private static let filtersKey = "discover.filters"
+    private static let kindKey = "discover.kind"
+    // With AI Picks and Movies & TV, whether the next batch is TV shows from TMDb
+    private var tvTurn = false
     private static let profileKey = "discover.tasteProfile"
     private static let maxPages = 30
     private static let deckKey = "discover.savedDeck"
@@ -279,6 +306,7 @@ class DiscoverViewModel: ObservableObject {
         genreFilter = Set(UserDefaults.standard.array(forKey: Self.genreFilterKey) as? [Int] ?? [])
         filters = UserDefaults.standard.data(forKey: Self.filtersKey)
             .flatMap { try? JSONDecoder().decode(DiscoverFilters.self, from: $0) } ?? DiscoverFilters()
+        kind = UserDefaults.standard.string(forKey: Self.kindKey).flatMap(DiscoverKind.init) ?? .all
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
         // The cards left last time, minus any since skipped or disliked; ones added to a list go once the lists sync
@@ -392,7 +420,7 @@ class DiscoverViewModel: ObservableObject {
 
     /// AI picks take a few seconds to start arriving, so the next batch is fetched while plenty of cards remain
     private var refillThreshold: Int {
-        Personalization.useAI && aiAvailable ? 12 : 5
+        usesAI ? 12 : 5
     }
 
     private func saveDeck() {
@@ -450,6 +478,19 @@ class DiscoverViewModel: ObservableObject {
             UserDefaults.standard.set(data, forKey: Self.filtersKey)
         }
         sourceChanged()
+    }
+
+    /// Switches between films, TV shows or both. Starts the deck over
+    func setKind(_ newKind: DiscoverKind) {
+        guard newKind != kind else { return }
+        kind = newKind
+        UserDefaults.standard.set(newKind.rawValue, forKey: Self.kindKey)
+        sourceChanged()
+    }
+
+    /// AI Picks are films only, so TV Shows always come from TMDb
+    var usesAI: Bool {
+        Personalization.useAI && aiAvailable && kind != .tv
     }
 
     /// Starts the deck over after switching between AI picks and TMDb recommendations
@@ -528,16 +569,25 @@ class DiscoverViewModel: ObservableObject {
 
     private func loadMore() {
         guard !isLoading, !isExhausted, !loadFailed else { return }
-        if Personalization.useAI && aiAvailable {
-            loadFromAI()
+        if usesAI {
+            // AI Picks are films, so with Movies & TV every other batch is shows from TMDb
+            if kind == .all && tvTurn {
+                tvTurn = false
+                loadFromTMDb(kind: .tv)
+            } else {
+                tvTurn = kind == .all
+                loadFromAI()
+            }
         } else {
-            loadFromTMDb()
+            loadFromTMDb(kind: kind)
         }
     }
 
     private func isFresh(_ movie: Movie) -> Bool {
         !listedIDs.contains(movie.id) && !passedIDs.contains(movie.id) && !dislikedIDs.contains(movie.id) && !shownIDs.contains(movie.id)
             && !deck.contains { $0.id == movie.id }
+            // A deck saved before switching to films or shows
+            && (kind == .all || movie.isTV == (kind == .tv))
             // The server and the AI are asked for these genres and languages too; this catches any that slip through
             && (genreFilter.isEmpty || !genreFilter.isDisjoint(with: movie.genre_ids ?? []))
             && (filters.languages.isEmpty || filters.languages.contains(movie.original_language))
@@ -604,12 +654,13 @@ class DiscoverViewModel: ObservableObject {
         }
     }
 
-    private func loadFromTMDb() {
+    private func loadFromTMDb(kind: DiscoverKind) {
         isLoading = true
         // A chosen genre beats a learned dislike of it
         let chosen = !genreFilter.isEmpty
         APIService.shared.discoverMovies(
             seeds: nextSeeds(),
+            kind: kind,
             genres: chosen ? genreFilter.sorted() : automaticGenres,
             avoidGenres: profile.avoidedGenres.filter { !genreFilter.contains($0) },
             onlyGenres: chosen,

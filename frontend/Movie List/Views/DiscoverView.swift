@@ -36,6 +36,7 @@ struct DiscoverView: View {
     // Genres ticked in the picker, applied when it closes with Done
     @State private var draftGenres: Set<Int> = []
     @State private var draftFilters = DiscoverFilters()
+    @State private var draftKind = DiscoverKind.all
     // Streaming services in the user's country, loaded when the filters open
     @State private var services: [StreamingService] = []
     // Quick Add sends swiped-right films straight to one list, without asking which list or where they rank
@@ -99,47 +100,63 @@ struct DiscoverView: View {
                     .accessibilityHint("Brings back the last card you skipped")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    // Three lines, each opening its own choices, so the menu stays short
                     Menu {
                         Section(sourceDescription) {
                             // Only offered once AI is allowed in Settings; until then it shows Classic
-                            Picker("Recommendations", selection: Binding(get: { canUseAI && useAI }, set: { useAI = $0 })) {
+                            Picker(selection: Binding(get: { canUseAI && useAI }, set: { useAI = $0 })) {
                                 Label("AI Picks", systemImage: "brain").tag(true)
                                 Label("Classic (TMDb)", systemImage: "film.stack").tag(false)
+                            } label: {
+                                Label("Recommendations", systemImage: "wand.and.stars")
                             }
+                            .pickerStyle(.menu)
                             .disabled(!canUseAI)
                         }
-                        Section("Adding Films") {
+                        Menu {
                             Picker("When You Add a Film", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
                                 Label("Ask Each Time", systemImage: "list.bullet").tag(false)
                                 Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
                             }
-                            if let list = quickAddList, ListRanking.isRanked(list.id) {
-                                Picker("Placement", selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
-                                    Label("Add to the Bottom", systemImage: "arrow.down.to.line").tag(false)
-                                    Label("Let AI Place It", systemImage: "sparkles").tag(true)
+                            .pickerStyle(.inline)
+                            if let list = quickAddList {
+                                if ListRanking.isRanked(list.id) {
+                                    Picker(selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
+                                        Label("At the Bottom", systemImage: "arrow.down.to.line").tag(false)
+                                        Label("Where AI Places It", systemImage: "sparkles").tag(true)
+                                    } label: {
+                                        Label("Placement", systemImage: "list.number")
+                                    }
+                                    .pickerStyle(.menu)
+                                    .disabled(!canUseAI)
                                 }
-                                .disabled(!canUseAI)
-                            }
-                            if quickAddList != nil {
                                 Button {
                                     choosingQuickAddList = true
                                 } label: {
-                                    Label("Change Quick Add List…", systemImage: "arrow.left.arrow.right")
+                                    Label("Change List…", systemImage: "arrow.left.arrow.right")
                                 }
                             }
+                        } label: {
+                            Label("Adding Films", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
+                            Text(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Ask Each Time")
                         }
-                        Section(profileDescription) {
-                            Button {
-                                withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
-                            } label: {
-                                Label("Show Skipped Films Again", systemImage: "arrow.counterclockwise")
+                        Menu {
+                            Section(profileDescription) {
+                                Button {
+                                    withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
+                                } label: {
+                                    Label("Show Skipped Again", systemImage: "arrow.counterclockwise")
+                                }
+                                Button(role: .destructive) {
+                                    withAnimation(Theme.spring) { viewModel.resetProfile() }
+                                } label: {
+                                    Label("Reset Taste Profile", systemImage: "trash")
+                                }
+                                .disabled(viewModel.profile.swipeCount == 0)
                             }
-                            Button(role: .destructive) {
-                                withAnimation(Theme.spring) { viewModel.resetProfile() }
-                            } label: {
-                                Label("Reset Taste Profile", systemImage: "trash")
-                            }
-                            .disabled(viewModel.profile.swipeCount == 0)
+                        } label: {
+                            Label("Taste Profile", systemImage: "person.crop.circle.badge.checkmark")
+                            Text(profileDescription)
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -292,7 +309,12 @@ private extension DiscoverView {
         if !useAI {
             return "Recommended by TMDb from your lists"
         }
-        return viewModel.aiAvailable ? "Picked by AI from your lists and swipes" : "AI picks unavailable, using TMDb for now"
+        guard viewModel.aiAvailable else { return "AI picks unavailable, using TMDb for now" }
+        switch viewModel.kind {
+        case .movie: return "Picked by AI from your lists and swipes"
+        case .all: return "Films picked by AI, TV shows by TMDb"
+        case .tv: return "AI Picks are films only, so TV shows come from TMDb"
+        }
     }
 
     // Sparkles mark AI recommendations, so they only appear while AI Picks is the chosen source
@@ -313,10 +335,11 @@ private extension DiscoverView {
             Haptics.tap()
             draftGenres = viewModel.genreFilter
             draftFilters = viewModel.filters
+            draftKind = viewModel.kind
             showGenrePicker = true
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: showingAIPicks ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
+                Image(systemName: showingAIPicks && viewModel.kind != .tv ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
                     .foregroundStyle(Theme.accentGradient)
                 Text(genreSummary)
                     .foregroundColor(Theme.textSecondary)
@@ -339,6 +362,7 @@ private extension DiscoverView {
 
     var genreSummary: String {
         var parts: [String] = []
+        if viewModel.kind != .all { parts.append(viewModel.kind.title) }
         if !viewModel.filters.listNames.isEmpty { parts.append("From " + viewModel.filters.listNames.joined(separator: ", ")) }
         if !viewModel.genreFilter.isEmpty {
             parts.append(Self.genreName(viewModel.genreFilter.sorted { Self.genreName($0) < Self.genreName($1) }))
@@ -370,6 +394,15 @@ private extension DiscoverView {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    filterSection("SHOW") {
+                        Picker("Show", selection: $draftKind) {
+                            ForEach(DiscoverKind.allCases) { kind in
+                                Text(kind.title).tag(kind)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
                     filterSection("BASED ON") {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
                             filterChip("All My Lists", selected: draftFilters.listIDs.isEmpty) {
@@ -469,6 +502,7 @@ private extension DiscoverView {
                             viewModel.update(listedIDs: listedIDs, seedPool: seedPool(for: draftFilters.listIDs))
                             viewModel.setFilters(draftFilters)
                             viewModel.setGenreFilter(draftGenres)
+                            viewModel.setKind(draftKind)
                         }
                     }
                     .bold()
@@ -938,7 +972,7 @@ private extension DiscoverView {
         let lists = listIDs.isEmpty ? Array(movieLists) : movieLists.filter { listIDs.contains($0.id) }
         for list in lists {
             let ranked = list.movies.sorted { $0.rank < $1.rank }
-            for (index, movie) in ranked.enumerated() where movie.tmdb_id > 0 {
+            for (index, movie) in ranked.enumerated() where movie.tmdb_id != 0 {
                 let weight = Double(ranked.count - index) / Double(ranked.count)
                 // A film in several lists counts with its best placing
                 weights[Int64(movie.tmdb_id)] = max(weights[Int64(movie.tmdb_id)] ?? 0, weight)
@@ -977,6 +1011,9 @@ private struct DiscoverCard: View {
     private var info: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
+                if movie.isTV {
+                    MetaChip(icon: "tv", text: "TV Series", onPoster: true)
+                }
                 if let rating = movie.vote_average, rating > 0 {
                     MetaChip(icon: "star.fill", text: String(format: "%.1f", rating), onPoster: true)
                 }

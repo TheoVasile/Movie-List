@@ -16,7 +16,7 @@ final class TrailerStore {
 
     /// Calls back on the main thread, straight away if cached; nothing happens when the lookup fails
     func load(tmdbID: Int64, completion: @escaping (Trailer) -> Void) {
-        guard tmdbID > 0 else { return }
+        guard tmdbID != 0 else { return }
         if let cached = cache[tmdbID] {
             completion(cached)
             return

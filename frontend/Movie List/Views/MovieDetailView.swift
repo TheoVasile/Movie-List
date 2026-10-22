@@ -55,7 +55,7 @@ struct MovieDetailView: View {
             }
             loadIMDbID()
             loadInfo()
-            if movie.tmdb_id > 0 {
+            if movie.tmdb_id != 0 {
                 APIService.shared.fetchFriendTakes(tmdbID: Int64(movie.tmdb_id)) { result in
                     if case .success(let takes) = result {
                         withAnimation(Theme.spring) { friendTakes = takes }
@@ -149,7 +149,7 @@ struct MovieDetailView: View {
             imdbID = cached
             return
         }
-        guard movie.tmdb_id > 0 else { return }
+        guard movie.tmdb_id != 0 else { return }
         APIService.shared.fetchIMDbID(tmdbID: Int64(movie.tmdb_id)) { result in
             guard case .success(let id?) = result else { return }
             imdbID = id
@@ -345,8 +345,13 @@ struct MovieDetailView: View {
             .appearAnimation(delay: 0.1)
 
             HStack(spacing: 8) {
+                if movie.isTV {
+                    MetaChip(icon: "tv", text: "TV Series")
+                }
                 if let date = movie.release_date {
-                    MetaChip(icon: "calendar", text: date.formatted(.dateTime.year().month(.abbreviated).day()))
+                    // A show's date is when it first aired
+                    MetaChip(icon: movie.isTV ? "dot.radiowaves.left.and.right" : "calendar", text: date.formatted(.dateTime.year().month(.abbreviated).day()))
+                        .accessibilityLabel(movie.isTV ? "First aired" : "Released")
                 }
                 if let language = movie.original_language, !language.isEmpty {
                     MetaChip(icon: "globe", text: language.uppercased())
@@ -416,7 +421,7 @@ final class WatchProvidersStore {
 
     /// Calls back on the main thread, straight away if cached; nothing happens when the lookup fails
     func load(tmdbID: Int64, completion: @escaping (WatchProviders) -> Void) {
-        guard tmdbID > 0 else { return }
+        guard tmdbID != 0 else { return }
         if let cached = cache[tmdbID] {
             completion(cached)
             return
