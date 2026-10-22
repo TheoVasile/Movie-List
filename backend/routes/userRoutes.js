@@ -6,7 +6,8 @@ const { setStreamingPreferences, streamingPreferences } = require("../services/s
 const { availableServices } = require("../services/filmFilters");
 const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
-const { setPrivate, isHash, setPhoneHash, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const admin = require("../config/firebase");
+const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -70,18 +71,49 @@ async function sendAvatar(res, who) {
 router.get("/me/avatar", (req, res) => sendAvatar(res, { user_id: req.user.uid }));
 router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase() }));
 
-// Lets friends find the user from their contacts by phone number, e.g. { "phone_hash": "<sha256 hex>" }; the app
-// hashes the number first. null removes it
+// Saves the phone number the user just verified, so friends can find them from their contacts. The app verifies it
+// with Firebase (a code sent by text) and adds it to the user's Firebase account; the number is read from there,
+// never from the request, so only verified numbers are saved -> { has_phone, phone }
+router.post("/me/phone/verified", async (req, res) => {
+    try {
+        const { phoneNumber } = await admin.auth().getUser(req.user.uid);
+        if (!phoneNumber) {
+            return res.status(400).json({ error: "Verify your phone number first." });
+        }
+        await setPhone(req.user.uid, phoneNumber);
+        res.json({ has_phone: true, phone: phoneNumber });
+    } catch (error) {
+        if (error.code === "23505") {
+            return res.status(409).json({ error: "That number is already on another account." });
+        }
+        console.error("Error saving phone:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Removes the user's phone number, here and from their Firebase account
+router.delete("/me/phone", async (req, res) => {
+    try {
+        await admin.auth().updateUser(req.user.uid, { phoneNumber: null });
+        await setPhone(req.user.uid, null);
+        res.json({ has_phone: false, phone: null });
+    } catch (error) {
+        console.error("Error removing phone:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// App versions from before verification sent an unverified, hashed number here. Those aren't accepted any more;
+// removing still works
 router.put("/me/phone", async (req, res) => {
-    const hash = req.body?.phone_hash;
-    if (hash !== null && !isHash(hash)) {
-        return res.status(400).json({ error: "phone_hash must be a SHA-256 hex string or null." });
+    if (req.body?.phone_hash !== null) {
+        return res.status(410).json({ error: "Update CineList to add your phone number." });
     }
     try {
-        await setPhoneHash(req.user.uid, hash);
-        res.json({ has_phone: hash !== null });
+        await setPhone(req.user.uid, null);
+        res.json({ has_phone: false });
     } catch (error) {
-        console.error("Error saving phone:", error);
+        console.error("Error removing phone:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

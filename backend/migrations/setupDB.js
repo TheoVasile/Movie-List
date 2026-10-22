@@ -33,10 +33,15 @@ const createTables = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar BYTEA;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_updated_at TIMESTAMP;
 
-            -- A SHA-256 hash of the user's phone number (its last 10 digits), if they chose to add one so friends
-            -- can find them from their contacts. The number itself is never stored
+            -- Replaced by phone below. Numbers saved this way were never verified, so they're cleared; the
+            -- column stays only until no running server reads it
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_hash CHAR(64);
-            CREATE INDEX IF NOT EXISTS users_phone_hash ON users (phone_hash);
+            UPDATE users SET phone_hash = NULL WHERE phone_hash IS NOT NULL;
+            -- The user's phone number in international format (+14165550100), if they added one so friends can
+            -- find them from their contacts. Only ever copied from their Firebase account once Firebase has
+            -- verified it with a text message
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+            CREATE UNIQUE INDEX IF NOT EXISTS users_phone ON users (phone) WHERE phone IS NOT NULL;
 
             -- Which push notifications the user wants. The phone also has to allow notifications
             ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_requests BOOLEAN NOT NULL DEFAULT true;

@@ -89,7 +89,7 @@ struct UserSettingsView : View {
                 } header: {
                     Text("Phone Number")
                 } footer: {
-                    Text("Friends who sync their contacts can find you by this number. Only a scrambled version is stored, never the number itself.")
+                    Text("Friends who sync their contacts can find you by this number. You'll get a text with a code to confirm it's yours. Only you can see it.")
                 }
                 .listRowBackground(Theme.surface)
 

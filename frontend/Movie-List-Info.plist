@@ -15,6 +15,15 @@
 			</array>
 		</dict>
 		<dict>
+			<!-- Firebase's fallback when it verifies a phone number: a reCAPTCHA page that returns to the app -->
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-263609300559-ios-fc25c4a4f59ab3911a1c3a</string>
+			</array>
+		</dict>
+		<dict>
 			<!-- cinelist://film/<TMDb id>, used by the Home Screen widgets to open a film -->
 			<key>CFBundleURLName</key>
 			<string>Theodor-Vasile.Movie-List.widget</string>

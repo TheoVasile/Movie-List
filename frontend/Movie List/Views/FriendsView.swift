@@ -683,7 +683,7 @@ struct FindPeopleView: View {
                 Text("Let Friends Find You")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
-                Text("Add your phone number so friends who sync their contacts can find you. Only a scrambled version is stored.")
+                Text("Add your phone number so friends who sync their contacts can find you. You'll get a text with a code to confirm it.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
                 PhoneNumberField()
