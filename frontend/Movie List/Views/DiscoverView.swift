@@ -41,6 +41,8 @@ struct DiscoverView: View {
     // Quick Add sends swiped-right films straight to one list, without asking which list or where they rank
     @AppStorage("discoverQuickAdd") private var quickAddOn = false
     @AppStorage("discoverQuickAddListID") private var quickAddListID = 0
+    // Whether Quick Add leaves films at the bottom or lets the AI place them
+    @AppStorage("discoverQuickAddUsesAI") private var quickAddUsesAI = false
     @State private var choosingQuickAddList = false
 
     private let swipeThreshold: CGFloat = 110
@@ -110,6 +112,13 @@ struct DiscoverView: View {
                             Picker("When You Add a Film", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
                                 Label("Ask Each Time", systemImage: "list.bullet").tag(false)
                                 Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
+                            }
+                            if let list = quickAddList, ListRanking.isRanked(list.id) {
+                                Picker("Placement", selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
+                                    Label("Add to the Bottom", systemImage: "arrow.down.to.line").tag(false)
+                                    Label("Let AI Place It", systemImage: "sparkles").tag(true)
+                                }
+                                .disabled(!canUseAI)
                             }
                             if quickAddList != nil {
                                 Button {
@@ -783,12 +792,20 @@ private extension DiscoverView {
         }
     }
 
-    // Adds the film at the bottom of the Quick Add list, without the list picker or Compare
+    // Adds the film to the Quick Add list without the list picker or Compare: at the bottom,
+    // or wherever the AI places it when that's chosen
     func quickAdd(_ movie: Movie, to list: CDMovieList) {
         withAnimation(Theme.spring) {
             viewModel.add(movie, to: [list], context: context) { added in
                 if let only = added.first {
-                    showToast("Added to \(only.list.name ?? "your list") at #\(only.movie.rank)")
+                    let name = only.list.name ?? "your list"
+                    if canUseAI && quickAddUsesAI && ListRanking.isRanked(list.id) && only.list.movies.count > 1 {
+                        ListViewModel(movieList: only.list, context: context).smartPlace(only.movie) { message in
+                            showToast("\(message) in \(name)")
+                        }
+                    } else {
+                        showToast("Added to \(name) at #\(only.movie.rank)")
+                    }
                 } else {
                     showToast("Couldn't add \(movie.title). Try again.")
                 }
@@ -813,7 +830,7 @@ private extension DiscoverView {
                     showToast("Added to \(added.count) lists")
                 }
                 // New films land at the bottom, so ask where it belongs in each list that has other films
-                rankingQueue = added.filter { $0.list.movies.count > 1 }
+                rankingQueue = added.filter { $0.list.movies.count > 1 && ListRanking.isRanked($0.list.id) }
                 if let first = rankingQueue.first {
                     rankingQueue.removeFirst()
                     startRanking(first.movie, in: first.list)
