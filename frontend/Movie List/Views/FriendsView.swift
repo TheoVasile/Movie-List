@@ -558,6 +558,9 @@ struct ConnectionCounts: View {
 }
 
 struct FindPeopleView: View {
+    @ObservedObject private var social = SocialStore.shared
+    // Whether to offer adding a phone number: decided when it's first known, so the card stays to show it saved
+    @State private var offerPhone: Bool? = nil
     @State private var query = ""
     @State private var results: [UserSummary] = []
     @State private var isSearching = false
@@ -571,6 +574,7 @@ struct FindPeopleView: View {
             VStack(spacing: 10) {
                 if query.count < 2 {
                     contactsSection
+                    phoneSection
                     Text("Or search for a friend by their @username.")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
@@ -595,6 +599,10 @@ struct FindPeopleView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Find People")
         .onAppear { if fromContacts == nil && ContactsFinder.wasAllowed { findInContacts() } }
+        .onChange(of: social.profile?.has_phone) { hasPhone in
+            if offerPhone == nil, let hasPhone { offerPhone = !hasPhone }
+        }
+        .onAppear { if let hasPhone = social.profile?.has_phone { offerPhone = !hasPhone } }
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "@username")
         .textInputAutocapitalization(.never)
@@ -644,10 +652,10 @@ struct FindPeopleView: View {
                             .foregroundStyle(Theme.accentGradient)
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Find Friends From Your Contacts")
+                        Text("Sync Contacts")
                             .font(.headline)
                             .foregroundColor(Theme.textPrimary)
-                        Text("Contacts' emails and numbers are scrambled on your iPhone before matching, and never stored.")
+                        Text("Find friends from your contacts. Their emails and numbers are scrambled on your iPhone before matching, and never stored.")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
                             .multilineTextAlignment(.leading)
@@ -664,6 +672,28 @@ struct FindPeopleView: View {
                     .font(.footnote)
                     .foregroundColor(Theme.accentSecondary)
             }
+        }
+    }
+
+    // Syncing works both ways: friends find the user by phone number only if they've added theirs
+    @ViewBuilder
+    private var phoneSection: some View {
+        if offerPhone ?? (social.profile?.has_phone == false) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Let Friends Find You")
+                    .font(.headline)
+                    .foregroundColor(Theme.textPrimary)
+                Text("Add your phone number so friends who sync their contacts can find you. You'll get a text with a code to confirm it.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                PhoneNumberField()
+                    .padding(12)
+                    .background(Theme.surfaceRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(14)
+            .cardStyle(cornerRadius: 16)
+            .padding(.top, 6)
         }
     }
 

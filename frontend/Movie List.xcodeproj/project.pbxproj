@@ -14,6 +14,7 @@
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
 		FA7E5A012F00000000000012 /* ListSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000011 /* ListSharing.swift */; };
 		FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000016 /* ListPickerSheet.swift */; };
+		A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */; };
 		EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516C04920FFE5E41C8B08A86 /* DiaryView.swift */; };
 		4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */; };
 		3A059804AA2C274AF6146724 /* MovieNightPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */; };
@@ -124,6 +125,7 @@
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000011 /* ListSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSharing.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000016 /* ListPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListPickerSheet.swift; sourceTree = "<group>"; };
+		7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberField.swift; sourceTree = "<group>"; };
 		516C04920FFE5E41C8B08A86 /* DiaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryView.swift; sourceTree = "<group>"; };
 		B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieNightView.swift; sourceTree = "<group>"; };
 		C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieNightPoll.swift; sourceTree = "<group>"; };
@@ -317,6 +319,7 @@
 				136D73C186092B82C1D05137 /* StreamingServicesView.swift */,
 				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
 				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
+				7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */,
 				516C04920FFE5E41C8B08A86 /* DiaryView.swift */,
 				B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */,
 				C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */,
@@ -500,6 +503,7 @@
 				B696E18D05D767827A57F334 /* StreamingServicesView.swift in Sources */,
 				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
 				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
+				A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */,
 				EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */,
 				4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */,
 				3A059804AA2C274AF6146724 /* MovieNightPoll.swift in Sources */,

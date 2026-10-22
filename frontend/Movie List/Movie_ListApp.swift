@@ -12,16 +12,19 @@ import GoogleSignIn
 import GoogleSignInSwift
 import FirebaseAppCheck
 import FirebaseMessaging
+import FirebaseAuth
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    // App Check's provider has to be chosen before Firebase starts, or the default is used. Debug builds use the
+    // debug provider, since the simulator can't attest; release builds keep the default (DeviceCheck)
+    #if DEBUG
+    AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
+    #endif
     FirebaseApp.configure()
     Personalization.migrateGenderToPronouns()
     Personalization.migrateAIConsent()
-        
-    let providerFactory = AppCheckDebugProviderFactory()
-    AppCheck.setAppCheckProviderFactory(providerFactory)
 
     NotificationManager.shared.configure(application)
     return true
@@ -30,10 +33,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     // Firebase needs Apple's push token to turn it into its own
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
+        // Firebase also uses it to check a phone number is being verified from this app, without a reCAPTCHA
+        Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+    }
+
+    // Firebase's silent notification for phone verification
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        if Auth.auth().canHandleNotification(userInfo) {
+            completionHandler(.noData)
+            return
+        }
+        completionHandler(.newData)
     }
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        if Auth.auth().canHandle(url) { return true }
         return GIDSignIn.sharedInstance.handle(url)
     }
 }

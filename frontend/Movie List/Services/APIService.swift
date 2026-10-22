@@ -338,8 +338,10 @@ struct UserProfile: Decodable {
     // Which push notifications the user wants
     let notify_requests: Bool?
     let notify_activity: Bool?
-    // Whether they've added a phone number so contacts can find them
+    // Whether they've added (and verified) a phone number so contacts can find them, and the number itself
+    // in international format, e.g. "+14165550100"
     let has_phone: Bool?
+    let phone: String?
     // Private profiles approve each follower and can't have lists everyone can see
     let is_private: Bool?
 }
@@ -793,9 +795,17 @@ class APIService {
 
     private struct PhoneResponse: Decodable { let has_phone: Bool }
 
-    /// Saves the hash of the user's phone number so contacts can find them; nil removes it
-    func setPhoneHash(_ hash: String?, completion: @escaping (Bool) -> Void) {
-        sendJSON("PUT", "/users/me/phone", body: ["phone_hash": hash ?? NSNull()]) { (result: Result<PhoneResponse, Error>) in
+    /// Saves the phone number just verified with Firebase, which the server reads from the user's Firebase account.
+    /// Fails with code 409 when it's already on another account
+    func savePhoneVerified(completion: @escaping (Result<Void, Error>) -> Void) {
+        sendJSON("POST", "/users/me/phone/verified") { (result: Result<PhoneResponse, Error>) in
+            completion(result.map { _ in () })
+        }
+    }
+
+    /// Removes the user's phone number, here and from their Firebase account
+    func removePhone(completion: @escaping (Bool) -> Void) {
+        sendJSON("DELETE", "/users/me/phone") { (result: Result<PhoneResponse, Error>) in
             completion((try? result.get()) != nil)
         }
     }

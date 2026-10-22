@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import FirebaseAuth
 
 struct ContentView: View {
     @EnvironmentObject var network: NetworkService
@@ -113,6 +114,8 @@ struct ContentView: View {
 
     /// Handles cinelist://film/<TMDb id> from the widgets by opening that film's info screen
     private func openLink(_ url: URL) {
+        // The return from Firebase's reCAPTCHA page while verifying a phone number
+        if Auth.auth().canHandle(url) { return }
         guard url.scheme == "cinelist", url.host == "film", let tmdbID = Int32(url.lastPathComponent) else { return }
         let request = CDMovie.fetchRequest()
         request.predicate = NSPredicate(format: "tmdb_id == %d", tmdbID)
