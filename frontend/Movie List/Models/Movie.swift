@@ -21,4 +21,7 @@ struct Movie: Identifiable, Codable {
     var genre_ids: [Int]?
     // Only sent by the AI discover endpoint: why this film was picked for the user
     var reason: String?
+
+    /// TV shows have negative ids, since TMDb's film and TV ids overlap (see backend/services/tmdbMedia.js)
+    var isTV: Bool { id < 0 }
 }

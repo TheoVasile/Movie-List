@@ -894,9 +894,14 @@ struct FriendListView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(Theme.textPrimary)
                                 .lineLimit(2)
-                            Text(Theme.year(from: film.release_date))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
+                            HStack(spacing: 4) {
+                                if film.tmdb_id < 0 {
+                                    TVBadge()
+                                }
+                                Text(Theme.year(from: film.release_date))
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
                         Spacer()
                         if film.watched {

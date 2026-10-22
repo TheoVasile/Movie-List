@@ -12,6 +12,7 @@ const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = 
 const { fetchPicks, pickHistory, saveRecommendations } = require("../models/groupPicksModel");
 const pool = require("../config/db");
 const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
+const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
 
 const router = express.Router();
 // The list's owner, or someone they invited to edit it
@@ -68,8 +69,9 @@ router.get("/search", async (req, res) => {
         if (!name) {
             return res.status(400).json({ error: "Movie name is required" });
         }
+        // TV shows too, for app versions that can tell them apart (see services/tmdbMedia.js)
+        const types = req.query.include_tv === "1" ? ["movie", "tv"] : ["movie"];
 
-        const url = `https://api.themoviedb.org/3/search/movie`;
         const params = {
             query: name,
             include_adult: false,
@@ -79,10 +81,12 @@ router.get("/search", async (req, res) => {
 
         // Two pages, since the film being looked for can sit past TMDb's first 20 results
         console.log("📡 Fetching movies from TMDb...");
-        const pages = await Promise.all([1, 2].map((page) => axios.get(url, { params: { ...params, page } })));
+        const pages = await Promise.all(types.flatMap((type) => [1, 2].map((page) =>
+            axios.get(`https://api.themoviedb.org/3/search/${type}`, { params: { ...params, page } })
+                .then((response) => (type === "tv" ? response.data.results.map(showAsFilm) : response.data.results)))));
         const seen = new Set();
         const movies = pages
-            .flatMap((response) => response.data.results)
+            .flat()
             .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
 
         // Array.prototype.sort is stable, so equal scores keep TMDb's order
@@ -116,6 +120,7 @@ function toDiscoverMovie(movie) {
         popularity: movie.popularity ?? 0,
         vote_average: movie.vote_average ?? 0,
         genre_ids: movie.genre_ids ?? [],
+        media_type: movie.media_type === "tv" ? "tv" : "movie",
     };
 }
 
@@ -128,71 +133,91 @@ function parseIds(value, limit) {
         .slice(0, limit);
 }
 
+// Comma-separated film and show ids, where shows are negative, e.g. "771,-1399"
+function parseMediaIds(value, limit) {
+    return String(value ?? "")
+        .split(",")
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id !== 0)
+        .slice(0, limit);
+}
+
+// A film or show id from a query parameter, or null when it isn't one
+function mediaId(value) {
+    const id = Number(value);
+    return Number.isInteger(id) && id !== 0 ? id : null;
+}
+
 // Films for the Discover tab: TMDb recommendations for the given films (seeds: the user's top-ranked
 // and recently liked films) plus well-rated films in their favourite genres (genres), interleaved so
 // no single source dominates, followed by this week's trending films. avoid_genres keeps disliked
 // genres out of the genre feed. only_genres=1 means the user picked these genres themselves: then every
-// film returned has at least one of them. The app filters out films already in a list and orders by taste
+// film returned has at least one of them. kind=tv gives TV shows instead (negative ids, see services/tmdbMedia.js)
+// and kind=all both; seeds can be shows. The app filters out films already in a list and orders by taste
 router.get("/discover", async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-        const seeds = parseIds(req.query.seeds, 8);
+        const kind = ["movie", "tv", "all"].includes(req.query.kind) ? req.query.kind : "movie";
+        const types = kind === "all" ? ["movie", "tv"] : [kind];
+        const seeds = parseMediaIds(req.query.seeds, 8).filter((id) => types.includes(isTV(id) ? "tv" : "movie"));
         const onlyGenres = req.query.only_genres === "1";
         const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
         const avoidGenres = parseIds(req.query.avoid_genres, 3);
         const params = { api_key: process.env.API_KEY, language: "en-US", page };
         // Optional: only films in these original languages, and/or streaming on these services in region
         const filters = parseFilters(req.query);
+        // Genres are film genres; shows are asked for in the closest TV genres
+        const genresFor = (type, ids) => (type === "tv" ? tvGenres(ids) : ids);
+        // TMDb results as films, shows included
+        const fetchResults = (type, path, extra = {}) => axios.get(`https://api.themoviedb.org/3/${path}`, { params: { ...params, ...extra } })
+            .then((response) => (response.data.results ?? []).map((item) => (type === "tv" ? showAsFilm(item) : item)));
 
         // Films in any of the favourite genres ("|" means or), skipping obscure titles
-        const genreFeed = genres.length
-            ? [axios.get("https://api.themoviedb.org/3/discover/movie", {
-                params: {
-                    ...params,
-                    with_genres: genres.join("|"),
-                    without_genres: avoidGenres.join(","),
-                    sort_by: "popularity.desc",
-                    "vote_count.gte": 200,
-                    include_adult: false,
-                },
-            })]
+        const genreFeeds = genres.length
+            ? types.map((type) => fetchResults(type, `discover/${type}`, {
+                with_genres: genresFor(type, genres).join("|"),
+                without_genres: genresFor(type, avoidGenres).join(","),
+                sort_by: "popularity.desc",
+                "vote_count.gte": type === "tv" ? 100 : 200,
+                include_adult: false,
+            }))
             : [];
 
         // With filters, recommendations alone rarely have enough matches, so TMDb is also asked directly for films
         // that fit: one feed per language (or one for the services alone), in the chosen genres
         const filteredFeeds = hasFilters(filters)
-            ? (filters.languages.length ? filters.languages.slice(0, 3) : [null]).map((language) => axios.get("https://api.themoviedb.org/3/discover/movie", {
-                params: {
-                    ...params,
-                    ...(language ? { with_original_language: language } : {}),
-                    ...(filters.providers.length ? { with_watch_providers: filters.providers.join("|"), watch_region: filters.region, with_watch_monetization_types: "flatrate|free|ads" } : {}),
-                    ...(genres.length && onlyGenres ? { with_genres: genres.join("|") } : {}),
-                    sort_by: "popularity.desc",
-                    "vote_count.gte": 100,
-                    include_adult: false,
-                },
-            }))
+            ? types.flatMap((type) => (filters.languages.length ? filters.languages.slice(0, 3) : [null]).map((language) => fetchResults(type, `discover/${type}`, {
+                ...(language ? { with_original_language: language } : {}),
+                ...(filters.providers.length ? { with_watch_providers: filters.providers.join("|"), watch_region: filters.region, with_watch_monetization_types: "flatrate|free|ads" } : {}),
+                ...(genres.length && onlyGenres ? { with_genres: genresFor(type, genres).join("|") } : {}),
+                sort_by: "popularity.desc",
+                "vote_count.gte": type === "tv" ? 50 : 100,
+                include_adult: false,
+            })))
             : [];
 
         // allSettled so one seed TMDb doesn't know about can't fail the whole request
-        const [trending, ...recommendations] = await Promise.allSettled([
-            axios.get("https://api.themoviedb.org/3/trending/movie/week", { params }),
+        const outcomes = await Promise.allSettled([
+            ...types.map((type) => fetchResults(type, `trending/${type}/week`)),
             // The app sends different seeds for every batch, so each seed's best (first page) recommendations are used
-            ...seeds.map((id) => axios.get(`https://api.themoviedb.org/3/movie/${id}/recommendations`, { params: { ...params, page: 1 } })),
-            ...genreFeed,
+            ...seeds.map((id) => fetchResults(isTV(id) ? "tv" : "movie", `${tmdbPath(id)}/recommendations`, { page: 1 })),
+            ...genreFeeds,
             ...filteredFeeds,
         ]);
-        const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value.data.results : []);
-
-        const recommendationLists = recommendations.map(resultsOf);
-        const interleaved = [];
-        for (let i = 0; i < Math.max(0, ...recommendationLists.map((list) => list.length)); i++) {
-            recommendationLists.forEach((list) => list[i] && interleaved.push(list[i]));
-        }
+        const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value : []);
+        const interleave = (lists) => {
+            const merged = [];
+            for (let i = 0; i < Math.max(0, ...lists.map((list) => list.length)); i++) {
+                lists.forEach((list) => list[i] && merged.push(list[i]));
+            }
+            return merged;
+        };
+        const trending = interleave(outcomes.slice(0, types.length).map(resultsOf));
+        const interleaved = interleave(outcomes.slice(types.length).map(resultsOf));
 
         const seen = new Set(seeds);
         const wanted = new Set(genres);
-        const movies = [...interleaved, ...resultsOf(trending)]
+        const movies = [...interleaved, ...trending]
             .map(toDiscoverMovie)
             .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
             .filter((movie) => !onlyGenres || movie.genre_ids.some((id) => wanted.has(id)));
@@ -294,7 +319,8 @@ async function classicMovieNight(people, count, filters, genres) {
 
     // Which people's favourites TMDb recommends each film from
     const params = { api_key: process.env.API_KEY, language: "en-US", page: 1 };
-    const seeds = data.flatMap((person, index) => person.seeds.map((seed) => ({ ...seed, person: index })));
+    // Movie night is for films, so shows in people's lists don't seed it
+    const seeds = data.flatMap((person, index) => person.seeds.filter((seed) => !isTV(seed.tmdb_id)).map((seed) => ({ ...seed, person: index })));
     const outcomes = await Promise.allSettled(
         seeds.map((seed) => axios.get(`https://api.themoviedb.org/3/movie/${seed.tmdb_id}/recommendations`, { params, timeout: 15000 }))
     );
@@ -641,18 +667,22 @@ function usCertification(releaseDates) {
 // Read-only: the app caches these to label films and filter its lists by genre. Films TMDb can't find are left out
 router.get("/info", async (req, res) => {
     try {
-        const ids = parseIds(req.query.ids, 50);
+        const ids = parseMediaIds(req.query.ids, 50);
         const films = await mapWithConcurrency(ids, async (id) => {
             try {
-                const response = await axios.get(`https://api.themoviedb.org/3/movie/${id}`, {
-                    params: { api_key: process.env.API_KEY, append_to_response: "release_dates" },
+                const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(id)}`, {
+                    params: { api_key: process.env.API_KEY, append_to_response: isTV(id) ? "content_ratings" : "release_dates" },
                     timeout: 15000,
                 });
                 const film = response.data;
+                const genreIds = (film.genres ?? []).map((genre) => genre.id);
                 return {
                     id,
-                    genre_ids: (film.genres ?? []).map((genre) => genre.id),
-                    certification: usCertification(film.release_dates),
+                    genre_ids: isTV(id) ? filmGenres(genreIds) : genreIds,
+                    // Shows have TV ratings ("TV-MA", "TV-14") rather than film ones
+                    certification: isTV(id)
+                        ? ((film.content_ratings?.results ?? []).find((rating) => rating.iso_3166_1 === "US")?.rating ?? "")
+                        : usCertification(film.release_dates),
                     vote_average: film.vote_average ?? 0,
                     vote_count: film.vote_count ?? 0,
                 };
@@ -670,12 +700,12 @@ router.get("/info", async (req, res) => {
 // The IMDb id for a TMDb film, e.g. ?tmdb_id=771 -> { tmdb_id: 771, imdb_id: "tt0099785" }.
 // imdb_id is null when TMDb doesn't know it
 router.get("/imdb", async (req, res) => {
-    const tmdbId = Number(req.query.tmdb_id);
-    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    const tmdbId = mediaId(req.query.tmdb_id);
+    if (tmdbId === null) {
         return res.status(400).json({ error: "A tmdb_id is required." });
     }
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/external_ids`, {
+        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/external_ids`, {
             params: { api_key: process.env.API_KEY },
             timeout: 15000,
         });
@@ -696,14 +726,14 @@ router.get("/imdb", async (req, res) => {
 const trailerCache = new Map();
 
 router.get("/trailer", async (req, res) => {
-    const tmdbId = Number(req.query.tmdb_id);
-    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    const tmdbId = mediaId(req.query.tmdb_id);
+    if (tmdbId === null) {
         return res.status(400).json({ error: "A tmdb_id is required." });
     }
     const cached = trailerCache.get(tmdbId);
     if (cached && Date.now() - cached.at < 24 * 60 * 60 * 1000) return res.json(cached.trailer);
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/videos`, {
+        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/videos`, {
             // English videos plus ones with no language, which TMDb leaves out unless asked
             params: { api_key: process.env.API_KEY, include_video_language: "en,null" },
             timeout: 15000,
@@ -729,9 +759,9 @@ router.get("/trailer", async (req, res) => {
 // ?tmdb_id=771&region=CA -> { region: "CA", link, stream: [{ id, name, logo_path }], free: [...], rent: [...], buy: [...] }.
 // Each group is in TMDb's display order; link is TMDb's watch page for the film. All empty when it isn't available there
 router.get("/providers", async (req, res) => {
-    const tmdbId = Number(req.query.tmdb_id);
+    const tmdbId = mediaId(req.query.tmdb_id);
     const region = String(req.query.region ?? "US").toUpperCase();
-    if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    if (tmdbId === null) {
         return res.status(400).json({ error: "A tmdb_id is required." });
     }
     if (!/^[A-Z]{2}$/.test(region)) {
@@ -745,7 +775,7 @@ router.get("/providers", async (req, res) => {
             .map((item) => ({ id: item.provider_id, name: item.provider_name, logo_path: item.logo_path ?? null }));
     };
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/watch/providers`, {
+        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/watch/providers`, {
             params: { api_key: process.env.API_KEY },
             timeout: 15000,
         });

@@ -27,9 +27,14 @@ struct MovieCard: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(Theme.year(from: movie.release_date))
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                HStack(spacing: 4) {
+                    if movie.isTV {
+                        TVBadge()
+                    }
+                    Text(Theme.year(from: movie.release_date))
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
             }
         }
         .frame(maxWidth: .infinity)

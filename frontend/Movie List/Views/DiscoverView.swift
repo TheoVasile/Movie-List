@@ -94,6 +94,15 @@ struct DiscoverView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Section("Show") {
+                            Picker("Show", selection: Binding(get: { viewModel.kind }, set: { kind in
+                                withAnimation(Theme.spring) { viewModel.setKind(kind) }
+                            })) {
+                                ForEach(DiscoverKind.allCases) { kind in
+                                    Label(kind.title, systemImage: kind.systemImage).tag(kind)
+                                }
+                            }
+                        }
                         Section(sourceDescription) {
                             // Only offered once AI is allowed in Settings; until then it shows Classic
                             Picker("Recommendations", selection: Binding(get: { canUseAI && useAI }, set: { useAI = $0 })) {
@@ -255,7 +264,12 @@ private extension DiscoverView {
         if !useAI {
             return "Recommended by TMDb from your lists"
         }
-        return viewModel.aiAvailable ? "Picked by AI from your lists and swipes" : "AI picks unavailable, using TMDb for now"
+        guard viewModel.aiAvailable else { return "AI picks unavailable, using TMDb for now" }
+        switch viewModel.kind {
+        case .movie: return "Picked by AI from your lists and swipes"
+        case .all: return "Films picked by AI, TV shows by TMDb"
+        case .tv: return "AI Picks are films only, so TV shows come from TMDb"
+        }
     }
 
     // Sparkles mark AI recommendations, so they only appear while AI Picks is the chosen source
@@ -279,7 +293,7 @@ private extension DiscoverView {
             showGenrePicker = true
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: showingAIPicks ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
+                Image(systemName: showingAIPicks && viewModel.kind != .tv ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
                     .foregroundStyle(Theme.accentGradient)
                 Text(genreSummary)
                     .foregroundColor(Theme.textSecondary)
@@ -836,7 +850,7 @@ private extension DiscoverView {
         let lists = listIDs.isEmpty ? Array(movieLists) : movieLists.filter { listIDs.contains($0.id) }
         for list in lists {
             let ranked = list.movies.sorted { $0.rank < $1.rank }
-            for (index, movie) in ranked.enumerated() where movie.tmdb_id > 0 {
+            for (index, movie) in ranked.enumerated() where movie.tmdb_id != 0 {
                 let weight = Double(ranked.count - index) / Double(ranked.count)
                 // A film in several lists counts with its best placing
                 weights[Int64(movie.tmdb_id)] = max(weights[Int64(movie.tmdb_id)] ?? 0, weight)
@@ -875,6 +889,9 @@ private struct DiscoverCard: View {
     private var info: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
+                if movie.isTV {
+                    MetaChip(icon: "tv", text: "TV Series", onPoster: true)
+                }
                 if let rating = movie.vote_average, rating > 0 {
                     MetaChip(icon: "star.fill", text: String(format: "%.1f", rating), onPoster: true)
                 }

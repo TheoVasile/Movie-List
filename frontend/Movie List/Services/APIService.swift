@@ -1063,7 +1063,8 @@ class APIService {
         // .urlQueryAllowed leaves "&", "+" and "=" alone, which would cut titles like "Fast & Furious" short
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
-        guard let url = URL(string: "\(baseURL)/movies/search?name=\(name.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")") else {
+        // TV shows come back too, with negative ids
+        guard let url = URL(string: "\(baseURL)/movies/search?include_tv=1&name=\(name.addingPercentEncoding(withAllowedCharacters: allowed) ?? "")") else {
             completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
             return
         }
@@ -1102,9 +1103,10 @@ class APIService {
     }
     /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
     /// onlyGenres: the user picked these genres themselves, so every film returned has one of them
-    func discoverMovies(seeds: [Int64], genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    func discoverMovies(seeds: [Int64], kind: DiscoverKind = .movie, genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
+            URLQueryItem(name: "kind", value: kind.rawValue),
             URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),

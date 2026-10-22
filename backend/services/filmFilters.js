@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { tmdbPath } = require("./tmdbMedia");
 
 // Language and streaming filters for recommendations. Languages are TMDb's original_language codes ("en",
 // "ko"); streaming services are TMDb provider ids, which differ by country, so a region always goes with them
@@ -30,7 +31,7 @@ async function streamingServices(tmdbId, region) {
     if (cached && Date.now() - cached.at < DAY) return cached.ids;
     let ids = new Set();
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/movie/${tmdbId}/watch/providers`, {
+        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/watch/providers`, {
             params: { api_key: process.env.API_KEY },
             timeout: 15000,
         });

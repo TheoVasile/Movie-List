@@ -58,7 +58,8 @@ function takeDailyRequest(user_id) {
     usage.set(user_id, { day: today, count: count + 1 });
 }
 
-const filmLabel = (film) => (film.year ? `${film.title} (${film.year})` : film.title);
+// Shows in the user's lists are marked so the AI doesn't take them for films
+const filmLabel = (film) => `${film.year ? `${film.title} (${film.year})` : film.title}${film.tv ? " [TV series]" : ""}`;
 
 // The share of films in each group, largest first, e.g. "2010s 34%, 2000s 22%"
 function shares(films, groupOf, limit) {

@@ -44,7 +44,7 @@ final class MovieInfoCache {
     }
 
     private func needsFetch(_ tmdbID: Int64) -> Bool {
-        guard tmdbID > 0 else { return false }
+        guard tmdbID != 0 else { return false }
         guard let info = infoByID[tmdbID] else { return true }
         return Date().timeIntervalSince(info.fetched) > Self.maxAge
     }

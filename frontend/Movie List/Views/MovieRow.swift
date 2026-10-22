@@ -48,6 +48,9 @@ struct MovieRow: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
                 HStack(spacing: 6) {
+                    if movie.isTV {
+                        TVBadge()
+                    }
                     Text(Theme.year(from: movie.release_date))
                         .fixedSize()
                     if !movie.original_language.isNilOrEmpty {

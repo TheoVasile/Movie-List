@@ -280,6 +280,25 @@ struct SecondaryButtonStyle: ButtonStyle {
 
 // MARK: - Building blocks
 
+/// Marks a TV show among films, wherever a title's year is shown
+struct TVBadge: View {
+    // On a poster it gets the same dark backing as MetaChip
+    var onPoster = false
+
+    var body: some View {
+        Label("TV", systemImage: "tv")
+            .labelStyle(.titleAndIcon)
+            .font(.caption2.weight(.heavy))
+            .foregroundColor(onPoster ? Theme.posterText : Theme.accent)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(onPoster ? Color.black.opacity(0.55) : Theme.accent.opacity(0.14))
+            .clipShape(Capsule())
+            .fixedSize()
+            .accessibilityLabel("TV show")
+    }
+}
+
 struct MetaChip: View {
     let icon: String
     let text: String
