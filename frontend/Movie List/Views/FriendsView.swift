@@ -884,12 +884,28 @@ struct FriendListView: View {
     // The film whose info screen is open, and the one waiting for the user to pick lists to add it to
     @State private var details: CDMovie? = nil
     @State private var adding: Movie? = nil
+    // A film from this list picked for the user with the dice, shown at the top
+    @State private var pick: FriendLists.Film? = nil
+    @FetchRequest(fetchRequest: CDMovieList.fetch()) private var myLists: FetchedResults<CDMovieList>
     @Environment(\.managedObjectContext) private var context
     @EnvironmentObject private var authViewModel: AuthenticationViewModel
 
     private var isFollowed: Bool { followed ?? list.followed ?? false }
 
     var body: some View {
+        ScrollViewReader { proxy in
+            films
+                .onChange(of: pick?.id) { _ in
+                    guard let pick else { return }
+                    // Wait a run loop so the card for the new pick exists before scrolling to it
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("pick-\(pick.id)", anchor: .top) }
+                    }
+                }
+        }
+    }
+
+    private var films: some View {
         List {
             if !list.overview.isEmpty {
                 Text(list.overview)
@@ -897,6 +913,22 @@ struct FriendListView: View {
                     .foregroundColor(Theme.textSecondary)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+            }
+            if let pick {
+                PickCard(title: pick.title, year: Theme.year(from: pick.release_date), overview: pick.overview,
+                         posterPath: pick.poster_path, rank: list.is_ranked == false ? nil : pick.rank,
+                         heading: "PICK FOR YOU", tv: pick.tmdb_id < 0)
+                    .id("pick-\(pick.id)")
+                    .transition(.asymmetric(insertion: .scale(scale: 0.95).combined(with: .opacity), removal: .opacity))
+                    .onTapGesture {
+                        Haptics.tap()
+                        details = PersistenceController.preview(of: pick.movie)
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Shows the film's details, where you can add it to your lists")
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
             }
             ForEach(list.movies) { film in
                 Button {
@@ -974,6 +1006,17 @@ struct FriendListView: View {
             .presentationDragIndicator(.visible)
         }
         .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Haptics.tap()
+                    withAnimation(Theme.spring) { pickFilm() }
+                } label: {
+                    Image(systemName: "dice")
+                }
+                .disabled(list.movies.isEmpty)
+                .accessibilityLabel("Pick a Film for Me")
+                .accessibilityHint("Picks a film from this list that isn't in your lists yet")
+            }
             // Following a list adds films added to it to the daily digest
             if list.owner_handle != SocialStore.shared.profile?.handle {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -988,6 +1031,28 @@ struct FriendListView: View {
                     .accessibilityHint("Get updates in your daily digest when films are added")
                 }
             }
+        }
+    }
+
+    // Picks a film from this list, favouring ones the user doesn't have in their own lists yet and, in a ranked
+    // list, the ones ranked higher. Never the same film twice in a row
+    private func pickFilm() {
+        let mine = Set(myLists.flatMap { $0.movies.map { Int64($0.tmdb_id) } })
+        let others = list.movies.count > 1 ? list.movies.filter { $0.id != pick?.id } : list.movies
+        let new = others.filter { !mine.contains($0.tmdb_id) }
+        let candidates = new.isEmpty ? others : new
+        guard !candidates.isEmpty else { return }
+        // Sorted by rank, so earlier films get the larger weights
+        let weights = list.is_ranked == false
+            ? candidates.map { _ in 1 }
+            : candidates.indices.map { candidates.count - $0 }
+        var roll = Int.random(in: 0..<weights.reduce(0, +))
+        for (film, weight) in zip(candidates, weights) {
+            if roll < weight {
+                pick = film
+                return
+            }
+            roll -= weight
         }
     }
 

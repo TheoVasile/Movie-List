@@ -814,29 +814,52 @@ private extension ListView {
 
 // MARK: - Spotlight
 
+// A film from the user's own list, kept up to date as its rank changes
 private struct SpotlightCard: View {
     @ObservedObject var movie: CDMovie
     var ranked = true
 
     var body: some View {
+        PickCard(title: movie.title ?? "", year: Theme.year(from: movie.release_date), overview: movie.overview,
+                 posterPath: movie.poster_path, rank: ranked ? Int(movie.rank) : nil, tv: movie.isTV)
+    }
+}
+
+/// A big card for a film picked at random from a list: "Tonight's Pick" in the user's own lists, "Pick for You"
+/// in someone else's. rank is nil for unranked lists
+struct PickCard: View {
+    let title: String
+    let year: String
+    let overview: String?
+    let posterPath: String?
+    let rank: Int?
+    var heading = "TONIGHT'S PICK"
+    var tv = false
+
+    var body: some View {
         HStack(alignment: .bottom, spacing: 16) {
-            PosterImage(path: movie.poster_path, cornerRadius: 14, size: .medium)
+            PosterImage(path: posterPath, cornerRadius: 14, size: .medium)
                 .frame(width: 112, height: 168)
-                .overlay(alignment: .topLeading) { if ranked { rankBadge } }
+                .overlay(alignment: .topLeading) { if let rank { rankBadge(rank) } }
                 .shadow(color: Theme.shadow.opacity(0.6), radius: 14, y: 8)
             VStack(alignment: .leading, spacing: 8) {
-                Label("TONIGHT'S PICK", systemImage: "moon.fill")
+                Label(heading, systemImage: "moon.fill")
                     .font(.caption2.weight(.heavy))
                     .tracking(1.2)
                     .foregroundStyle(Theme.accentGradient)
-                Text(movie.title ?? "")
+                Text(title)
                     .font(.title3.weight(.heavy))
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(2)
-                Text(Theme.year(from: movie.release_date))
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(Theme.textSecondary)
-                if let overview = movie.overview, !overview.isEmpty {
+                HStack(spacing: 4) {
+                    if tv {
+                        TVBadge()
+                    }
+                    Text(year)
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                if let overview, !overview.isEmpty {
                     Text(overview)
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
@@ -850,7 +873,7 @@ private struct SpotlightCard: View {
         .background(
             ZStack {
                 Theme.surface
-                PosterBackdrop(path: movie.poster_path)
+                PosterBackdrop(path: posterPath)
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -861,19 +884,19 @@ private struct SpotlightCard: View {
         .shadow(color: Theme.shadow.opacity(0.4), radius: 18, y: 10)
     }
 
-    private var rankBadge: some View {
-        Text("#\(movie.rank)")
+    private func rankBadge(_ rank: Int) -> some View {
+        Text("#\(rank)")
             .font(.system(size: 15, weight: .black, design: .rounded))
             .foregroundColor(Theme.onAccent)
             .contentTransition(.numericText())
-            .animation(Theme.spring, value: movie.rank)
+            .animation(Theme.spring, value: rank)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(Theme.accentGradient)
             .clipShape(Capsule())
             .shadow(color: Theme.shadow.opacity(0.4), radius: 6, y: 2)
             .padding(8)
-            .accessibilityLabel("Ranked \(movie.rank) in this list")
+            .accessibilityLabel("Ranked \(rank) in this list")
     }
 }
 
