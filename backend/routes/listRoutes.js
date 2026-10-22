@@ -8,6 +8,7 @@ const { notifyUser } = require("../services/pushService");
 const pool = require("../config/db");
 const { setListWatched } = require("../models/watchedModel");
 const { isPrivate } = require("../models/socialModel");
+const { setListOrder } = require("../models/movieModel");
 
 const router = express.Router();
 
@@ -53,6 +54,24 @@ router.put("/:id/watched", requireListEditor((req) => req.params.id), async (req
         res.status(200).json({ list_id: Number(req.params.id), watched: req.body.watched });
     } catch (error) {
         console.error("Error updating watched status for list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Reorders a whole list at once, e.g. { "movie_ids": [12, 4, 9] } with every film in the list, first to last
+router.put("/:id/order", requireListEditor((req) => req.params.id), async (req, res) => {
+    try {
+        const ids = req.body.movie_ids;
+        if (!Array.isArray(ids) || !ids.length || ids.length > 5000 || !ids.every(Number.isInteger)
+            || new Set(ids).size !== ids.length) {
+            return res.status(400).json({ error: "movie_ids must list each film in the list once." });
+        }
+        if (!(await setListOrder(Number(req.params.id), ids))) {
+            return res.status(409).json({ error: "The list changed. Refresh and try again." });
+        }
+        res.json({ list_id: Number(req.params.id), count: ids.length });
+    } catch (error) {
+        console.error("Error reordering list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

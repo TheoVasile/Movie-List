@@ -134,6 +134,34 @@ async function updateMovieRank(list_id, movie_id, new_rank, aiPlaced = false) {
 }
 
 
+// Puts every film in a list in the given order at once, e.g. when the user sorts it by TMDb rating.
+// movieIds must hold exactly the list's films; returns false when it doesn't (the list changed meanwhile)
+async function setListOrder(listId, movieIds) {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const { rows } = await client.query("SELECT movie_id FROM list_movies WHERE list_id = $1 FOR UPDATE", [listId]);
+        const current = new Set(rows.map((row) => row.movie_id));
+        if (current.size !== movieIds.length || !movieIds.every((id) => current.has(id))) {
+            await client.query("ROLLBACK");
+            return false;
+        }
+        await client.query(
+            `UPDATE list_movies SET rank = o.ord, ai_placed = false
+             FROM unnest($2::int[]) WITH ORDINALITY AS o(movie_id, ord)
+             WHERE list_movies.list_id = $1 AND list_movies.movie_id = o.movie_id`,
+            [listId, movieIds]
+        );
+        await client.query("COMMIT");
+        return true;
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 async function getMovieByTmdbId(tmdb_id) {
     const result = await pool.query(
         "SELECT * FROM movies WHERE tmdb_id = $1",
@@ -142,4 +170,4 @@ async function getMovieByTmdbId(tmdb_id) {
     return result.rows[0];
 }
 
-module.exports = { createMovie, addMovieToList, getMovieByTmdbId, removeMovieFromList, updateMovieRank };
+module.exports = { createMovie, addMovieToList, getMovieByTmdbId, removeMovieFromList, updateMovieRank, setListOrder };
