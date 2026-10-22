@@ -27,9 +27,6 @@ struct UserSettingsView : View {
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @ObservedObject private var notifications = NotificationManager.shared
     @State private var notifyRequests = true
-    @State private var showAddPhone = false
-    @State private var showRemovePhone = false
-    @State private var phoneNumber = ""
     @State private var notifyActivity = true
     @AppStorage(NotificationManager.suggestionsKey) private var notifySuggestions = true
     // Streaming alerts and how many services the user has picked for them, as last loaded from the server
@@ -78,42 +75,21 @@ struct UserSettingsView : View {
                             .font(.footnote)
                             .foregroundColor(Theme.accentSecondary)
                     }
-                    // Optional: lets friends who have the number in their contacts find this account
-                    Button {
-                        if social.profile?.has_phone == true {
-                            showRemovePhone = true
-                        } else {
-                            phoneNumber = ""
-                            showAddPhone = true
-                        }
-                    } label: {
-                        HStack {
-                            Text("Phone Number")
-                                .foregroundColor(Theme.textPrimary)
-                            Spacer()
-                            Text(social.profile?.has_phone == true ? "Added" : "Add")
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                    .alert("Add Your Phone Number", isPresented: $showAddPhone) {
-                        TextField("Phone number", text: $phoneNumber)
-                            .keyboardType(.phonePad)
-                            .textContentType(.telephoneNumber)
-                        Button("Cancel", role: .cancel) {}
-                        Button("Add") { savePhone(phoneNumber) }
-                    } message: {
-                        Text("Friends with your number in their contacts can find you. Only a scrambled version is stored, never the number itself.")
-                    }
-                    .confirmationDialog("Remove your phone number?", isPresented: $showRemovePhone, titleVisibility: .visible) {
-                        Button("Remove", role: .destructive) { savePhone(nil) }
-                    } message: {
-                        Text("Friends will no longer find you by phone number. They can still find you by email or @username.")
-                    }
                     Picker("Pronouns", selection: $pronouns) {
                         ForEach(Personalization.pronouns, id: \.self) { option in
                             Text(option).tag(option)
                         }
                     }
+                }
+                .listRowBackground(Theme.surface)
+
+                // Optional: lets friends who have the number in their contacts find this account
+                Section {
+                    PhoneNumberField()
+                } header: {
+                    Text("Phone Number")
+                } footer: {
+                    Text("Friends who sync their contacts can find you by this number. Only a scrambled version is stored, never the number itself.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -338,26 +314,6 @@ struct UserSettingsView : View {
 }
 
 extension UserSettingsView {
-    private func savePhone(_ number: String?) {
-        let hash: String?
-        if let number {
-            guard let hashed = ContactsFinder.hash(phone: number) else {
-                nameMessage = "That doesn't look like a phone number."
-                return
-            }
-            hash = hashed
-        } else {
-            hash = nil
-        }
-        APIService.shared.setPhoneHash(hash) { saved in
-            if saved {
-                social.load()
-            } else {
-                nameMessage = "Couldn't save your phone number. Try again."
-            }
-        }
-    }
-
     private var savedName: String {
         authenticationViewModel.user?.displayName ?? ""
     }
