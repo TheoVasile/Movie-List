@@ -116,6 +116,8 @@ class ListViewModel: ObservableObject {
     @Published var movedMovieID: Int64? = nil
     // Set when a drag to reorder couldn't be saved and the old order was put back
     @Published var reorderFailed = false
+    // Looking up TMDb scores before sorting by them
+    @Published var isSorting = false
     
     var movieList: CDMovieList
     private let context: NSManagedObjectContext
@@ -240,6 +242,59 @@ class ListViewModel: ObservableObject {
                 try? self.context.save()
                 self.reorderFailed = true
             }
+        }
+    }
+
+    /// Reorders the whole list by TMDb user score, highest first, looking up any scores not yet known.
+    /// Films TMDb has no score for keep their order at the end. Puts the old order back if the server can't save it
+    func sortByRating(completion: @escaping () -> Void = {}) {
+        isSorting = true
+        MovieInfoCache.shared.fetchMissing(movies.map { Int64($0.tmdb_id) }, onBatch: {}, completion: {
+            DispatchQueue.main.async {
+                self.isSorting = false
+                self.applyRatingOrder()
+                completion()
+            }
+        })
+    }
+
+    private func applyRatingOrder() {
+        let score = { (movie: CDMovie) -> Double? in
+            guard let info = self.info(of: movie), info.voteCount > 0 else { return nil }
+            return info.voteAverage
+        }
+        let previous = movies
+        let sorted = previous.enumerated().sorted { a, b in
+            switch (score(a.element), score(b.element)) {
+            case let (x?, y?) where x != y: return x > y
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return a.offset < b.offset
+            }
+        }.map(\.element)
+        guard sorted != previous else { return }
+
+        withAnimation(Theme.spring) {
+            movies = sorted
+            for (index, movie) in sorted.enumerated() {
+                movie.rank = Int32(index + 1)
+                // The new spots come from TMDb, not the AI
+                AIPlacement.set(false, listID: movieList.id, movieID: movie.id)
+            }
+        }
+        placementVersion += 1
+        try? context.save()
+
+        APIService.shared.setListOrder(listID: movieList.id, movieIDs: sorted.map(\.id)) { saved in
+            guard !saved else { return }
+            withAnimation(Theme.spring) {
+                self.movies = previous
+                for (index, movie) in previous.enumerated() {
+                    movie.rank = Int32(index + 1)
+                }
+            }
+            try? self.context.save()
+            self.reorderFailed = true
         }
     }
 

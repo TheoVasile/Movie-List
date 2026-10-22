@@ -1443,6 +1443,23 @@ class APIService {
         }
     }
 
+    /// Puts every film in a list in this order at once, first to last. Calls back on the main thread
+    func setListOrder(listID: Int64, movieIDs: [Int64], completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/lists/\(listID)/order"),
+              let body = try? JSONSerialization.data(withJSONObject: ["movie_ids": movieIDs]) else {
+            completion(false)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        send(request) { _, response, error in
+            let saved = error == nil && (200...299).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            DispatchQueue.main.async { completion(saved) }
+        }
+    }
+
     func updateMovieRanking(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/updateRank") else { return }
         
