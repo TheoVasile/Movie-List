@@ -289,6 +289,10 @@ struct PhoneNumberField: View {
     }
 
     private static func describe(_ error: Error?) -> String {
+        // The Firebase project can't send texts until billing is set up for it
+        if let error, "\(error)".contains("BILLING_NOT_ENABLED") {
+            return "Texting codes isn't set up yet, so numbers can't be verified right now."
+        }
         switch (error as NSError?).flatMap({ AuthErrorCode(rawValue: $0.code) }) {
         case .invalidPhoneNumber:
             return "That doesn't look like a phone number. Check the country code too."

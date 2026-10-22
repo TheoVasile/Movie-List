@@ -17,12 +17,14 @@ import FirebaseAuth
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    // App Check's provider has to be chosen before Firebase starts, or the default is used. Debug builds use the
+    // debug provider, since the simulator can't attest; release builds keep the default (DeviceCheck)
+    #if DEBUG
+    AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
+    #endif
     FirebaseApp.configure()
     Personalization.migrateGenderToPronouns()
     Personalization.migrateAIConsent()
-        
-    let providerFactory = AppCheckDebugProviderFactory()
-    AppCheck.setAppCheckProviderFactory(providerFactory)
 
     NotificationManager.shared.configure(application)
     return true
