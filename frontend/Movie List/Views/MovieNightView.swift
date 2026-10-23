@@ -144,7 +144,8 @@ struct MovieNightView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundColor(Theme.textSecondary)
                 if let reason = movie.reason {
-                    Label(reason, systemImage: "sparkles")
+                    // Sparkles only mark the AI's picks; Classic reasons come from TMDb and the watchlists
+                    Label(reason, systemImage: movie.ai == true ? "sparkles" : "film.stack")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

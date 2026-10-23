@@ -357,7 +357,8 @@ private extension DiscoverView {
             showGenrePicker = true
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: showingAIPicks && viewModel.kind != .tv ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
+                // Sparkles only while the AI is actually picking, not after falling back to TMDb
+                Image(systemName: showingAIPicks && viewModel.usesAI ? "sparkles" : viewModel.genreFilter.isEmpty ? "wand.and.stars" : "line.3.horizontal.decrease")
                     .foregroundStyle(Theme.accentGradient)
                 Text(genreSummary)
                     .foregroundColor(Theme.textSecondary)

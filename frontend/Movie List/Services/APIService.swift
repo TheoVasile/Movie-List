@@ -175,6 +175,8 @@ struct GroupPick: Decodable, Identifiable, Equatable {
     let original_language: String?
     let popularity: Double?
     let reason: String?
+    // Whether the AI picked it rather than TMDb; optional for older servers
+    let ai: Bool?
     // @handle of whoever suggested it; nil for recommendations
     let suggested_by: String?
     let likes: Int
@@ -186,7 +188,7 @@ struct GroupPick: Decodable, Identifiable, Equatable {
 
     var movie: Movie {
         Movie(id: tmdb_id, title: title, release_date: release_date ?? "", overview: overview ?? "", poster_path: poster_path,
-              original_language: original_language ?? "", popularity: popularity ?? 0, reason: reason)
+              original_language: original_language ?? "", popularity: popularity ?? 0, reason: reason, ai: ai)
     }
 }
 

@@ -135,6 +135,8 @@ const createTables = async () => {
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (group_id, tmdb_id)
             );
+            -- Whether the AI (Claude) picked it, as opposed to TMDb's recommendations, so only those get the AI mark
+            ALTER TABLE group_picks ADD COLUMN IF NOT EXISTS by_ai BOOLEAN NOT NULL DEFAULT false;
             CREATE TABLE IF NOT EXISTS group_pick_reactions (
                 group_id INT NOT NULL,
                 tmdb_id INT NOT NULL,
