@@ -15,6 +15,8 @@ struct PollCard: View {
     @Binding var poll: GroupPoll
     // Adds the winner to the user's lists
     var onAddWinner: (Movie) -> Void = { _ in }
+    // Opens a film's info screen
+    var onShowDetails: (Movie) -> Void = { _ in }
     // Starts a new vote
     var onNewVote: () -> Void = {}
 
@@ -102,6 +104,9 @@ struct PollCard: View {
         }
         .padding(12)
         .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture { onShowDetails(winner.movie) }
+        .accessibilityAction(named: "Show Details") { onShowDetails(winner.movie) }
     }
 
     private func optionRow(_ option: PollOption) -> some View {
@@ -130,6 +135,10 @@ struct PollCard: View {
                 }
             }
         }
+        // Tapping anywhere but the vote button opens the film's info
+        .contentShape(Rectangle())
+        .onTapGesture { onShowDetails(option.movie) }
+        .accessibilityAction(named: "Show Details") { onShowDetails(option.movie) }
     }
 
     private func tally(_ option: PollOption) -> some View {
