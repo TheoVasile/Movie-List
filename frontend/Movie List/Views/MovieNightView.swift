@@ -351,7 +351,7 @@ struct MovieNightFiltersSheet: View {
                 .font(.caption2.weight(.heavy))
                 .tracking(1.2)
                 .foregroundColor(Theme.textSecondary)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+            FlowLayout(spacing: 8) {
                 content()
             }
             Text(note)
@@ -365,14 +365,13 @@ struct MovieNightFiltersSheet: View {
             Haptics.tap()
             action()
         } label: {
+            // Same as Discover's filters: full-size text, with the tag growing to fit
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
                 .foregroundColor(selected ? Theme.onAccent : Theme.textPrimary)
-                .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 16)
                 .background(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))

@@ -423,7 +423,7 @@ private extension DiscoverView {
                     }
 
                     filterSection("BASED ON") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                        FlowLayout(spacing: 8) {
                             filterChip("All My Lists", selected: draftFilters.listIDs.isEmpty) {
                                 draftFilters.listIDs = []
                                 draftFilters.listNames = []
@@ -447,7 +447,7 @@ private extension DiscoverView {
 
                     filterSection("GENRES") {
                         automaticGenresOption
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+                        FlowLayout(spacing: 8) {
                             ForEach(Self.pickableGenres, id: \.self) { genre in
                                 genreOption(genre)
                             }
@@ -460,7 +460,7 @@ private extension DiscoverView {
                     }
 
                     filterSection("LANGUAGE") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+                        FlowLayout(spacing: 8) {
                             ForEach(DiscoverFilters.commonLanguages, id: \.self) { code in
                                 filterChip(DiscoverFilters.languageName(code), selected: draftFilters.languages.contains(code)) {
                                     if let index = draftFilters.languages.firstIndex(of: code) {
@@ -480,7 +480,7 @@ private extension DiscoverView {
                         if services.isEmpty {
                             ProgressView()
                         } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                            FlowLayout(spacing: 8) {
                                 ForEach(services) { service in
                                     filterChip(service.name, selected: draftFilters.services.contains(service)) {
                                         if let index = draftFilters.services.firstIndex(of: service) {
@@ -599,14 +599,13 @@ private extension DiscoverView {
             Haptics.tap()
             action()
         } label: {
+            // Always full size: the tag grows to fit its text, and the tags wrap onto new rows
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
                 .foregroundColor(selected ? Theme.onAccent : Theme.textPrimary)
-                .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 16)
                 .background(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
@@ -624,10 +623,9 @@ private extension DiscoverView {
             Text(Self.genreName(genre))
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
                 .foregroundColor(isSelected ? Theme.onAccent : Theme.textPrimary)
-                .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
+                .padding(.horizontal, 16)
                 .background(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(isSelected ? Color.clear : Theme.stroke, lineWidth: 1))
