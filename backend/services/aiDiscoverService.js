@@ -302,7 +302,9 @@ async function placeInList(user_id, listName, films, newFilm) {
     const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}`).join("\n");
     const response = await anthropic.messages.create({
         model: MODEL,
-        max_tokens: 500,
+        // Room for the model's reasoning as well as the answer: a long list can take it past 500 tokens, and a
+        // reply cut short fails the placement
+        max_tokens: 4000,
         system: PLACEMENT_PROMPT,
         output_config: {
             effort: "low",
