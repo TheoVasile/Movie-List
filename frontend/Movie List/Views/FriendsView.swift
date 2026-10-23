@@ -846,6 +846,7 @@ struct FriendProfileView: View {
                         .foregroundColor(Theme.textSecondary)
                 } else if let lists {
                     movieNightButton(friendAllowsAI: lists.ai_allowed ?? false)
+                    tasteLinks(lists)
                     if lists.lists.isEmpty {
                         Text("No lists yet.")
                             .font(.subheadline)
@@ -957,6 +958,40 @@ struct FriendProfileView: View {
                 blockFailed = true
             }
         }
+    }
+
+    // Their stats, and theirs against the user's, from the lists they let the user see
+    private func tasteLinks(_ lists: FriendLists) -> some View {
+        HStack(spacing: 10) {
+            NavigationLink {
+                StatsView(friend: (handle: person.handle, lists: lists.lists))
+            } label: {
+                tasteLink("@\(person.handle)'s Stats", icon: "chart.bar.xaxis")
+            }
+            NavigationLink {
+                TasteComparisonView(friend: person, friendLists: lists.lists)
+            } label: {
+                tasteLink("Your Taste vs Your Friend's", icon: "person.2.fill")
+            }
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.97))
+    }
+
+    private func tasteLink(_ title: String, icon: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(Theme.accentGradient)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 64)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
+        .cardStyle(cornerRadius: 16)
     }
 
     private func load() {
