@@ -60,9 +60,9 @@ struct MovieRow: View {
                     if let info, !info.certification.isEmpty {
                         CertificationBadge(certification: info.certification)
                     }
-                    // A small check rather than a badge, since most films in a list are usually watched
+                    // A small eye rather than a badge, since most films in a list are usually watched
                     if movie.watched {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "eye.fill")
                             .foregroundStyle(Theme.accentGradient)
                             .accessibilityLabel("Watched")
                             .transition(.scale.combined(with: .opacity))
