@@ -146,6 +146,8 @@ struct UserProfileView: View {
         VStack(spacing: 0) {
             statsLink
             Divider().padding(.leading, 56)
+            collectionsLink
+            Divider().padding(.leading, 56)
             diaryLink
             Divider().padding(.leading, 56)
             recommendationsLink
@@ -154,6 +156,38 @@ struct UserProfileView: View {
         }
         .cardStyle(cornerRadius: 18)
         .appearAnimation(delay: 0.16)
+    }
+
+    private var collectionsLink: some View {
+        NavigationLink {
+            CollectionsView()
+                .environment(\.managedObjectContext, context)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checklist")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Directors & Franchises")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("How many you've seen, and what's left")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 
     private var statsLink: some View {

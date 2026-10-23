@@ -673,7 +673,7 @@ router.get("/info", async (req, res) => {
         const films = await mapWithConcurrency(ids, async (id) => {
             try {
                 const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(id)}`, {
-                    params: { api_key: process.env.API_KEY, append_to_response: isTV(id) ? "content_ratings" : "release_dates" },
+                    params: { api_key: process.env.API_KEY, append_to_response: isTV(id) ? "content_ratings" : "release_dates,credits" },
                     timeout: 15000,
                 });
                 const film = response.data;
@@ -690,6 +690,11 @@ router.get("/info", async (req, res) => {
                     runtime: (isTV(id) ? film.episode_run_time?.[0] ?? film.last_episode_to_air?.runtime : film.runtime) || 0,
                     seasons: film.number_of_seasons ?? 0,
                     episodes: film.number_of_episodes ?? 0,
+                    // For Directors & Franchises: who directed a film, and the franchise (TMDb collection) it's part of
+                    directors: isTV(id) ? [] : (film.credits?.crew ?? [])
+                        .filter((person) => person.job === "Director")
+                        .map((person) => ({ id: person.id, name: person.name })),
+                    collection: film.belongs_to_collection ? { id: film.belongs_to_collection.id, name: film.belongs_to_collection.name } : null,
                 };
             } catch (error) {
                 return null;
@@ -698,6 +703,68 @@ router.get("/info", async (req, res) => {
         res.json(films.filter(Boolean));
     } catch (error) {
         console.error("Error fetching film info:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The films in a franchise (TMDb collection) or directed by someone, oldest first, for Directors & Franchises, e.g.
+// /collection/10 -> { name: "Star Wars Collection", films: [discover movie...] } and /director/525 -> { name, films }.
+// Only released feature films; a director's films leave out ones too obscure to count (shorts, student films)
+const filmographyCache = new Map();
+
+async function filmography(key, load) {
+    const cached = filmographyCache.get(key);
+    if (cached && Date.now() - cached.at < 24 * 60 * 60 * 1000) return cached.value;
+    const value = await load();
+    filmographyCache.set(key, { at: Date.now(), value });
+    return value;
+}
+
+const releasedFilm = (movie) => /^\d{4}-\d{2}-\d{2}$/.test(movie.release_date ?? "") && movie.release_date <= new Date().toISOString().slice(0, 10);
+const oldestFirst = (a, b) => a.release_date.localeCompare(b.release_date);
+
+router.get("/collection/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!(id > 0)) return res.status(400).json({ error: "A collection id is required." });
+    try {
+        res.json(await filmography(`collection:${id}`, async () => {
+            const response = await axios.get(`https://api.themoviedb.org/3/collection/${id}`, {
+                params: { api_key: process.env.API_KEY }, timeout: 15000,
+            });
+            const films = (response.data.parts ?? []).filter(releasedFilm).map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
+            return { name: response.data.name ?? "", films };
+        }));
+    } catch (error) {
+        if (error.response?.status === 404) return res.status(404).json({ error: "Collection not found." });
+        console.error("Error fetching collection:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.get("/director/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!(id > 0)) return res.status(400).json({ error: "A person id is required." });
+    try {
+        res.json(await filmography(`director:${id}`, async () => {
+            const [person, credits] = await Promise.all([
+                axios.get(`https://api.themoviedb.org/3/person/${id}`, { params: { api_key: process.env.API_KEY }, timeout: 15000 }),
+                axios.get(`https://api.themoviedb.org/3/person/${id}/movie_credits`, { params: { api_key: process.env.API_KEY }, timeout: 15000 }),
+            ]);
+            const seen = new Set();
+            const directed = (credits.data.crew ?? [])
+                .filter((movie) => movie.job === "Director" && releasedFilm(movie))
+                .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
+            // Shorts and student films have a tiny share of the votes their best-known films get, whoever the
+            // director is, so the bar is relative to their most-rated film
+            const most = Math.max(0, ...directed.map((movie) => movie.vote_count ?? 0));
+            const bar = Math.max(50, most * 0.03);
+            const films = directed.filter((movie) => (movie.vote_count ?? 0) >= bar)
+                .map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
+            return { name: person.data.name ?? "", films };
+        }));
+    } catch (error) {
+        if (error.response?.status === 404) return res.status(404).json({ error: "Person not found." });
+        console.error("Error fetching filmography:", error.message);
         res.status(500).json({ error: "Internal server error" });
     }
 });
