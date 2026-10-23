@@ -1237,7 +1237,7 @@ class APIService {
         }
     }
     
-    /// Genres, US age rating and TMDb user score for up to 50 films, keyed by TMDb id. Calls back on the main thread
+    /// Genres, US age rating, TMDb user score and length for up to 50 films, keyed by TMDb id. Calls back on the main thread
     func fetchMovieInfo(tmdbIDs: [Int64], completion: @escaping (Result<[Int64: MovieInfo], Error>) -> Void) {
         struct FilmInfo: Decodable {
             let id: Int64
@@ -1245,6 +1245,10 @@ class APIService {
             let certification: String
             let vote_average: Double
             let vote_count: Int
+            // Optional for older servers
+            let runtime: Int?
+            let seasons: Int?
+            let episodes: Int?
         }
         var components = URLComponents(string: "\(baseURL)/movies/info")
         components?.queryItems = [URLQueryItem(name: "ids", value: tmdbIDs.map(String.init).joined(separator: ","))]
@@ -1259,7 +1263,8 @@ class APIService {
                let films = try? JSONDecoder().decode([FilmInfo].self, from: data) {
                 let fetched = Date()
                 result = .success(Dictionary(films.map {
-                    ($0.id, MovieInfo(genres: $0.genre_ids, certification: $0.certification, voteAverage: $0.vote_average, voteCount: $0.vote_count, fetched: fetched))
+                    ($0.id, MovieInfo(genres: $0.genre_ids, certification: $0.certification, voteAverage: $0.vote_average, voteCount: $0.vote_count,
+                              runtime: $0.runtime ?? 0, seasons: $0.seasons, episodes: $0.episodes, fetched: fetched))
                 }, uniquingKeysWith: { first, _ in first }))
             } else {
                 result = .failure(error ?? NSError(domain: "Film info lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))

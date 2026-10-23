@@ -344,7 +344,7 @@ struct MovieDetailView: View {
             }
             .appearAnimation(delay: 0.1)
 
-            HStack(spacing: 8) {
+            FlowLayout(spacing: 8) {
                 if movie.isTV {
                     MetaChip(icon: "tv", text: "TV Series")
                 }
@@ -352,6 +352,15 @@ struct MovieDetailView: View {
                     // A show's date is when it first aired
                     MetaChip(icon: movie.isTV ? "dot.radiowaves.left.and.right" : "calendar", text: date.formatted(.dateTime.year().month(.abbreviated).day()))
                         .accessibilityLabel(movie.isTV ? "First aired" : "Released")
+                }
+                if let length = info?.length {
+                    MetaChip(icon: "clock", text: movie.isTV ? "\(length) episodes" : length)
+                        .accessibilityLabel(movie.isTV ? "Episodes run \(length)" : "Runs \(length)")
+                        .transition(.opacity)
+                }
+                if movie.isTV, let seasons = info?.seasons, seasons > 0 {
+                    MetaChip(icon: "square.stack", text: "\(seasons) \(seasons == 1 ? "season" : "seasons")")
+                        .transition(.opacity)
                 }
                 if let language = movie.original_language, !language.isEmpty {
                     MetaChip(icon: "globe", text: language.uppercased())

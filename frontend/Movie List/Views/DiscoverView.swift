@@ -999,6 +999,8 @@ private struct DiscoverCard: View {
     var onFullDetails: () -> Void = {}
     // Fetched the first time the card's details are opened
     @State private var providers: WatchProviders? = nil
+    // How long it runs, like "2h 14m", loaded with the details
+    @State private var length: String? = nil
 
     var body: some View {
         PosterImage(path: movie.poster_path, cornerRadius: 28, size: .xlarge)
@@ -1018,6 +1020,11 @@ private struct DiscoverCard: View {
                     MetaChip(icon: "star.fill", text: String(format: "%.1f", rating), onPoster: true)
                 }
                 MetaChip(icon: "calendar", text: Theme.year(from: movie.release_date), onPoster: true)
+                if showDetails, let length {
+                    MetaChip(icon: "clock", text: length, onPoster: true)
+                        .accessibilityLabel(movie.isTV ? "Episodes run \(length)" : "Runs \(length)")
+                        .transition(.opacity)
+                }
                 if !movie.original_language.isEmpty {
                     MetaChip(icon: "globe", text: movie.original_language.uppercased(), onPoster: true)
                 }
@@ -1047,6 +1054,11 @@ private struct DiscoverCard: View {
                         WatchProvidersStore.shared.load(tmdbID: movie.id) { loaded in
                             withAnimation(Theme.spring) { providers = loaded }
                         }
+                        let tmdbID = movie.id
+                        length = MovieInfoCache.shared.info(for: tmdbID)?.length
+                        MovieInfoCache.shared.fetchMissing([tmdbID], onBatch: {}, completion: {
+                            withAnimation(Theme.spring) { length = MovieInfoCache.shared.info(for: tmdbID)?.length }
+                        })
                     }
                 HStack(spacing: 8) {
                     TrailerButton(tmdbID: movie.id, title: movie.title, onPoster: true)
