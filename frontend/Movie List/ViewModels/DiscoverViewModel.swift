@@ -338,8 +338,7 @@ class DiscoverViewModel: ObservableObject {
     @Published private(set) var listGenres: [Int] = []
     // Recent skips, likes and "not for me"s, newest last, so they can be undone. Adding to a list isn't undone here
     @Published private(set) var undoHistory: [(movie: Movie, reaction: DiscoverReaction, profile: TasteProfile)] = []
-    // A few steps back is enough to fix a mis-swipe; each step keeps a copy of the taste profile
-    private static let undoLimit = 5
+    private static let undoLimit = 20
     // How many skipped, "not for me" and liked films are remembered, most recent kept
     static let passedLimit = 2000
     static let dislikedLimit = 2000
