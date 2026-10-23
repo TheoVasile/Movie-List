@@ -13,6 +13,7 @@ const { fetchPicks, pickHistory, saveRecommendations } = require("../models/grou
 const pool = require("../config/db");
 const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
 const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
+const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
 
 const router = express.Router();
 // The list's owner, or someone they invited to edit it
@@ -698,6 +699,33 @@ router.get("/info", async (req, res) => {
         res.json(films.filter(Boolean));
     } catch (error) {
         console.error("Error fetching film info:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// A TV show's seasons and its latest and next episode, e.g. /tv/-1399 (the app's id) or /tv/1399 ->
+// { name, status, seasons: [{ season, name, episodes, air_date, poster_path }], last_episode, next_episode }
+router.get("/tv/:id", async (req, res) => {
+    const showId = Math.abs(parseInt(req.params.id, 10));
+    if (!(showId > 0)) return res.status(400).json({ error: "A show id is required." });
+    try {
+        res.json(await showDetails(showId));
+    } catch (error) {
+        if (error.response?.status === 404) return res.status(404).json({ error: "Show not found." });
+        console.error("Error fetching show:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// One season's episodes, e.g. /tv/-1399/season/2 -> { season, name, episodes: [{ episode, name, air_date, runtime, overview, still_path }] }
+router.get("/tv/:id/season/:season", async (req, res) => {
+    const showId = Math.abs(parseInt(req.params.id, 10)), season = parseInt(req.params.season, 10);
+    if (!(showId > 0) || !(season >= 0)) return res.status(400).json({ error: "A show and season are required." });
+    try {
+        res.json(await seasonEpisodes(showId, season));
+    } catch (error) {
+        if (error.response?.status === 404) return res.status(404).json({ error: "Season not found." });
+        console.error("Error fetching season:", error.message);
         res.status(500).json({ error: "Internal server error" });
     }
 });
