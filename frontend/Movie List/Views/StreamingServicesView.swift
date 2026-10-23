@@ -85,6 +85,8 @@ struct StreamingServicesView: View {
             case .success(let saved):
                 chosen = Set(saved.services)
                 onSaved(saved.services.count)
+                // Lists showing what's on the user's services check again with the new ones
+                StreamingNowStore.shared.servicesChanged()
             case .failure:
                 chosen = before
                 failed = true

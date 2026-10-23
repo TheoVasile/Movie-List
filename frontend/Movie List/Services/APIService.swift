@@ -746,6 +746,12 @@ class APIService {
         sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
     }
 
+    /// Which of up to 200 films stream on the user's own services in their country
+    func fetchStreamingNow(tmdbIDs: [Int64], completion: @escaping (Result<StreamingNow, Error>) -> Void) {
+        sendJSON("POST", "/movies/streaming-now", body: ["ids": tmdbIDs, "region": Locale.current.region?.identifier ?? "US"],
+                 completion: completion)
+    }
+
     /// Streaming services in the user's country, most popular first
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
