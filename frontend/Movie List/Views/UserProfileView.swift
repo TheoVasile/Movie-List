@@ -18,6 +18,8 @@ struct UserProfileView: View {
     @State private var showPhotoOptions = false
     @State private var showPhotoPicker = false
     @State private var pickedPhoto: PhotosPickerItem? = nil
+    // The chosen photo, waiting to be moved and scaled into the circle
+    @State private var cropping: CroppablePhoto? = nil
     @State private var uploadingPhoto = false
     @State private var photoError: String? = nil
     @ObservedObject private var social = SocialStore.shared
@@ -101,7 +103,13 @@ struct UserProfileView: View {
             .photosPicker(isPresented: $showPhotoPicker, selection: $pickedPhoto, matching: .images)
             .onChange(of: pickedPhoto) { item in
                 guard let item else { return }
-                upload(item)
+                open(item)
+            }
+            .fullScreenCover(item: $cropping) { photo in
+                AvatarCropView(image: photo.image, onCancel: { cropping = nil }) { cropped in
+                    cropping = nil
+                    upload(cropped)
+                }
             }
             if let photoError {
                 Text(photoError)
@@ -304,20 +312,28 @@ struct UserProfileView: View {
         }
     }
 
-    private func upload(_ item: PhotosPickerItem) {
-        uploadingPhoto = true
+    // Loads the photo from the library, then asks where to crop it
+    private func open(_ item: PhotosPickerItem) {
         photoError = nil
         Task {
-            defer {
-                uploadingPhoto = false
-                pickedPhoto = nil
-            }
-            guard let data = try? await item.loadTransferable(type: Data.self),
-                  let photo = UIImage(data: data),
-                  let jpeg = AvatarStore.profileJPEG(from: photo) else {
+            defer { pickedPhoto = nil }
+            guard let data = try? await item.loadTransferable(type: Data.self), let photo = UIImage(data: data) else {
                 photoError = "Couldn't open that photo."
                 return
             }
+            cropping = CroppablePhoto(image: photo)
+        }
+    }
+
+    private func upload(_ photo: UIImage) {
+        guard let jpeg = AvatarStore.profileJPEG(from: photo) else {
+            photoError = "Couldn't open that photo."
+            return
+        }
+        uploadingPhoto = true
+        photoError = nil
+        Task {
+            defer { uploadingPhoto = false }
             let version = await withCheckedContinuation { continuation in
                 APIService.shared.uploadAvatar(jpeg) { continuation.resume(returning: $0) }
             }
