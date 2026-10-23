@@ -146,7 +146,7 @@ private extension Home {
                 .foregroundStyle(Theme.accentGradient)
             Text(movieLists.isEmpty
                  ? "Start your first collection"
-                 : "\(movieLists.count) \(movieLists.count == 1 ? "list" : "lists") · \(totalMovies) films ranked")
+                 : "\(movieLists.count) \(movieLists.count == 1 ? "list" : "lists") · \(totalTitles)")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
             if let error = sync.lastError, !movieLists.isEmpty, !sync.isSyncing {
@@ -181,8 +181,19 @@ private extension Home {
         return firstName.isEmpty ? timeOfDay : "\(timeOfDay), \(firstName)"
     }
 
-    var totalMovies: Int {
-        movieLists.reduce(0) { $0 + $1.movies.count }
+    // Each film or show once, however many lists it's in, e.g. "984 films · 32 shows"
+    var totalTitles: String {
+        let ids = Set(movieLists.flatMap { $0.movies.map(\.tmdb_id) })
+        let shows = ids.filter { $0 < 0 }.count
+        return Self.countLabel(films: ids.count - shows, shows: shows)
+    }
+
+    /// "5 films", "32 shows", or "12 films · 3 shows" when there are both
+    static func countLabel(films: Int, shows: Int) -> String {
+        let filmText = "\(films.formatted()) \(films == 1 ? "film" : "films")"
+        let showText = "\(shows.formatted()) \(shows == 1 ? "show" : "shows")"
+        if shows == 0 { return filmText }
+        return films == 0 ? showText : "\(filmText) · \(showText)"
     }
 
     var movieListsView: some View {
@@ -469,7 +480,8 @@ private struct ListCard: View {
                     .foregroundColor(Theme.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 4) {
-                    Text("\(movieList.movies.count) \(movieList.movies.count == 1 ? "film" : "films")")
+                    let shows = movieList.movies.filter(\.isTV).count
+                    Text(Home.countLabel(films: movieList.movies.count - shows, shows: shows))
                     if !ListRanking.isRanked(movieList.id) {
                         Text("· unranked")
                     }

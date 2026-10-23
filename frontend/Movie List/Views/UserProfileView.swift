@@ -31,10 +31,7 @@ struct UserProfileView: View {
                     VStack(spacing: 24) {
                         profileHeader
                         stats
-                        statsLink
-                        diaryLink
-                        recommendationsLink
-                        likedLink
+                        links
                         FollowingSection()
                         FollowedListsSection()
                         MovieNightGroupsSection()
@@ -138,10 +135,25 @@ struct UserProfileView: View {
     private var stats: some View {
         HStack(spacing: 12) {
             statTile(value: "\(movieLists.count)", label: "Lists", icon: "film.stack")
-            statTile(value: "\(totalMovies)", label: "Films", icon: "film")
+            statTile(value: uniqueTitles.formatted(), label: hasShows ? "Films & Shows" : "Films", icon: "film")
             statTile(value: topLanguage, label: "Top Language", icon: "globe")
         }
         .appearAnimation(delay: 0.14)
+    }
+
+    // Stats, Diary, Recommended to You and Liked & Not for Me as rows of one card, like a Settings group
+    private var links: some View {
+        VStack(spacing: 0) {
+            statsLink
+            Divider().padding(.leading, 56)
+            diaryLink
+            Divider().padding(.leading, 56)
+            recommendationsLink
+            Divider().padding(.leading, 56)
+            likedLink
+        }
+        .cardStyle(cornerRadius: 18)
+        .appearAnimation(delay: 0.16)
     }
 
     private var statsLink: some View {
@@ -153,6 +165,8 @@ struct UserProfileView: View {
                 Image(systemName: "chart.bar.xaxis")
                     .font(.title3)
                     .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Your Stats")
                         .font(.headline)
@@ -167,11 +181,11 @@ struct UserProfileView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundColor(Theme.textTertiary)
             }
-            .padding(16)
-            .cardStyle(cornerRadius: 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
-        .appearAnimation(delay: 0.16)
     }
 
     private var diaryLink: some View {
@@ -182,6 +196,8 @@ struct UserProfileView: View {
                 Image(systemName: "book.closed.fill")
                     .font(.title3)
                     .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Diary")
                         .font(.headline)
@@ -196,11 +212,11 @@ struct UserProfileView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundColor(Theme.textTertiary)
             }
-            .padding(16)
-            .cardStyle(cornerRadius: 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
-        .appearAnimation(delay: 0.17)
     }
 
     private var recommendationsLink: some View {
@@ -213,6 +229,8 @@ struct UserProfileView: View {
                 Image(systemName: "paperplane.fill")
                     .font(.title3)
                     .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Recommended to You")
                         .font(.headline)
@@ -235,11 +253,11 @@ struct UserProfileView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundColor(Theme.textTertiary)
             }
-            .padding(16)
-            .cardStyle(cornerRadius: 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
-        .appearAnimation(delay: 0.172)
         .accessibilityLabel(unseen > 0 ? "Recommended to You, \(unseen) new" : "Recommended to You")
     }
 
@@ -252,6 +270,8 @@ struct UserProfileView: View {
                 Image(systemName: "heart.fill")
                     .font(.title3)
                     .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Liked & Not for Me")
                         .font(.headline)
@@ -266,11 +286,11 @@ struct UserProfileView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundColor(Theme.textTertiary)
             }
-            .padding(16)
-            .cardStyle(cornerRadius: 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
-        .appearAnimation(delay: 0.175)
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {
@@ -292,8 +312,13 @@ struct UserProfileView: View {
         .cardStyle(cornerRadius: 18)
     }
 
-    private var totalMovies: Int {
-        movieLists.reduce(0) { $0 + $1.movies.count }
+    // Each film or show once, however many lists it's in
+    private var uniqueTitles: Int {
+        Set(movieLists.flatMap { $0.movies.map(\.tmdb_id) }).count
+    }
+
+    private var hasShows: Bool {
+        movieLists.contains { $0.movies.contains(where: \.isTV) }
     }
 
     private var topLanguage: String {
