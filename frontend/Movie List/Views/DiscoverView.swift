@@ -765,7 +765,7 @@ private extension DiscoverView {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(Theme.surface)
                     .overlay(Shimmer().clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous)))
-                    .aspectRatio(2/3, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Text("Finding films for you…")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
@@ -1044,8 +1044,10 @@ private struct DiscoverCard: View {
     @State private var length: String? = nil
 
     var body: some View {
+        // Every card is as wide as the screen allows and as tall as the space left, whatever the poster's
+        // shape, so cards never change size from one film to the next
         PosterImage(path: movie.poster_path, cornerRadius: 28, size: .xlarge)
-            .aspectRatio(2/3, contentMode: .fit)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottom) { info }
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .shadow(color: Theme.shadow.opacity(0.55), radius: 24, y: 12)
@@ -1053,7 +1055,8 @@ private struct DiscoverCard: View {
 
     private var info: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+            // Wraps onto a second row rather than spilling past the card's edges
+            FlowLayout(spacing: 6) {
                 if movie.isTV {
                     MetaChip(icon: "tv", text: "TV Series", onPoster: true)
                 }
