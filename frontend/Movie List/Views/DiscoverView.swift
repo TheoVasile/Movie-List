@@ -45,6 +45,7 @@ struct DiscoverView: View {
     // Whether Quick Add leaves films at the bottom or lets the AI place them
     @AppStorage("discoverQuickAddUsesAI") private var quickAddUsesAI = false
     @State private var choosingQuickAddList = false
+    @State private var showReactions = false
 
     private let swipeThreshold: CGFloat = 110
 
@@ -97,7 +98,7 @@ struct DiscoverView: View {
                     }
                     .disabled(!viewModel.canUndo)
                     .accessibilityLabel("Undo")
-                    .accessibilityHint("Brings back the last card you skipped")
+                    .accessibilityHint("Brings back the last card you skipped or liked")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     // Three lines, each opening its own choices, so the menu stays short
@@ -142,6 +143,11 @@ struct DiscoverView: View {
                         }
                         Menu {
                             Section(profileDescription) {
+                                Button {
+                                    showReactions = true
+                                } label: {
+                                    Label("Liked & Not for Me", systemImage: "heart.text.square")
+                                }
                                 Button {
                                     withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
                                 } label: {
@@ -189,6 +195,18 @@ struct DiscoverView: View {
                 fullDetails = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { swipeRight() }
             })
+        }
+        .sheet(isPresented: $showReactions) {
+            NavigationStack {
+                DiscoverReactionsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showReactions = false }
+                        }
+                    }
+            }
+            .environmentObject(authViewModel)
+            .environment(\.managedObjectContext, context)
         }
         .sheet(isPresented: $showGenrePicker) {
             genrePicker
@@ -667,7 +685,7 @@ private extension DiscoverView {
     }
 
     var actionButtons: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 16) {
             circleButton(icon: "hand.thumbsdown", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
                 notForMe()
             }
@@ -680,6 +698,11 @@ private extension DiscoverView {
                 withAnimation(Theme.spring) { showDetails.toggle() }
             }
             .accessibilityLabel("Details")
+            circleButton(icon: "heart.fill", size: 48, style: AnyShapeStyle(Theme.accentGradient), filled: false) {
+                like()
+            }
+            .accessibilityLabel("Like")
+            .accessibilityHint("Tells Discover you like this film without adding it to a list")
             circleButton(icon: quickAddList == nil ? "plus" : "bolt.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), filled: true) {
                 swipeRight()
             }
@@ -783,6 +806,24 @@ private extension DiscoverView {
                 showDetails = false
             }
             showToast("Got it, fewer films like this")
+        }
+    }
+
+    // Likes the film without adding it to a list, so Discover recommends more like it.
+    // The card floats up and away, unlike a skip or "not for me"
+    func like() {
+        guard let movie = viewModel.topMovie else { return }
+        Haptics.success()
+        withAnimation(.easeIn(duration: 0.22)) {
+            dragOffset = CGSize(width: 0, height: -900)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            withAnimation(Theme.spring) {
+                viewModel.like(movie)
+                dragOffset = .zero
+                showDetails = false
+            }
+            showToast("Liked. Discover will find more like this")
         }
     }
 

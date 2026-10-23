@@ -33,6 +33,7 @@ struct UserProfileView: View {
                         stats
                         statsLink
                         diaryLink
+                        likedLink
                         FollowingSection()
                         FollowedListsSection()
                         MovieNightGroupsSection()
@@ -199,6 +200,36 @@ struct UserProfileView: View {
         }
         .buttonStyle(PressableButtonStyle())
         .appearAnimation(delay: 0.17)
+    }
+
+    private var likedLink: some View {
+        NavigationLink {
+            DiscoverReactionsView()
+                .environment(\.managedObjectContext, context)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Liked & Not for Me")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Films you liked or passed on for good in Discover")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .cardStyle(cornerRadius: 18)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .appearAnimation(delay: 0.175)
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {
