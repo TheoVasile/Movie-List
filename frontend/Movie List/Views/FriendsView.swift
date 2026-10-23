@@ -888,7 +888,8 @@ struct FriendProfileView: View {
             .padding(16)
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("@\(person.handle)")
+        // The header already shows their @username in large type
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMovieNight) {
             MovieNightView(people: [person], canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))

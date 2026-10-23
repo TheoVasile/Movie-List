@@ -60,6 +60,13 @@ struct MovieRow: View {
                     if let info, !info.certification.isEmpty {
                         CertificationBadge(certification: info.certification)
                     }
+                    // A small check rather than a badge, since most films in a list are usually watched
+                    if movie.watched {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Theme.accentGradient)
+                            .accessibilityLabel("Watched")
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
                 .lineLimit(1)
                 .font(.caption.weight(.medium))
@@ -72,10 +79,6 @@ struct MovieRow: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(Theme.textTertiary)
                         .lineLimit(1)
-                }
-                if movie.watched {
-                    WatchedTag()
-                        .transition(.scale(scale: 0.8, anchor: .leading).combined(with: .opacity))
                 }
             }
             Spacer(minLength: 0)

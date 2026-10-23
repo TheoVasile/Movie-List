@@ -686,20 +686,21 @@ private extension DiscoverView {
     }
 
     var actionButtons: some View {
-        HStack(spacing: 16) {
-            circleButton(icon: "hand.thumbsdown", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
+        // Captions line up along the bottom, whatever size each button is
+        HStack(alignment: .lastTextBaseline, spacing: 14) {
+            circleButton(icon: "hand.thumbsdown", caption: "Not for Me", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
                 notForMe()
             }
             .accessibilityLabel("Not for me")
-            circleButton(icon: "xmark", size: 64, style: AnyShapeStyle(Theme.accentSecondary), filled: false) {
+            circleButton(icon: "xmark", caption: "Skip", size: 64, style: AnyShapeStyle(Theme.accentSecondary), filled: false) {
                 swipeLeft()
             }
             .accessibilityLabel("Skip")
-            circleButton(icon: showDetails ? "info.circle.fill" : "info", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
+            circleButton(icon: showDetails ? "info.circle.fill" : "info", caption: "Details", size: 48, style: AnyShapeStyle(Theme.textSecondary), filled: false) {
                 withAnimation(Theme.spring) { showDetails.toggle() }
             }
             .accessibilityLabel("Details")
-            circleButton(icon: quickAddList == nil ? "plus" : "bolt.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), filled: true) {
+            circleButton(icon: quickAddList == nil ? "plus" : "bolt.fill", caption: quickAddList == nil ? "Add" : "Quick Add", size: 64, style: AnyShapeStyle(Theme.accentGradient), filled: true) {
                 swipeRight()
             }
             // With Quick Add on, touch and hold still lets one film go somewhere else
@@ -720,7 +721,7 @@ private extension DiscoverView {
             .accessibilityLabel(quickAddList.map { "Add to \($0.name ?? "your list")" } ?? "Add to a list")
             .accessibilityHint(quickAddList == nil ? "" : "Touch and hold to choose lists")
             // On the far right, opposite "Not for me" on the far left
-            circleButton(icon: "heart.fill", size: 48, style: AnyShapeStyle(Theme.accentGradient), filled: false) {
+            circleButton(icon: "heart.fill", caption: "Like", size: 48, style: AnyShapeStyle(Theme.accentGradient), filled: false) {
                 like()
             }
             .accessibilityLabel("Like")
@@ -728,16 +729,24 @@ private extension DiscoverView {
         }
     }
 
-    func circleButton(icon: String, size: CGFloat, style: AnyShapeStyle, filled: Bool, action: @escaping () -> Void) -> some View {
+    func circleButton(icon: String, caption: String, size: CGFloat, style: AnyShapeStyle, filled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: size * 0.36, weight: .heavy))
-                .foregroundStyle(filled ? AnyShapeStyle(Theme.onAccent) : style)
-                .frame(width: size, height: size)
-                .background(filled ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
-                .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: size * 0.36, weight: .heavy))
+                    .foregroundStyle(filled ? AnyShapeStyle(Theme.onAccent) : style)
+                    .frame(width: size, height: size)
+                    .background(filled ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                    .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
+                // Says what each button does, since 👎 and ✕ look alike but mean different things
+                Text(caption)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    .fixedSize()
+                    .accessibilityHidden(true)
+            }
         }
         .buttonStyle(PressableButtonStyle(scale: 0.88))
     }
