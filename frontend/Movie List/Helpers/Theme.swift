@@ -12,18 +12,28 @@ import UIKit
 // MARK: - Palette
 
 enum Theme {
-    // Dark: a cinema at night. Light: crisp white with blue accents
-    static let background = Color(light: Color(red: 0.96, green: 0.97, blue: 1.0), dark: Color(red: 0.04, green: 0.04, blue: 0.07))
-    static let surface = Color(light: .white, dark: Color(red: 0.10, green: 0.10, blue: 0.14))
-    static let surfaceRaised = Color(light: Color(red: 0.91, green: 0.94, blue: 0.99), dark: Color(red: 0.15, green: 0.15, blue: 0.20))
-    static let stroke = Color(light: navy.opacity(0.10), dark: Color.white.opacity(0.08))
+    // Dark: a cinema at night. Light: crisp white with blue accents. Pink (the other ColorTheme): blush and
+    // hot pink by day, plum and neon pink by night
+    static let background = Color(light: Color(red: 0.96, green: 0.97, blue: 1.0), dark: Color(red: 0.04, green: 0.04, blue: 0.07),
+                                  pinkLight: Color(red: 1.0, green: 0.95, blue: 0.97), pinkDark: Color(red: 0.08, green: 0.03, blue: 0.07))
+    static let surface = Color(light: .white, dark: Color(red: 0.10, green: 0.10, blue: 0.14),
+                               pinkLight: .white, pinkDark: Color(red: 0.16, green: 0.08, blue: 0.14))
+    static let surfaceRaised = Color(light: Color(red: 0.91, green: 0.94, blue: 0.99), dark: Color(red: 0.15, green: 0.15, blue: 0.20),
+                                     pinkLight: Color(red: 0.99, green: 0.89, blue: 0.94), pinkDark: Color(red: 0.23, green: 0.11, blue: 0.20))
+    static let stroke = Color(light: navy.opacity(0.10), dark: Color.white.opacity(0.08),
+                              pinkLight: plum.opacity(0.10), pinkDark: Color.white.opacity(0.08))
 
-    // Dark: marquee gold fading into a cinema-seat red. Light: royal blue fading into sky blue
-    static let accent = Color(light: Color(red: 0.15, green: 0.39, blue: 0.92), dark: Color(red: 0.98, green: 0.76, blue: 0.27))
-    static let accentSecondary = Color(light: Color(red: 0.05, green: 0.65, blue: 0.91), dark: Color(red: 0.93, green: 0.29, blue: 0.36))
-    static let textPrimary = Color(light: navy, dark: .white)
-    static let textSecondary = Color(light: navy.opacity(0.62), dark: Color.white.opacity(0.62))
-    static let textTertiary = Color(light: navy.opacity(0.40), dark: Color.white.opacity(0.38))
+    // Dark: marquee gold fading into a cinema-seat red. Light: royal blue fading into sky blue.
+    // Pink: hot pink fading into bubblegum by day, neon pink fading into violet by night
+    static let accent = Color(light: Color(red: 0.15, green: 0.39, blue: 0.92), dark: Color(red: 0.98, green: 0.76, blue: 0.27),
+                              pinkLight: Color(red: 0.91, green: 0.18, blue: 0.53), pinkDark: Color(red: 1.0, green: 0.45, blue: 0.74))
+    static let accentSecondary = Color(light: Color(red: 0.05, green: 0.65, blue: 0.91), dark: Color(red: 0.93, green: 0.29, blue: 0.36),
+                                       pinkLight: Color(red: 0.98, green: 0.52, blue: 0.72), pinkDark: Color(red: 0.76, green: 0.36, blue: 0.96))
+    static let textPrimary = Color(light: navy, dark: .white, pinkLight: plum, pinkDark: .white)
+    static let textSecondary = Color(light: navy.opacity(0.62), dark: Color.white.opacity(0.62),
+                                     pinkLight: plum.opacity(0.62), pinkDark: Color.white.opacity(0.62))
+    static let textTertiary = Color(light: navy.opacity(0.40), dark: Color.white.opacity(0.38),
+                                    pinkLight: plum.opacity(0.40), pinkDark: Color.white.opacity(0.38))
     // Text and icons drawn on top of the accent gradient
     static let onAccent = Color(light: .white, dark: .black)
     // Text drawn over a poster's dark gradient, which stays dark in both themes
@@ -34,6 +44,10 @@ enum Theme {
     static let scrim = Color(light: navy.opacity(0.35), dark: Color.black.opacity(0.6))
 
     private static let navy = Color(red: 0.04, green: 0.10, blue: 0.20)
+    private static let plum = Color(red: 0.24, green: 0.05, blue: 0.17)
+
+    // Whether the pink palette is in use. Read whenever a colour is drawn; set by AppearanceSettings
+    nonisolated(unsafe) static var isPink = false
 
     static let accentGradient = LinearGradient(
         colors: [accent, accentSecondary],
@@ -64,6 +78,14 @@ extension Color {
     init(light: Color, dark: Color) {
         self.init(UIColor { traits in
             UIColor(traits.userInterfaceStyle == .light ? light : dark)
+        })
+    }
+
+    /// A colour that also has a version for the pink palette, chosen each time it's drawn
+    init(light: Color, dark: Color, pinkLight: Color, pinkDark: Color) {
+        self.init(UIColor { traits in
+            let isLight = traits.userInterfaceStyle == .light
+            return UIColor(Theme.isPink ? (isLight ? pinkLight : pinkDark) : (isLight ? light : dark))
         })
     }
 }

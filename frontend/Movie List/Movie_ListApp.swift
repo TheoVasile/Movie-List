@@ -60,6 +60,7 @@ struct Movie_ListApp: App {
     @StateObject private var network = NetworkService()
     @StateObject private var db = DatabaseService()
     let persistenceController = PersistenceController.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     
     var body: some Scene {
         WindowGroup {
@@ -70,6 +71,8 @@ struct Movie_ListApp: App {
                     .environmentObject(network)
                     .environmentObject(db)
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                    // Colours are fixed once a view is drawn, so a new colour theme builds the app's screens again
+                    .id(appearance.colorTheme)
             }
             .tint(Theme.accent)
             // Light or dark is set on the window, so pop-ups and sheets follow it too
