@@ -18,7 +18,20 @@ struct MovieInfo: Codable {
     // Out of 10
     let voteAverage: Double
     let voteCount: Int
+    // Minutes (a show's typical episode), 0 when TMDb doesn't know. nil in info cached before lengths were kept
+    var runtime: Int? = nil
+    // For TV shows
+    var seasons: Int? = nil
+    var episodes: Int? = nil
     let fetched: Date
+
+    /// The length as "2h 14m", or "45m" for a show's episodes, nil when unknown
+    var length: String? {
+        guard let runtime, runtime > 0 else { return nil }
+        let hours = runtime / 60, minutes = runtime % 60
+        if hours == 0 { return "\(minutes)m" }
+        return minutes == 0 ? "\(hours)h" : "\(hours)h \(minutes)m"
+    }
 }
 
 /// TMDb info for each film, keyed by TMDb id, fetched once and kept on this device. Genres and
@@ -46,7 +59,8 @@ final class MovieInfoCache {
     private func needsFetch(_ tmdbID: Int64) -> Bool {
         guard tmdbID != 0 else { return false }
         guard let info = infoByID[tmdbID] else { return true }
-        return Date().timeIntervalSince(info.fetched) > Self.maxAge
+        // Info cached before lengths were kept is fetched again to get them
+        return info.runtime == nil || Date().timeIntervalSince(info.fetched) > Self.maxAge
     }
 
     /// Fetches the films that aren't cached or are out of date, two batches at a time so a big list

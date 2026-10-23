@@ -662,8 +662,9 @@ function usCertification(releaseDates) {
     return theatrical?.certification.trim() ?? "";
 }
 
-// Genres, US age rating and TMDb user score for up to 50 TMDb films at a time, e.g. ?ids=771 ->
-// [{ id: 771, genre_ids: [35, 10751], certification: "PG", vote_average: 7.4, vote_count: 11000 }].
+// Genres, US age rating, TMDb user score and length for up to 50 TMDb films at a time, e.g. ?ids=771 ->
+// [{ id: 771, genre_ids: [35, 10751], certification: "PG", vote_average: 7.4, vote_count: 11000, runtime: 103,
+// seasons: 0, episodes: 0 }]. runtime is in minutes (a show's typical episode), 0 when TMDb doesn't know it.
 // Read-only: the app caches these to label films and filter its lists by genre. Films TMDb can't find are left out
 router.get("/info", async (req, res) => {
     try {
@@ -685,6 +686,9 @@ router.get("/info", async (req, res) => {
                         : usCertification(film.release_dates),
                     vote_average: film.vote_average ?? 0,
                     vote_count: film.vote_count ?? 0,
+                    runtime: (isTV(id) ? film.episode_run_time?.[0] ?? film.last_episode_to_air?.runtime : film.runtime) || 0,
+                    seasons: film.number_of_seasons ?? 0,
+                    episodes: film.number_of_episodes ?? 0,
                 };
             } catch (error) {
                 return null;
