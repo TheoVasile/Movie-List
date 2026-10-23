@@ -859,6 +859,11 @@ class APIService {
         }
     }
 
+    /// What the people the user follows watched and ranked over the last two weeks, newest first
+    func fetchFriendActivity(completion: @escaping (Result<[FriendActivity], Error>) -> Void) {
+        sendJSON("GET", "/users/me/activity", query: [URLQueryItem(name: "days", value: "14")], completion: completion)
+    }
+
     func fetchRecommendations(completion: @escaping (Result<[FilmRecommendation], Error>) -> Void) {
         sendJSON("GET", "/users/me/recommendations", completion: completion)
     }

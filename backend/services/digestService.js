@@ -9,12 +9,15 @@ const BULK_WATCH_SIZE = 20;
 const yearOf = (date) => String(date ?? "").slice(0, 4);
 const filmLabel = (row) => (yearOf(row.release_date) ? `${row.title} (${yearOf(row.release_date)})` : row.title);
 
-/// What the people a user follows did in the last day: films they watched and films they added to a list,
-/// with whether each film is in one of the user's own lists (and if so whether it's their watchlist)
-async function fetchFriendActivity(user_id) {
+/// What the people a user follows did recently (the last day by default, for the digest; the in-app feed asks for
+/// longer): films they watched, rewatched and added to a list, newest first, with whether each film is in one of
+/// the user's own lists (and if so whether it's their watchlist), and the film's details for opening it
+async function fetchFriendActivity(user_id, { days = 1, limit = 500 } = {}) {
+    const since = `${Math.min(Math.max(Math.round(days * 24), 1), 24 * 60)} hours`;
     const result = await pool.query(
         `WITH friends AS (
-             SELECT f.followee_id AS id, COALESCE('@' || u.handle, u.username) AS name, u.handle
+             SELECT f.followee_id AS id, COALESCE('@' || u.handle, u.username) AS name, u.handle,
+                    FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version
              FROM follows f JOIN users u ON u.firebase_uid = f.followee_id
              WHERE f.follower_id = $1 AND f.accepted
          ), bulk AS (
@@ -24,32 +27,34 @@ async function fetchFriendActivity(user_id) {
          ), bulk_added AS (
              SELECT l.user_id, date_trunc('second', lm.added_at) AS at
              FROM list_movies lm JOIN lists l ON l.id = lm.list_id
-             WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - INTERVAL '24 hours'
+             WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - $2::interval
              GROUP BY 1, 2 HAVING COUNT(*) > ${BULK_WATCH_SIZE}
          ), events AS (
              SELECT w.user_id, w.movie_id, 'watched' AS kind, w.watched_at AS at, NULL::int AS rank, NULL AS list_name
              FROM watched_movies w
-             WHERE w.user_id IN (SELECT id FROM friends) AND w.watched_at > NOW() - INTERVAL '24 hours'
+             WHERE w.user_id IN (SELECT id FROM friends) AND w.watched_at > NOW() - $2::interval
                AND (w.user_id, date_trunc('second', w.watched_at)) NOT IN (SELECT user_id, at FROM bulk)
              UNION ALL
              SELECT wl.user_id, wl.movie_id, 'rewatched', wl.created_at, NULL, NULL
              FROM watch_log wl
-             WHERE wl.user_id IN (SELECT id FROM friends) AND wl.created_at > NOW() - INTERVAL '24 hours'
+             WHERE wl.user_id IN (SELECT id FROM friends) AND wl.created_at > NOW() - $2::interval
              UNION ALL
              -- An unranked list's films have no rank to brag about, so they're just "added"
              SELECT l.user_id, lm.movie_id, 'ranked', lm.added_at, CASE WHEN l.is_ranked THEN lm.rank END, l.name
              FROM list_movies lm JOIN lists l ON l.id = lm.list_id
-             WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - INTERVAL '24 hours'
+             WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - $2::interval
                AND l.visibility <> 'private'
                AND (l.user_id, date_trunc('second', lm.added_at)) NOT IN (SELECT user_id, at FROM bulk_added)
          )
-         SELECT e.kind, e.rank, e.list_name, e.at, fr.name AS friend, fr.handle, m.title, m.release_date,
+         SELECT e.kind, e.rank, e.list_name, e.at, fr.name AS friend, fr.handle, fr.avatar_version, m.title, m.release_date,
+                m.tmdb_id, m.poster_path, m.overview, m.original_language, m.popularity,
                 (SELECT ml.name FROM lists ml JOIN list_movies mlm ON mlm.list_id = ml.id
                  WHERE ml.user_id = $1 AND mlm.movie_id = e.movie_id
                  ORDER BY (ml.name ILIKE '%watch%') DESC LIMIT 1) AS my_list
          FROM events e JOIN friends fr ON fr.id = e.user_id JOIN movies m ON m.id = e.movie_id
-         ORDER BY e.at DESC`,
-        [user_id]
+         ORDER BY e.at DESC
+         LIMIT $3`,
+        [user_id, since, limit]
     );
     return result.rows;
 }
