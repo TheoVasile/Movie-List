@@ -33,6 +33,8 @@ struct MovieNightView: View {
     // The film waiting for the user to choose lists, and the films already added
     @State private var adding: Movie? = nil
     @State private var added: Set<Int64> = []
+    // The film whose info screen is open, as a temporary copy that isn't saved anywhere
+    @State private var details: CDMovie? = nil
 
     init(people: [UserSummary], canUseAI: Bool) {
         self.people = people
@@ -108,6 +110,14 @@ struct MovieNightView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+            .sheet(item: $details) { preview in
+                // Add to Lists closes the info screen and asks which lists
+                MovieDetailView(movie: preview, onAddToLists: {
+                    let film = picks.first { $0.id == Int64(preview.tmdb_id) }
+                    details = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = film }
+                })
+            }
             .sheet(isPresented: $showFilters) {
                 MovieNightFiltersSheet(filters: filters) { chosen in
                     filters = chosen
@@ -146,6 +156,13 @@ struct MovieNightView: View {
         }
         .padding(14)
         .cardStyle(cornerRadius: 18)
+        // Tapping anywhere but the button opens the film's info
+        .contentShape(Rectangle())
+        .onTapGesture {
+            Haptics.tap()
+            details = PersistenceController.preview(of: movie)
+        }
+        .accessibilityAction(named: "Show Details") { details = PersistenceController.preview(of: movie) }
     }
 
     private func load() {

@@ -37,6 +37,9 @@ struct GroupMovieNightView: View {
     // The film waiting for the user to choose lists, and the films already added
     @State private var adding: Movie? = nil
     @State private var added: Set<Int64> = []
+    // The film whose info screen is open, as a temporary copy that isn't saved anywhere, and the film it shows
+    @State private var details: CDMovie? = nil
+    @State private var detailsMovie: Movie? = nil
     @State private var showMembers = false
     @State private var showFilters = false
     @State private var showSuggest = false
@@ -59,7 +62,7 @@ struct GroupMovieNightView: View {
                         .padding(.horizontal, -16)
                         .onChange(of: usesAI) { _ in refresh() }
                     if let binding = Binding($poll) {
-                        PollCard(groupID: group.id, poll: binding, onAddWinner: { adding = $0 }) {
+                        PollCard(groupID: group.id, poll: binding, onAddWinner: { adding = $0 }, onShowDetails: showDetails) {
                             withAnimation(Theme.spring) { poll = nil }
                         }
                         .transition(.opacity)
@@ -100,6 +103,14 @@ struct GroupMovieNightView: View {
                 .environment(\.managedObjectContext, context)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $details) { preview in
+                // Add to Lists closes the info screen and asks which lists
+                MovieDetailView(movie: preview, onAddToLists: {
+                    let film = detailsMovie
+                    details = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = film }
+                })
             }
             .sheet(isPresented: $showMembers) {
                 GroupMembersSheet(group: group) { updated in
@@ -338,6 +349,10 @@ struct GroupMovieNightView: View {
         }
         .padding(14)
         .cardStyle(cornerRadius: 18)
+        // Tapping anywhere but the buttons opens the film's info
+        .contentShape(Rectangle())
+        .onTapGesture { showDetails(pick.movie) }
+        .accessibilityAction(named: "Show Details") { showDetails(pick.movie) }
         .contextMenu {
             // Whoever suggested a film, or the group's owner, can take it off
             if let by = pick.suggested_by, by == social.profile?.handle || group.is_owner {
@@ -381,6 +396,12 @@ struct GroupMovieNightView: View {
     }
 
     // MARK: Actions
+
+    private func showDetails(_ movie: Movie) {
+        Haptics.tap()
+        detailsMovie = movie
+        details = PersistenceController.preview(of: movie)
+    }
 
     private func fetchAll() async {
         await withCheckedContinuation { continuation in
