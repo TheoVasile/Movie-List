@@ -34,6 +34,26 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// The app's colours. Pink is offered only to the accounts in `pinkHandles`
+enum ColorTheme: String, CaseIterable, Identifiable {
+    case classic, pink
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .classic: return "Classic"
+        case .pink: return "Pink"
+        }
+    }
+
+    static let pinkHandles: Set<String> = ["bitchpickles", "rogueaxis3301"]
+
+    static func isAvailable(_ theme: ColorTheme, to handle: String?) -> Bool {
+        theme == .classic || handle.map { pinkHandles.contains($0) } == true
+    }
+}
+
 /// The app's light/dark setting. Daylight mode is light between sunrise and sunset and dark otherwise.
 /// Sun times come from the device's approximate location if the user allows it, rounded to about
 /// 10 km and kept on this device only; without it, daytime is 7 AM to 7 PM
@@ -49,6 +69,13 @@ final class AppearanceSettings: NSObject, ObservableObject {
             refresh()
         }
     }
+    @Published var colorTheme: ColorTheme {
+        didSet {
+            UserDefaults.standard.set(colorTheme.rawValue, forKey: Self.colorThemeKey)
+            Theme.isPink = colorTheme == .pink
+            redraw()
+        }
+    }
     @Published private(set) var sunTimes: SunTimes
     @Published private(set) var usesLocation: Bool
 
@@ -56,11 +83,15 @@ final class AppearanceSettings: NSObject, ObservableObject {
     private var timer: Timer?
 
     private static let modeKey = "appearance.mode"
+    private static let colorThemeKey = "appearance.colorTheme"
     private static let latitudeKey = "appearance.latitude"
     private static let longitudeKey = "appearance.longitude"
 
     private override init() {
         mode = UserDefaults.standard.string(forKey: Self.modeKey).flatMap(AppearanceMode.init) ?? .dark
+        let savedTheme = UserDefaults.standard.string(forKey: Self.colorThemeKey).flatMap(ColorTheme.init) ?? .classic
+        colorTheme = savedTheme
+        Theme.isPink = savedTheme == .pink
         usesLocation = UserDefaults.standard.object(forKey: Self.latitudeKey) != nil
         sunTimes = SunTimes.fallback(on: Date())
         super.init()
@@ -127,6 +158,24 @@ final class AppearanceSettings: NSObject, ObservableObject {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
+    }
+
+    /// Falls back to Classic when the signed-in account can't use the chosen theme (after signing out, say)
+    func checkColorTheme(for handle: String?) {
+        if !ColorTheme.isAvailable(colorTheme, to: handle) { colorTheme = .classic }
+    }
+
+    // The app's screens are built again for the new theme (see Movie_ListApp); this fades between the two and
+    // has UIKit's own parts, like the tab bar, pick up the new colours
+    private func redraw() {
+        let style = interfaceStyle
+        for window in currentWindows {
+            let current = window.traitCollection.userInterfaceStyle
+            UIView.transition(with: window, duration: 0.35, options: .transitionCrossDissolve) {
+                window.overrideUserInterfaceStyle = current == .dark ? .light : .dark
+                window.overrideUserInterfaceStyle = style
+            }
+        }
     }
 
     /// Sets the style on every window, so sheets and alerts follow it too
