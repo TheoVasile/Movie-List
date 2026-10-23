@@ -442,7 +442,8 @@ router.post("/movie-night", async (req, res) => {
                 const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
                 if (!movie || (wanted.size && !movie.genre_ids.some((id) => wanted.has(id)))) return null;
                 if (hasFilters(filters) && !(await matchesFilters(movie, filters))) return null;
-                return { ...movie, reason: cleanText(pick.reason, 200) };
+                // Marked as the AI's, so the app shows its sparkles only on these
+                return { ...movie, reason: cleanText(pick.reason, 200), ai: true };
             } catch (error) {
                 return null;
             }
@@ -538,7 +539,7 @@ router.post("/ai-discover", async (req, res) => {
                 try {
                     const movie = toDiscoverMovie(await findOnTmdb(pick.title, pick.year) ?? {});
                     const fits = movie && (!hasFilters(filters) || await matchesFilters(movie, filters));
-                    found[index] = fits ? { ...movie, reason: cleanText(pick.reason, 200) } : null;
+                    found[index] = fits ? { ...movie, reason: cleanText(pick.reason, 200), ai: true } : null;
                 } catch (error) {
                     found[index] = null;
                 }

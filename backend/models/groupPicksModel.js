@@ -12,7 +12,7 @@ async function fetchPicks(user_id, group_id) {
     if (!(await groupParticipants(user_id, group_id))) return null;
     const result = await pool.query(
         `SELECT p.tmdb_id, p.title, p.poster_path, p.release_date, p.overview, p.original_language, p.popularity, p.reason,
-                s.handle AS suggested_by,
+                p.by_ai AS ai, s.handle AS suggested_by,
                 COUNT(r.*) FILTER (WHERE r.reaction = 1)::int AS likes,
                 COUNT(r.*) FILTER (WHERE r.reaction = -1)::int AS dislikes,
                 COALESCE(MAX(r.reaction) FILTER (WHERE r.user_id = $2), 0)::int AS my_reaction,
@@ -48,7 +48,8 @@ async function pickHistory(group_id) {
     };
 }
 
-/// Swaps the group's recommendations that nobody has liked for new ones. movies are discover movies with a reason
+/// Swaps the group's recommendations that nobody has liked for new ones. movies are discover movies with a reason,
+/// and ai: true when the AI picked them
 async function saveRecommendations(group_id, movies) {
     await pool.query(
         `DELETE FROM group_picks p
@@ -59,12 +60,12 @@ async function saveRecommendations(group_id, movies) {
     for (const [position, movie] of movies.entries()) {
         await pool.query(
             // Never a film everyone in the group turned down
-            `INSERT INTO group_picks (group_id, tmdb_id, title, poster_path, release_date, overview, original_language, popularity, reason, position)
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+            `INSERT INTO group_picks (group_id, tmdb_id, title, poster_path, release_date, overview, original_language, popularity, reason, position, by_ai)
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
              WHERE NOT EXISTS (SELECT 1 FROM group_dismissed WHERE group_id = $1 AND tmdb_id = $2)
              ON CONFLICT DO NOTHING`,
             [group_id, movie.id, String(movie.title).slice(0, 255), movie.poster_path || null, String(movie.release_date ?? "").slice(0, 20),
-             movie.overview ?? "", movie.original_language ?? "", movie.popularity ?? 0, movie.reason ?? null, position]
+             movie.overview ?? "", movie.original_language ?? "", movie.popularity ?? 0, movie.reason ?? null, position, movie.ai === true]
         );
     }
 }
