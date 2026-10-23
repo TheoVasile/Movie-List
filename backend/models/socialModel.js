@@ -21,7 +21,9 @@ async function getProfile(user_id) {
                 u.phone IS NOT NULL AS has_phone, u.phone, u.is_private,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
-                (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests
+                (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests,
+                (SELECT COUNT(*) FROM film_recommendations r WHERE r.recipient_id = u.firebase_uid AND NOT r.seen
+                   AND ${notBlocked("u.firebase_uid", "r.sender_id")})::int AS recommendations_unseen
          FROM users u WHERE u.firebase_uid = $1`,
         [user_id]
     );
@@ -338,7 +340,7 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
 }
 
 /// Blocks whoever has @handle: unfollows both ways (and drops requests), takes each off the other's lists as an
-/// editor and follower, and out of each other's movie night groups. Returns false when there's no such person
+/// editor and follower, out of each other's movie night groups, and deletes the films they sent each other. Returns false when there's no such person
 async function blockUser(user_id, handle) {
     const target = await pool.query("SELECT firebase_uid FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
     const other_id = target.rows[0]?.firebase_uid;
@@ -358,6 +360,7 @@ async function blockUser(user_id, handle) {
                 "DELETE FROM watch_group_members WHERE user_id = $2 AND group_id IN (SELECT id FROM watch_groups WHERE owner_id = $1)",
                 [owner, other]
             );
+            await client.query("DELETE FROM film_recommendations WHERE sender_id = $1 AND recipient_id = $2", [owner, other]);
         }
         await client.query("COMMIT");
         return true;

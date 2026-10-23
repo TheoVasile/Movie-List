@@ -33,6 +33,7 @@ struct UserProfileView: View {
                         stats
                         statsLink
                         diaryLink
+                        recommendationsLink
                         likedLink
                         FollowingSection()
                         FollowedListsSection()
@@ -200,6 +201,46 @@ struct UserProfileView: View {
         }
         .buttonStyle(PressableButtonStyle())
         .appearAnimation(delay: 0.17)
+    }
+
+    private var recommendationsLink: some View {
+        let unseen = social.profile?.recommendations_unseen ?? 0
+        return NavigationLink {
+            RecommendationsView()
+                .environment(\.managedObjectContext, context)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "paperplane.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recommended to You")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text(unseen > 0 ? "\(unseen) new from friends" : "Films friends think you should see")
+                        .font(.caption)
+                        .foregroundColor(unseen > 0 ? Theme.accent : Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if unseen > 0 {
+                    Text("\(unseen)")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(Theme.onAccent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.accentGradient, in: Capsule())
+                }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .cardStyle(cornerRadius: 18)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .appearAnimation(delay: 0.172)
+        .accessibilityLabel(unseen > 0 ? "Recommended to You, \(unseen) new" : "Recommended to You")
     }
 
     private var likedLink: some View {

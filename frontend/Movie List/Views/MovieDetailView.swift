@@ -31,6 +31,8 @@ struct MovieDetailView: View {
     @State private var imdbID: String? = nil
     @State private var info: MovieInfo? = nil
     @State private var providers: WatchProviders? = nil
+    @State private var recommending = false
+    @ObservedObject private var social = SocialStore.shared
 
     private static let imdbCacheKey = "imdbIDs"
 
@@ -253,6 +255,28 @@ struct MovieDetailView: View {
         }
     }
 
+    // Sends the film to friends, like the trailer button beside it
+    private var recommendButton: some View {
+        Button {
+            Haptics.tap()
+            recommending = true
+        } label: {
+            Label("Recommend", systemImage: "paperplane.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Theme.surface).overlay(Capsule().stroke(Theme.stroke, lineWidth: 1)))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.94))
+        .accessibilityLabel("Recommend to Friends")
+        .sheet(isPresented: $recommending) {
+            RecommendFilmSheet(movie: Movie(movie))
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
     private var hasActions: Bool {
         onCompare != nil || onSetRank != nil || onToggleWatched != nil || onAddToLists != nil
     }
@@ -369,7 +393,13 @@ struct MovieDetailView: View {
             }
             .appearAnimation(delay: 0.18)
 
-            TrailerButton(tmdbID: Int64(movie.tmdb_id), title: movie.title ?? "")
+            HStack(spacing: 8) {
+                TrailerButton(tmdbID: Int64(movie.tmdb_id), title: movie.title ?? "")
+                // Needs an @username, since that's how friends see who sent it
+                if movie.tmdb_id != 0 && social.profile?.handle != nil {
+                    recommendButton
+                }
+            }
 
             // The overview comes straight after the title, so it's readable without scrolling
             if let overview = movie.overview, !overview.isEmpty {

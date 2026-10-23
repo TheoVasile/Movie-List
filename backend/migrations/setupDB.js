@@ -206,6 +206,25 @@ const createTables = async () => {
             );
             CREATE INDEX IF NOT EXISTS blocks_blocked ON blocks (blocked_id);
 
+            -- Films people send each other to watch, with an optional note. seen turns true once the recipient opens them
+            CREATE TABLE IF NOT EXISTS film_recommendations (
+                id SERIAL PRIMARY KEY,
+                sender_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                recipient_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                poster_path VARCHAR(255),
+                release_date VARCHAR(20),
+                overview TEXT,
+                original_language VARCHAR(10),
+                popularity DOUBLE PRECISION,
+                note VARCHAR(300),
+                seen BOOLEAN NOT NULL DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (sender_id, recipient_id, tmdb_id)
+            );
+            CREATE INDEX IF NOT EXISTS film_recommendations_recipient ON film_recommendations (recipient_id, created_at DESC);
+
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,
                 tmdb_id VARCHAR(20) UNIQUE,
