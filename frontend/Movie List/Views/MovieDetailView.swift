@@ -362,11 +362,9 @@ struct MovieDetailView: View {
                     MetaChip(icon: "square.stack", text: "\(seasons) \(seasons == 1 ? "season" : "seasons")")
                         .transition(.opacity)
                 }
+                // Spelled out here ("Japanese"); everywhere else it's the code ("JA")
                 if let language = movie.original_language, !language.isEmpty {
-                    MetaChip(icon: "globe", text: language.uppercased())
-                }
-                if movie.popularity > 0 {
-                    MetaChip(icon: "flame.fill", text: String(format: "%.0f", movie.popularity))
+                    MetaChip(icon: "globe", text: DiscoverFilters.languageName(language))
                 }
             }
             .appearAnimation(delay: 0.18)
