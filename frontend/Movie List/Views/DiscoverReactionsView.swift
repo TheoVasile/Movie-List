@@ -33,10 +33,17 @@ final class DiscoverReactions: ObservableObject {
         disliked = Self.load(Self.dislikedKey)
     }
 
+    // The most recent of each kept, so the history stays a reasonable size
+    private static let limit = 500
+
     func add(_ movie: Movie, liked isLiked: Bool) {
         remove(movie.id)
         let entry = Entry(movie: movie, date: Date())
-        if isLiked { liked.insert(entry, at: 0) } else { disliked.insert(entry, at: 0) }
+        if isLiked {
+            liked = Array(([entry] + liked).prefix(Self.limit))
+        } else {
+            disliked = Array(([entry] + disliked).prefix(Self.limit))
+        }
         save()
     }
 

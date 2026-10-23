@@ -262,6 +262,40 @@ struct TasteProfile: Codable {
     }
 }
 
+/// Film ids kept on this device, oldest first, up to a limit: past it, the oldest are forgotten so what
+/// Discover keeps doesn't grow forever
+struct RecentIDs {
+    private(set) var order: [Int64]
+    private(set) var set: Set<Int64>
+    let limit: Int
+
+    init(_ stored: [Int], limit: Int) {
+        self.limit = limit
+        order = Array(stored.map(Int64.init).suffix(limit))
+        set = Set(order)
+    }
+
+    func contains(_ id: Int64) -> Bool { set.contains(id) }
+
+    mutating func insert(_ id: Int64) {
+        if set.contains(id) { order.removeAll { $0 == id } }
+        order.append(id)
+        set.insert(id)
+        if order.count > limit {
+            let dropped = order.prefix(order.count - limit)
+            order.removeFirst(dropped.count)
+            set.subtract(dropped)
+        }
+    }
+
+    mutating func remove(_ id: Int64) {
+        guard set.remove(id) != nil else { return }
+        order.removeAll { $0 == id }
+    }
+
+    var stored: [Int] { order.map(Int.init) }
+}
+
 class DiscoverViewModel: ObservableObject {
     /// Cards still to swipe, top card first
     @Published private(set) var deck: [Movie] = [] {
@@ -281,11 +315,11 @@ class DiscoverViewModel: ObservableObject {
     // TMDb ids of every film already in one of the user's lists
     private var listedIDs: Set<Int64> = []
     // Films swiped left, remembered across launches so they don't come back until "Show Skipped Films"
-    private var passedIDs: Set<Int64>
+    private var passedIDs: RecentIDs
     // Films marked "Not for me", which stay hidden even when skipped films are shown again
-    private var dislikedIDs: Set<Int64>
+    private var dislikedIDs: RecentIDs
     // Films liked with the heart, which, like films added to a list, aren't shown again
-    private var likedIDs: Set<Int64>
+    private var likedIDs: RecentIDs
     private var reactionsChanged: AnyCancellable? = nil
     // Whether to ask the AI for the next batch. Turned off for the session if the server says AI isn't
     // set up, the daily limit is reached, a request fails, or it keeps suggesting films already seen
@@ -304,7 +338,12 @@ class DiscoverViewModel: ObservableObject {
     @Published private(set) var listGenres: [Int] = []
     // Recent skips, likes and "not for me"s, newest last, so they can be undone. Adding to a list isn't undone here
     @Published private(set) var undoHistory: [(movie: Movie, reaction: DiscoverReaction, profile: TasteProfile)] = []
-    private static let undoLimit = 20
+    // A few steps back is enough to fix a mis-swipe; each step keeps a copy of the taste profile
+    private static let undoLimit = 5
+    // How many skipped, "not for me" and liked films are remembered, most recent kept
+    static let passedLimit = 2000
+    static let dislikedLimit = 2000
+    static let likedLimit = 1000
 
     private static let passedKey = "discover.passedMovieIDs"
     static let dislikedKey = "discover.dislikedMovieIDs"
@@ -322,10 +361,9 @@ class DiscoverViewModel: ObservableObject {
     private var loadGeneration = 0
 
     init() {
-        let stored = UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? []
-        passedIDs = Set(stored.map(Int64.init))
-        dislikedIDs = Set((UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? []).map(Int64.init))
-        likedIDs = Set((UserDefaults.standard.array(forKey: Self.likedKey) as? [Int] ?? []).map(Int64.init))
+        passedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? [], limit: Self.passedLimit)
+        dislikedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? [], limit: Self.dislikedLimit)
+        likedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.likedKey) as? [Int] ?? [], limit: Self.likedLimit)
         genreFilter = Set(UserDefaults.standard.array(forKey: Self.genreFilterKey) as? [Int] ?? [])
         filters = UserDefaults.standard.data(forKey: Self.filtersKey)
             .flatMap { try? JSONDecoder().decode(DiscoverFilters.self, from: $0) } ?? DiscoverFilters()
@@ -342,8 +380,8 @@ class DiscoverViewModel: ObservableObject {
     }
 
     private func reloadReactions() {
-        dislikedIDs = Set((UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? []).map(Int64.init))
-        likedIDs = Set((UserDefaults.standard.array(forKey: Self.likedKey) as? [Int] ?? []).map(Int64.init))
+        dislikedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? [], limit: Self.dislikedLimit)
+        likedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.likedKey) as? [Int] ?? [], limit: Self.likedLimit)
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
     }
@@ -404,7 +442,7 @@ class DiscoverViewModel: ObservableObject {
         remember(movie, .skipped)
         deck.removeAll { $0.id == movie.id }
         passedIDs.insert(movie.id)
-        UserDefaults.standard.set(passedIDs.map { Int($0) }, forKey: Self.passedKey)
+        UserDefaults.standard.set(passedIDs.stored, forKey: Self.passedKey)
         learn(from: movie, .skipped)
         refillIfNeeded()
     }
@@ -413,7 +451,7 @@ class DiscoverViewModel: ObservableObject {
         remember(movie, .disliked)
         deck.removeAll { $0.id == movie.id }
         dislikedIDs.insert(movie.id)
-        UserDefaults.standard.set(dislikedIDs.map { Int($0) }, forKey: Self.dislikedKey)
+        UserDefaults.standard.set(dislikedIDs.stored, forKey: Self.dislikedKey)
         learn(from: movie, .disliked)
         DiscoverReactions.shared.add(movie, liked: false)
         refillIfNeeded()
@@ -425,7 +463,7 @@ class DiscoverViewModel: ObservableObject {
         remember(movie, .liked)
         deck.removeAll { $0.id == movie.id }
         likedIDs.insert(movie.id)
-        UserDefaults.standard.set(likedIDs.map { Int($0) }, forKey: Self.likedKey)
+        UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
         learn(from: movie, .liked)
         DiscoverReactions.shared.add(movie, liked: true)
         refillIfNeeded()
@@ -477,7 +515,7 @@ class DiscoverViewModel: ObservableObject {
     func showSkippedAgain() {
         usedSeeds = []
         resetAI()
-        passedIDs = []
+        passedIDs = RecentIDs([], limit: Self.passedLimit)
         UserDefaults.standard.removeObject(forKey: Self.passedKey)
         page = 1
         isExhausted = false
@@ -506,9 +544,9 @@ class DiscoverViewModel: ObservableObject {
         passedIDs.remove(last.movie.id)
         dislikedIDs.remove(last.movie.id)
         likedIDs.remove(last.movie.id)
-        UserDefaults.standard.set(passedIDs.map { Int($0) }, forKey: Self.passedKey)
-        UserDefaults.standard.set(dislikedIDs.map { Int($0) }, forKey: Self.dislikedKey)
-        UserDefaults.standard.set(likedIDs.map { Int($0) }, forKey: Self.likedKey)
+        UserDefaults.standard.set(passedIDs.stored, forKey: Self.passedKey)
+        UserDefaults.standard.set(dislikedIDs.stored, forKey: Self.dislikedKey)
+        UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
         if last.reaction != .skipped { DiscoverReactions.shared.remove(last.movie.id) }
         profile = last.profile
         if let data = try? JSONEncoder().encode(profile) {
@@ -558,9 +596,9 @@ class DiscoverViewModel: ObservableObject {
         resetAI()
         profile = TasteProfile()
         UserDefaults.standard.removeObject(forKey: Self.profileKey)
-        dislikedIDs = []
+        dislikedIDs = RecentIDs([], limit: Self.dislikedLimit)
         UserDefaults.standard.removeObject(forKey: Self.dislikedKey)
-        likedIDs = []
+        likedIDs = RecentIDs([], limit: Self.likedLimit)
         UserDefaults.standard.removeObject(forKey: Self.likedKey)
         DiscoverReactions.shared.clear()
         page = 1
@@ -671,7 +709,7 @@ class DiscoverViewModel: ObservableObject {
             age_range: Personalization.value(for: Personalization.ageRangeKey),
             pronouns: Personalization.value(for: Personalization.pronounsKey),
             already_suggested: Array(aiSuggestedTitles.suffix(400)),
-            exclude_ids: Array(dislikedIDs.union(likedIDs).union(passedIDs).union(shownIDs).prefix(5000)),
+            exclude_ids: Array(dislikedIDs.set.union(likedIDs.set).union(passedIDs.set).union(shownIDs).prefix(5000)),
             count: 20,
             languages: filters.languages,
             providers: filters.services.map(\.id),
