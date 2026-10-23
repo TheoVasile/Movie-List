@@ -7,7 +7,7 @@ const { availableServices } = require("../services/filmFilters");
 const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const admin = require("../config/firebase");
-const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError } = require("../models/socialModel");
+const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -607,6 +607,38 @@ router.get("/search", async (req, res) => {
         res.json(await searchUsers(req.user.uid, query.slice(0, 20)));
     } catch (error) {
         console.error("Error searching users:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The people the user has blocked
+router.get("/me/blocked", async (req, res) => {
+    try {
+        res.json(await fetchBlocked(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching blocked users:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Blocks or unblocks @handle. Blocking unfollows both ways and hides each from the other (see blockUser)
+router.post("/:handle/block", async (req, res) => {
+    try {
+        const blocked = await blockUser(req.user.uid, req.params.handle.toLowerCase());
+        if (!blocked) return res.status(404).json({ error: "User not found." });
+        res.json({ handle: req.params.handle.toLowerCase(), blocked: true });
+    } catch (error) {
+        console.error("Error blocking user:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/:handle/block", async (req, res) => {
+    try {
+        await unblockUser(req.user.uid, req.params.handle.toLowerCase());
+        res.json({ handle: req.params.handle.toLowerCase(), blocked: false });
+    } catch (error) {
+        console.error("Error unblocking user:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

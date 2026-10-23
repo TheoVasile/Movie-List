@@ -473,6 +473,89 @@ final class AvatarStore {
 
 // MARK: - Find people
 
+/// The people the user has blocked, each with Unblock. In Settings
+struct BlockedAccountsView: View {
+    @State private var people: [UserSummary] = []
+    @State private var isLoading = true
+    @State private var message: String? = nil
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                } else if let message {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                } else if people.isEmpty {
+                    Text("You haven't blocked anyone. To block someone, open their profile and tap •••.")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                } else {
+                    ForEach(people) { person in
+                        HStack(spacing: 12) {
+                            Avatar(name: person.display_name, handle: person.handle, version: person.avatar_version)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("@\(person.handle)")
+                                    .font(.headline)
+                                    .foregroundColor(Theme.textPrimary)
+                                    .lineLimit(1)
+                                Text(person.display_name)
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Button("Unblock") { unblock(person) }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(Theme.accent)
+                                .buttonStyle(.borderless)
+                        }
+                        .padding(12)
+                        .cardStyle(cornerRadius: 16)
+                    }
+                    Text("Unblocking doesn't make you follow each other again.")
+                        .font(.caption)
+                        .foregroundColor(Theme.textTertiary)
+                }
+            }
+            .padding(16)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Blocked Accounts")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        APIService.shared.fetchBlocked { result in
+            isLoading = false
+            switch result {
+            case .success(let loaded): people = loaded
+            case .failure: message = "Couldn't load blocked accounts. Check your connection."
+            }
+        }
+    }
+
+    private func unblock(_ person: UserSummary) {
+        Haptics.tap()
+        withAnimation(Theme.spring) { people.removeAll { $0.handle == person.handle } }
+        APIService.shared.setBlocked(person.handle, false) { saved in
+            if !saved {
+                withAnimation(Theme.spring) { people.insert(person, at: 0) }
+            }
+        }
+    }
+}
+
 /// Someone's followers or the people they follow, as rows that open each person's profile
 struct ConnectionsView: View {
     // nil for the signed-in user's own
@@ -722,6 +805,9 @@ struct FriendProfileView: View {
     @State private var lists: FriendLists? = nil
     @State private var loadFailed = false
     @State private var showMovieNight = false
+    @State private var confirmBlock = false
+    @State private var blockFailed = false
+    @Environment(\.dismiss) private var dismiss
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
 
@@ -807,6 +893,30 @@ struct FriendProfileView: View {
         .sheet(isPresented: $showMovieNight) {
             MovieNightView(people: [person], canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(role: .destructive) {
+                        confirmBlock = true
+                    } label: {
+                        Label("Block @\(person.handle)", systemImage: "hand.raised")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("More")
+            }
+        }
+        .confirmationDialog("Block @\(person.handle)?", isPresented: $confirmBlock, titleVisibility: .visible) {
+            Button("Block", role: .destructive, action: block)
+        } message: {
+            Text("They won't be able to find you, see your profile or lists, follow you or send you films, and you'll both stop following each other. They aren't told. You can unblock them in Settings.")
+        }
+        .alert("Couldn't block @\(person.handle)", isPresented: $blockFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Check your connection and try again.")
+        }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }
     }
@@ -832,6 +942,18 @@ struct FriendProfileView: View {
                 Text("Uses Classic recommendations, since @\(person.handle) hasn't allowed AI features.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
+            }
+        }
+    }
+
+    private func block() {
+        APIService.shared.setBlocked(person.handle, true) { saved in
+            if saved {
+                Haptics.success()
+                social.load()
+                dismiss()
+            } else {
+                blockFailed = true
             }
         }
     }

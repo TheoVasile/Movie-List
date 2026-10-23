@@ -103,6 +103,11 @@ struct UserSettingsView : View {
                             let waiting = social.profile?.requests ?? 0
                             Text("The \(waiting) \(waiting == 1 ? "person" : "people") waiting to follow you will be accepted.")
                         }
+                    NavigationLink {
+                        BlockedAccountsView()
+                    } label: {
+                        Label("Blocked Accounts", systemImage: "hand.raised")
+                    }
                 } header: {
                     Text("Privacy")
                 } footer: {

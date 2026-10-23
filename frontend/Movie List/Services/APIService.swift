@@ -857,6 +857,21 @@ class APIService {
         }
     }
 
+    private struct BlockResponse: Decodable { let blocked: Bool }
+
+    /// Blocks or unblocks someone. Calls back with whether it was saved
+    func setBlocked(_ handle: String, _ blocked: Bool, completion: @escaping (Bool) -> Void) {
+        let path = "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/block"
+        sendJSON(blocked ? "POST" : "DELETE", path) { (result: Result<BlockResponse, Error>) in
+            completion((try? result.get())?.blocked == blocked)
+        }
+    }
+
+    /// The people the user has blocked, most recent first
+    func fetchBlocked(completion: @escaping (Result<[UserSummary], Error>) -> Void) {
+        sendJSON("GET", "/users/me/blocked", completion: completion)
+    }
+
     func fetchFriendLists(_ handle: String, completion: @escaping (Result<FriendLists, Error>) -> Void) {
         sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/lists", completion: completion)
     }
