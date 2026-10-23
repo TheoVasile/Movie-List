@@ -110,7 +110,16 @@ class ListViewModel: ObservableObject {
         didSet { ensureRecommendation() }
     }
     @Published var searchResults: [Movie] = []
-    @Published var recommendedMovie: CDMovie? = nil
+    // Tonight's Pick. Remembered for each list on this device, so it stays the same until the dice is rolled
+    @Published var recommendedMovie: CDMovie? = nil {
+        didSet {
+            if let recommendedMovie {
+                UserDefaults.standard.set(Int(recommendedMovie.id), forKey: pickKey)
+            }
+        }
+    }
+
+    private var pickKey: String { "tonightsPick.\(movieList.id)" }
     @Published var showPopup: Bool = false
     @Published var newMovieSearchText: String = ""
     @Published var searchText: String = ""
@@ -143,13 +152,18 @@ class ListViewModel: ObservableObject {
         ensureRecommendation()
     }
 
-    /// Keeps a recommendation showing whenever the list has films, picking a new one when the
-    /// current pick is removed
+    /// Keeps a recommendation showing whenever the list has films: the one picked last time, or a new one when
+    /// there isn't one yet or it has left the list
     private func ensureRecommendation() {
         if movies.isEmpty {
             if recommendedMovie != nil { recommendedMovie = nil }
         } else if recommendedMovie.map({ !movies.contains($0) }) ?? true {
-            recommendMovie()
+            let saved = UserDefaults.standard.object(forKey: pickKey) as? Int
+            if let saved, let movie = movies.first(where: { Int($0.id) == saved }) {
+                recommendedMovie = movie
+            } else {
+                recommendMovie()
+            }
         }
     }
     
