@@ -64,8 +64,8 @@ struct ContentView: View {
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle.fill")
                 }
-                // Follow requests waiting to be answered
-                .badge(social.requests.count)
+                // Follow requests waiting to be answered, and films friends sent that haven't been looked at
+                .badge(social.requests.count + (social.profile?.recommendations_unseen ?? 0))
                 .tag(Tab.profile)
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)

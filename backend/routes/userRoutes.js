@@ -2,6 +2,7 @@ const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, suggestPick, reactToPick, removePick, likedPicks } = require("../models/groupPicksModel");
 const { yearReview } = require("../models/yearReviewModel");
+const { MAX_RECIPIENTS, sendRecommendation, fetchReceived, markSeen, removeReceived } = require("../models/recommendationsModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
 const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
@@ -607,6 +608,83 @@ router.get("/search", async (req, res) => {
         res.json(await searchUsers(req.user.uid, query.slice(0, 20)));
     } catch (error) {
         console.error("Error searching users:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Films people sent the user, newest first
+router.get("/me/recommendations", async (req, res) => {
+    try {
+        res.json(await fetchReceived(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching recommendations:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Sends a film to people who follow the user or whom the user follows, e.g. { "handles": ["sam"], "tmdb_id": 329865,
+// "title": "Arrival", "poster_path", "release_date", "overview", "original_language", "popularity", "note": "..." }.
+// Replies with the @handles it went to
+router.post("/me/recommendations", async (req, res) => {
+    const body = req.body ?? {};
+    const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+    const handles = (Array.isArray(body.handles) ? body.handles : [])
+        .map((handle) => text(handle, 40).replace(/^@/, "").toLowerCase()).filter(Boolean);
+    const film = {
+        // Negative for a TV show (services/tmdbMedia.js)
+        tmdb_id: Number(body.tmdb_id),
+        title: text(body.title, 255),
+        poster_path: text(body.poster_path, 255) || null,
+        release_date: text(body.release_date, 20),
+        overview: text(body.overview, 2000),
+        original_language: text(body.original_language, 10),
+        popularity: Number(body.popularity) || 0,
+    };
+    const note = text(body.note, 300) || null;
+    if (!handles.length || handles.length > MAX_RECIPIENTS) {
+        return res.status(400).json({ error: `Pick between 1 and ${MAX_RECIPIENTS} people.` });
+    }
+    if (!Number.isInteger(film.tmdb_id) || film.tmdb_id === 0 || !film.title) {
+        return res.status(400).json({ error: "A tmdb_id and title are required." });
+    }
+    try {
+        const sentTo = await sendRecommendation(req.user.uid, handles, film, note);
+        if (!sentTo.length) return res.status(403).json({ error: "You can only send films to people you follow or who follow you." });
+        const me = await getProfile(req.user.uid);
+        const from = me?.handle ? `@${me.handle}` : me?.display_name ?? "Someone";
+        const year = film.release_date.slice(0, 4);
+        for (const recipient of sentTo) {
+            notifyUser(recipient.firebase_uid, "recommendation", {
+                title: `${from} thinks you should see this`,
+                body: `${film.title}${year ? ` (${year})` : ""}${note ? `: "${note}"` : ""}`,
+                data: { tmdb_id: String(film.tmdb_id) },
+            });
+        }
+        res.status(201).json({ sent_to: sentTo.map((recipient) => recipient.handle) });
+    } catch (error) {
+        console.error("Error sending recommendation:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.put("/me/recommendations/seen", async (req, res) => {
+    try {
+        await markSeen(req.user.uid);
+        res.json({ seen: true });
+    } catch (error) {
+        console.error("Error marking recommendations seen:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+router.delete("/me/recommendations/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "An id is required." });
+    try {
+        if (!(await removeReceived(req.user.uid, id))) return res.status(404).json({ error: "Not found." });
+        res.json({ removed: true });
+    } catch (error) {
+        console.error("Error removing recommendation:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

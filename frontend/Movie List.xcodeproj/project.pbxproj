@@ -10,6 +10,7 @@
 		FA7E5A012F0000000000000F /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000E /* DiscoverViewModel.swift */; };
 		FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000C /* DiscoverView.swift */; };
 		FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */; };
+		50D932EF1D418A6BC2B2ABB1 /* RecommendFilmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */; };
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
@@ -123,6 +124,7 @@
 		FA7E5A012F0000000000000E /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
 		FA7E5A012F0000000000000C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverReactionsView.swift; sourceTree = "<group>"; };
+		A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendFilmSheet.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 				FA7E5A012F00000000000003 /* MovieDetailView.swift */,
 				FA7E5A012F0000000000000C /* DiscoverView.swift */,
 				D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */,
+				A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */,
 				FAE949E82D547D0300592081 /* AccountView.swift */,
 				FAE949EA2D5480A200592081 /* SignUpView.swift */,
 				FAE949EC2D54828200592081 /* SignInView.swift */,
@@ -551,6 +554,7 @@
 				FA7E5A012F0000000000000F /* DiscoverViewModel.swift in Sources */,
 				FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */,
 				FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */,
+				50D932EF1D418A6BC2B2ABB1 /* RecommendFilmSheet.swift in Sources */,
 				FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */,
 				FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */,
 				FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */,

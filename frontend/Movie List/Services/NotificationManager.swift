@@ -155,7 +155,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         switch notification.request.content.userInfo["type"] as? String {
-        case "follow_request":
+        case "follow_request", "recommendation":
             DispatchQueue.main.async { SocialStore.shared.load() }
         case "list_invite":
             // The new shared list shows up straight away
@@ -171,7 +171,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         DispatchQueue.main.async {
             switch info["type"] as? String {
-            case "follow_request", "follow_accepted", "follow_new", "activity":
+            case "follow_request", "follow_accepted", "follow_new", "activity", "recommendation":
                 SocialStore.shared.load()
                 self.destination = .profile
             case "poll_started", "poll_result", "group_added", "group_suggestion":

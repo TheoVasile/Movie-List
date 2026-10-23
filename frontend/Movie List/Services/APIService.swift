@@ -346,6 +346,8 @@ struct UserProfile: Decodable {
     let phone: String?
     // Private profiles approve each follower and can't have lists everyone can see
     let is_private: Bool?
+    // Films friends sent that the user hasn't looked at yet
+    let recommendations_unseen: Int?
 }
 
 /// Follow requests waiting on the user, and the @usernames the user has asked to follow
@@ -854,6 +856,41 @@ class APIService {
         let path = "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/follow"
         sendJSON(following ? "POST" : "DELETE", path) { (result: Result<FollowResponse, Error>) in
             completion(result.map(\.following))
+        }
+    }
+
+    func fetchRecommendations(completion: @escaping (Result<[FilmRecommendation], Error>) -> Void) {
+        sendJSON("GET", "/users/me/recommendations", completion: completion)
+    }
+
+    private struct SentResponse: Decodable { let sent_to: [String] }
+
+    /// Sends a film to people the user follows or who follow them. Calls back with the @handles it went to
+    func sendRecommendation(_ movie: Movie, to handles: [String], note: String?, completion: @escaping (Result<[String], Error>) -> Void) {
+        var body: [String: Any] = [
+            "handles": handles, "tmdb_id": movie.id, "title": movie.title, "release_date": movie.release_date,
+            "overview": movie.overview, "original_language": movie.original_language, "popularity": movie.popularity,
+        ]
+        if let poster = movie.poster_path { body["poster_path"] = poster }
+        if let note { body["note"] = note }
+        sendJSON("POST", "/users/me/recommendations", body: body) { (result: Result<SentResponse, Error>) in
+            completion(result.map(\.sent_to))
+        }
+    }
+
+    private struct SeenResponse: Decodable { let seen: Bool }
+
+    func markRecommendationsSeen(completion: @escaping (Bool) -> Void) {
+        sendJSON("PUT", "/users/me/recommendations/seen") { (result: Result<SeenResponse, Error>) in
+            completion((try? result.get()) != nil)
+        }
+    }
+
+    private struct RemovedResponse: Decodable { let removed: Bool }
+
+    func removeRecommendation(_ id: Int64, completion: @escaping (Bool) -> Void) {
+        sendJSON("DELETE", "/users/me/recommendations/\(id)") { (result: Result<RemovedResponse, Error>) in
+            completion((try? result.get()) != nil)
         }
     }
 
