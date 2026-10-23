@@ -698,11 +698,6 @@ private extension DiscoverView {
                 withAnimation(Theme.spring) { showDetails.toggle() }
             }
             .accessibilityLabel("Details")
-            circleButton(icon: "heart.fill", size: 48, style: AnyShapeStyle(Theme.accentGradient), filled: false) {
-                like()
-            }
-            .accessibilityLabel("Like")
-            .accessibilityHint("Tells Discover you like this film without adding it to a list")
             circleButton(icon: quickAddList == nil ? "plus" : "bolt.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), filled: true) {
                 swipeRight()
             }
@@ -723,6 +718,12 @@ private extension DiscoverView {
             }
             .accessibilityLabel(quickAddList.map { "Add to \($0.name ?? "your list")" } ?? "Add to a list")
             .accessibilityHint(quickAddList == nil ? "" : "Touch and hold to choose lists")
+            // On the far right, opposite "Not for me" on the far left
+            circleButton(icon: "heart.fill", size: 48, style: AnyShapeStyle(Theme.accentGradient), filled: false) {
+                like()
+            }
+            .accessibilityLabel("Like")
+            .accessibilityHint("Tells Discover you like this film without adding it to a list")
         }
     }
 
