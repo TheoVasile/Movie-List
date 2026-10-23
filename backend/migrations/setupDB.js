@@ -195,6 +195,17 @@ const createTables = async () => {
             UPDATE follows SET accepted = true
             WHERE NOT accepted AND followee_id IN (SELECT firebase_uid FROM users WHERE NOT is_private);
 
+            -- People a user has blocked. Blocking removes follows both ways and stops them finding, following or
+            -- seeing each other, inviting each other to lists and groups, and sending each other films
+            CREATE TABLE IF NOT EXISTS blocks (
+                blocker_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                blocked_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (blocker_id, blocked_id),
+                CHECK (blocker_id <> blocked_id)
+            );
+            CREATE INDEX IF NOT EXISTS blocks_blocked ON blocks (blocked_id);
+
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,
                 tmdb_id VARCHAR(20) UNIQUE,

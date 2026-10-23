@@ -7,6 +7,9 @@ const HANDLE_PATTERN = /^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9_.]{3,20}$/;
 
 class HandleTakenError extends Error {}
 
+/// SQL that's true unless one of the two users has blocked the other, e.g. notBlocked("$1", "u.firebase_uid")
+const notBlocked = (a, b) => `NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ${a} AND b.blocked_id = ${b}) OR (b.blocker_id = ${b} AND b.blocked_id = ${a}))`;
+
 function isValidHandle(handle) {
     return typeof handle === "string" && HANDLE_PATTERN.test(handle);
 }
@@ -56,7 +59,7 @@ async function matchContacts(user_id, emailHashes, phoneHashes) {
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u
-         WHERE u.firebase_uid <> $1 AND u.handle IS NOT NULL
+         WHERE u.firebase_uid <> $1 AND u.handle IS NOT NULL AND ${notBlocked("$1", "u.firebase_uid")}
            AND (encode(sha256(lower(trim(u.email))::bytea), 'hex') = ANY($2::text[]) OR encode(sha256(right(regexp_replace(u.phone, '\\D', '', 'g'), 10)::bytea), 'hex') = ANY($3::text[]))
          ORDER BY u.username
          LIMIT 200`,
@@ -104,7 +107,7 @@ async function searchUsers(user_id, query) {
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following,
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested
          FROM users u
-         WHERE u.handle LIKE $2 || '%' ESCAPE '\\' AND u.firebase_uid <> $1
+         WHERE u.handle LIKE $2 || '%' ESCAPE '\\' AND u.firebase_uid <> $1 AND ${notBlocked("$1", "u.firebase_uid")}
          ORDER BY u.handle
          LIMIT 20`,
         [user_id, prefix]
@@ -116,7 +119,10 @@ async function searchUsers(user_id, query) {
 // request. Returns null when there's no one with that @username (or it's the user's own), otherwise
 // { followee_id, following, requested, isNewRequest, isNewFollow }
 async function setFollowing(user_id, handle, follow) {
-    const target = await pool.query("SELECT firebase_uid, is_private FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
+    const target = await pool.query(
+        `SELECT firebase_uid, is_private FROM users u WHERE handle = $1 AND firebase_uid <> $2 AND ${notBlocked("$2", "u.firebase_uid")}`,
+        [handle, user_id]
+    );
     if (!target.rows.length) return null;
     const followee_id = target.rows[0].firebase_uid;
     if (!follow) {
@@ -209,7 +215,7 @@ async function fetchConnections(viewer_id, { handle, which }) {
         const target = await pool.query(
             `SELECT u.firebase_uid,
                     EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND f.accepted) AS following
-             FROM users u WHERE u.handle = $2`,
+             FROM users u WHERE u.handle = $2 AND ${notBlocked("$1", "u.firebase_uid")}`,
             [viewer_id, handle]
         );
         const person = target.rows[0];
@@ -225,7 +231,7 @@ async function fetchConnections(viewer_id, { handle, which }) {
                 EXISTS (SELECT 1 FROM follows v WHERE v.follower_id = $2 AND v.followee_id = u.firebase_uid AND NOT v.accepted) AS requested,
                 u.firebase_uid = $2 AS is_me
          FROM follows f JOIN users u ON u.firebase_uid = f.${personColumn}
-         WHERE f.${targetColumn} = $1 AND f.accepted AND u.handle IS NOT NULL
+         WHERE f.${targetColumn} = $1 AND f.accepted AND u.handle IS NOT NULL AND ${notBlocked("$2", "u.firebase_uid")}
          ORDER BY f.created_at DESC`,
         [target_id, viewer_id]
     );
@@ -242,7 +248,7 @@ async function fetchUserLists(user_id, handle) {
                 EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = u.firebase_uid AND NOT f.accepted) AS requested,
                 (SELECT COUNT(*) FROM follows f WHERE f.followee_id = u.firebase_uid AND f.accepted)::int AS follower_count,
                 (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted)::int AS following_count
-         FROM users u WHERE u.handle = $2`,
+         FROM users u WHERE u.handle = $2 AND ${notBlocked("$1", "u.firebase_uid")}`,
         [user_id, handle]
     );
     const person = target.rows[0];
@@ -331,4 +337,57 @@ async function fetchFriendsOnFilm(user_id, tmdb_id) {
         .sort((a, b) => Number(Boolean(b.note)) - Number(Boolean(a.note)) || a.handle.localeCompare(b.handle));
 }
 
-module.exports = { setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
+/// Blocks whoever has @handle: unfollows both ways (and drops requests), takes each off the other's lists as an
+/// editor and follower, and out of each other's movie night groups. Returns false when there's no such person
+async function blockUser(user_id, handle) {
+    const target = await pool.query("SELECT firebase_uid FROM users WHERE handle = $1 AND firebase_uid <> $2", [handle, user_id]);
+    const other_id = target.rows[0]?.firebase_uid;
+    if (!other_id) return false;
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query("INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [user_id, other_id]);
+        await client.query(
+            "DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)",
+            [user_id, other_id]
+        );
+        for (const [owner, other] of [[user_id, other_id], [other_id, user_id]]) {
+            await client.query("DELETE FROM list_editors WHERE user_id = $2 AND list_id IN (SELECT id FROM lists WHERE user_id = $1)", [owner, other]);
+            await client.query("DELETE FROM list_follows WHERE user_id = $2 AND list_id IN (SELECT id FROM lists WHERE user_id = $1)", [owner, other]);
+            await client.query(
+                "DELETE FROM watch_group_members WHERE user_id = $2 AND group_id IN (SELECT id FROM watch_groups WHERE owner_id = $1)",
+                [owner, other]
+            );
+        }
+        await client.query("COMMIT");
+        return true;
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+/// Unblocks whoever has @handle. They don't come back as followers; either can follow again
+async function unblockUser(user_id, handle) {
+    const result = await pool.query(
+        "DELETE FROM blocks b USING users u WHERE b.blocker_id = $1 AND b.blocked_id = u.firebase_uid AND u.handle = $2",
+        [user_id, handle]
+    );
+    return result.rowCount > 0;
+}
+
+/// Everyone the user has blocked, most recent first
+async function fetchBlocked(user_id) {
+    const result = await pool.query(
+        `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, false AS following
+         FROM blocks b JOIN users u ON u.firebase_uid = b.blocked_id
+         WHERE b.blocker_id = $1 AND u.handle IS NOT NULL
+         ORDER BY b.created_at DESC`,
+        [user_id]
+    );
+    return result.rows;
+}
+
+module.exports = { notBlocked, blockUser, unblockUser, fetchBlocked, setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
