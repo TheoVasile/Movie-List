@@ -144,26 +144,21 @@ struct UserSettingsView : View {
                             }
                         }
                     }
-                    // Only a couple of accounts get the pink theme (ColorTheme.pinkHandles)
-                    if ColorTheme.isAvailable(.pink, to: social.profile?.handle) {
-                        Picker(selection: Binding(get: { appearance.colorTheme }, set: { theme in
-                            Haptics.select()
-                            appearance.colorTheme = theme
-                        })) {
-                            ForEach(ColorTheme.allCases) { theme in
-                                Text(theme.title).tag(theme)
-                            }
-                        } label: {
-                            Label("Color Theme", systemImage: "paintpalette.fill")
-                                .foregroundColor(Theme.textPrimary)
+                    Picker(selection: Binding(get: { appearance.colorTheme }, set: { theme in
+                        Haptics.select()
+                        appearance.colorTheme = theme
+                    })) {
+                        ForEach(ColorTheme.allCases) { theme in
+                            Text(theme.title).tag(theme)
                         }
+                    } label: {
+                        Label("Color Theme", systemImage: "paintpalette.fill")
+                            .foregroundColor(Theme.textPrimary)
                     }
                 } header: {
                     Text("Appearance")
                 } footer: {
-                    Text(ColorTheme.isAvailable(.pink, to: social.profile?.handle)
-                         ? "\(appearanceFooter) Changing the color theme closes Settings to redraw the app."
-                         : appearanceFooter)
+                    Text("\(appearanceFooter) Changing the color theme closes Settings to redraw the app.")
                 }
                 .listRowBackground(Theme.surface)
 

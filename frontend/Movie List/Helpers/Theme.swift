@@ -12,8 +12,8 @@ import UIKit
 // MARK: - Palette
 
 enum Theme {
-    // Dark: a cinema at night. Light: crisp white with blue accents. Pink (for a couple of accounts, see
-    // ColorTheme): blush and hot pink by day, plum and neon pink by night
+    // Dark: a cinema at night. Light: crisp white with blue accents. Pink (the other ColorTheme): blush and
+    // hot pink by day, plum and neon pink by night
     static let background = Color(light: Color(red: 0.96, green: 0.97, blue: 1.0), dark: Color(red: 0.04, green: 0.04, blue: 0.07),
                                   pinkLight: Color(red: 1.0, green: 0.95, blue: 0.97), pinkDark: Color(red: 0.08, green: 0.03, blue: 0.07))
     static let surface = Color(light: .white, dark: Color(red: 0.10, green: 0.10, blue: 0.14),

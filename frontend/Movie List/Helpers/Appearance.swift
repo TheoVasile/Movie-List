@@ -34,7 +34,7 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// The app's colours. Pink is offered only to the accounts in `pinkHandles`
+/// The app's colours
 enum ColorTheme: String, CaseIterable, Identifiable {
     case classic, pink
 
@@ -45,12 +45,6 @@ enum ColorTheme: String, CaseIterable, Identifiable {
         case .classic: return "Classic"
         case .pink: return "Pink"
         }
-    }
-
-    static let pinkHandles: Set<String> = ["bitchpickles", "rogueaxis3301"]
-
-    static func isAvailable(_ theme: ColorTheme, to handle: String?) -> Bool {
-        theme == .classic || handle.map { pinkHandles.contains($0) } == true
     }
 }
 
@@ -158,11 +152,6 @@ final class AppearanceSettings: NSObject, ObservableObject {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
-    }
-
-    /// Falls back to Classic when the signed-in account can't use the chosen theme (after signing out, say)
-    func checkColorTheme(for handle: String?) {
-        if !ColorTheme.isAvailable(colorTheme, to: handle) { colorTheme = .classic }
     }
 
     // The app's screens are built again for the new theme (see Movie_ListApp); this fades between the two and

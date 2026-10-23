@@ -86,10 +86,6 @@ struct ContentView: View {
             Personalization.syncAIAllowed()
         }
         .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
-        // Pink is only for some accounts, so another account signing in goes back to Classic
-        .onChange(of: social.profile?.handle) { handle in
-            if social.profile != nil { AppearanceSettings.shared.checkColorTheme(for: handle) }
-        }
         .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
         .fullScreenCover(isPresented: needsUsername) {
             UsernameSetupView(required: true) { viewModel.signOut() }
