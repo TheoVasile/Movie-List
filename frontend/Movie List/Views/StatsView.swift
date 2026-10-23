@@ -9,7 +9,57 @@ import Foundation
 import SwiftUI
 import Charts
 
-/// Numbers about the user's taste, worked out from the films in their lists and the TMDb info the app
+/// A film in a list, from the user's own lists or from a friend's, for working out stats
+struct StatFilm {
+    let tmdbID: Int64
+    let title: String
+    let year: String
+    let decade: Int?
+    let language: String?
+    let posterPath: String?
+    let rank: Int
+    let watched: Bool
+
+    init(_ movie: CDMovie) {
+        tmdbID = Int64(movie.tmdb_id)
+        title = movie.title ?? ""
+        year = Theme.year(from: movie.release_date)
+        decade = movie.release_date.map { Calendar.current.component(.year, from: $0) / 10 * 10 }
+        language = movie.original_language.flatMap { $0.isEmpty ? nil : $0 }
+        posterPath = movie.poster_path
+        rank = Int(movie.rank)
+        watched = movie.watched
+    }
+
+    init(_ film: FriendLists.Film) {
+        tmdbID = film.tmdb_id
+        title = film.title
+        year = Theme.year(from: film.release_date)
+        decade = Int(year).map { $0 / 10 * 10 }
+        language = film.original_language.flatMap { $0.isEmpty ? nil : $0 }
+        posterPath = film.poster_path
+        rank = film.rank
+        watched = film.watched
+    }
+}
+
+/// One list's films in rank order
+struct StatList {
+    let films: [StatFilm]
+    let ranked: Bool
+
+    init(films: [StatFilm], ranked: Bool) {
+        self.films = films
+        self.ranked = ranked
+    }
+
+    init(_ list: FriendLists.List) {
+        films = list.movies.sorted { $0.rank < $1.rank }.map(StatFilm.init)
+        ranked = list.is_ranked != false
+    }
+}
+
+/// Numbers about someone's taste, worked out from the films in their lists and the TMDb info the app
 /// already keeps for each film. Nothing new is sent anywhere
 struct StatsSummary {
     struct Count: Identifiable {
@@ -40,14 +90,20 @@ struct StatsSummary {
     // The highest-ranked film with the fewest TMDb ratings: the user's deepest cut
     let deepCut: Pick?
 
-    private static let topCount = 50
+    static let topCount = 50
 
     init(lists: [CDMovieList], info: @escaping (Int64) -> MovieInfo?) {
+        self.init(lists: lists.map { list in
+            StatList(films: list.movies.sorted { $0.rank < $1.rank }.map(StatFilm.init), ranked: ListRanking.isRanked(list.id))
+        }, info: info)
+    }
+
+    init(lists: [StatList], info: @escaping (Int64) -> MovieInfo?) {
         // A film in several lists counts once
-        var films: [Int64: CDMovie] = [:]
+        var films: [Int64: StatFilm] = [:]
         for list in lists {
-            for movie in list.movies where films[Int64(movie.tmdb_id)] == nil {
-                films[Int64(movie.tmdb_id)] = movie
+            for film in list.films where films[film.tmdbID] == nil {
+                films[film.tmdbID] = film
             }
         }
         let all = Array(films.values)
@@ -55,45 +111,44 @@ struct StatsSummary {
         watchedCount = all.filter(\.watched).count
         listCount = lists.count
 
-        let decadeCounts = Dictionary(grouping: all.compactMap { movie -> Int? in
-            guard let date = movie.release_date else { return nil }
-            return Calendar.current.component(.year, from: date) / 10 * 10
-        }, by: { $0 }).mapValues(\.count)
+        let decadeCounts = Dictionary(grouping: all.compactMap(\.decade), by: { $0 }).mapValues(\.count)
         decades = decadeCounts.sorted { $0.key < $1.key }.map { Count(label: "\($0.key)s", count: $0.value) }
 
         var genreCounts: [Int: Int] = [:]
-        for movie in all {
-            for genre in info(Int64(movie.tmdb_id))?.genres ?? [] {
+        for film in all {
+            for genre in info(film.tmdbID)?.genres ?? [] {
                 genreCounts[genre, default: 0] += 1
             }
         }
         genres = genreCounts.sorted { $0.value > $1.value }.prefix(8)
             .compactMap { id, count in TasteProfile.genreNames[id].map { Count(label: $0, count: count) } }
 
-        let languageCounts = Dictionary(grouping: all.compactMap { $0.original_language }, by: { $0 }).mapValues(\.count)
+        let languageCounts = Dictionary(grouping: all.compactMap(\.language), by: { $0 }).mapValues(\.count)
         languages = languageCounts.sorted { $0.value > $1.value }.prefix(6).map { code, count in
             Count(label: Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased(), count: count)
         }
 
-        // Ranks only mean something within one list, so taste is judged on the biggest one
-        let ranked = (lists.max { $0.movies.count < $1.movies.count }?.movies ?? [])
-            .sorted { $0.rank < $1.rank }
-        let scored = { (movies: [CDMovie]) -> [Double] in
-            movies.compactMap { movie in
-                info(Int64(movie.tmdb_id)).flatMap { $0.voteCount >= 20 ? $0.voteAverage : nil }
-            }
+        let ranked = Self.mainRanking(lists)
+        let scored = { (films: [StatFilm]) -> [Double] in
+            films.compactMap { film in info(film.tmdbID).flatMap { $0.voteCount >= 20 ? $0.voteAverage : nil } }
         }
         let average = { (scores: [Double]) -> Double? in scores.isEmpty ? nil : scores.reduce(0, +) / Double(scores.count) }
         topAverage = average(scored(Array(ranked.prefix(Self.topCount))))
         overallAverage = average(scored(all))
 
-        let pick = { (movie: CDMovie, info: MovieInfo) in
-            Pick(title: movie.title ?? "", year: Theme.year(from: movie.release_date), posterPath: movie.poster_path,
-                 rank: Int(movie.rank), voteAverage: info.voteAverage)
+        let pick = { (film: StatFilm, info: MovieInfo) in
+            Pick(title: film.title, year: film.year, posterPath: film.posterPath, rank: film.rank, voteAverage: info.voteAverage)
         }
-        let topHundred = ranked.prefix(100).compactMap { movie in info(Int64(movie.tmdb_id)).map { (movie, $0) } }
+        let topHundred = ranked.prefix(100).compactMap { film in info(film.tmdbID).map { (film, $0) } }
         underrated = topHundred.first { $0.1.voteCount >= 50 && $0.1.voteAverage < 6.45 }.map(pick)
         deepCut = topHundred.filter { $0.1.voteCount > 0 }.min { $0.1.voteCount < $1.1.voteCount }.map(pick)
+    }
+
+    /// Ranks only mean something within one list, so taste is judged on the biggest ranked one (or the biggest
+    /// list, when none are ranked), best first
+    static func mainRanking(_ lists: [StatList]) -> [StatFilm] {
+        let ranked = lists.filter(\.ranked)
+        return ((ranked.isEmpty ? lists : ranked).max { $0.films.count < $1.films.count }?.films ?? [])
     }
 
     var topDecade: String? { decades.max { $0.count < $1.count }?.label }
@@ -103,6 +158,8 @@ struct StatsSummary {
 
 struct StatsView: View {
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var movieLists: FetchedResults<CDMovieList>
+    // A friend whose stats these are, from the lists they let the user see; nil for the user's own
+    var friend: (handle: String, lists: [FriendLists.List])? = nil
     @Environment(\.colorScheme) private var colorScheme
     // Bumped as TMDb info arrives, so the charts fill in
     @State private var infoVersion = 0
@@ -112,8 +169,16 @@ struct StatsView: View {
 
     private var summary: StatsSummary {
         _ = infoVersion
+        if let friend {
+            return StatsSummary(lists: friend.lists.map(StatList.init), info: MovieInfoCache.shared.info(for:))
+        }
         return StatsSummary(lists: Array(movieLists), info: MovieInfoCache.shared.info(for:))
     }
+
+    private var isMine: Bool { friend == nil }
+    // "Your" or "@sam's", "your" or "their"
+    private var whose: String { friend.map { "@\($0.handle)'s" } ?? "Your" }
+    private var theirs: String { isMine ? "your" : "their" }
 
     var body: some View {
         let summary = summary
@@ -121,12 +186,15 @@ struct StatsView: View {
             Theme.background.ignoresSafeArea()
             if summary.filmCount == 0 {
                 EmptyStateView(icon: "chart.bar.fill", title: "No stats yet",
-                               message: "Add films to your lists and your stats will show up here.")
+                               message: isMine ? "Add films to your lists and your stats will show up here."
+                                               : "@\(friend?.handle ?? "") hasn't shared any lists with films yet.")
             } else {
                 ScrollView {
                     VStack(spacing: 18) {
-                        yearInReviewCard
-                            .appearAnimation()
+                        if isMine {
+                            yearInReviewCard
+                                .appearAnimation()
+                        }
                         totals(summary)
                             .appearAnimation()
                         if let top = summary.topAverage, let all = summary.overallAverage {
@@ -149,16 +217,18 @@ struct StatsView: View {
                 }
             }
         }
-        .navigationTitle("Your Stats")
+        .navigationTitle("\(whose) Stats")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    share(summary)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
+                if isMine {
+                    Button {
+                        share(summary)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(summary.filmCount == 0)
                 }
-                .disabled(summary.filmCount == 0)
             }
         }
         .sheet(item: $shareItem) { item in
@@ -202,7 +272,7 @@ struct StatsView: View {
     }
 
     private func loadInfo() {
-        let ids = movieLists.flatMap { $0.movies.map { Int64($0.tmdb_id) } }
+        let ids = friend.map { $0.lists.flatMap { $0.movies.map(\.tmdb_id) } } ?? movieLists.flatMap { $0.movies.map { Int64($0.tmdb_id) } }
         loadingInfo = true
         MovieInfoCache.shared.fetchMissing(ids, onBatch: { infoVersion += 1 }, completion: {
             infoVersion += 1
@@ -256,16 +326,16 @@ struct StatsView: View {
     private func tasteCard(top: Double, all: Double) -> some View {
         let difference = top - all
         return VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Your Taste vs TMDb", icon: "person.2.fill")
+            sectionTitle("\(whose) Taste vs TMDb", icon: "person.2.fill")
             HStack(alignment: .firstTextBaseline, spacing: 18) {
-                score(top, label: "Your top 50")
-                score(all, label: "All your films")
+                score(top, label: "\(isMine ? "Your" : "Their") top 50")
+                score(all, label: "All \(theirs) films")
             }
             Text(abs(difference) < 0.15
-                 ? "Your favourites score about the same on TMDb as the rest of your films."
+                 ? "\(whose) favourites score about the same on TMDb as the rest of \(theirs) films."
                  : difference > 0
-                 ? "Your favourites score \(String(format: "%.1f", difference)) higher on TMDb than the rest: you agree with the crowd."
-                 : "Your favourites score \(String(format: "%.1f", -difference)) lower on TMDb than the rest: you know what you like.")
+                 ? "\(whose) favourites score \(String(format: "%.1f", difference)) higher on TMDb than the rest: \(isMine ? "you agree" : "they agree") with the crowd."
+                 : "\(whose) favourites score \(String(format: "%.1f", -difference)) lower on TMDb than the rest: \(isMine ? "you know what you like" : "they know what they like").")
                 .font(.footnote)
                 .foregroundColor(Theme.textSecondary)
         }
@@ -291,11 +361,11 @@ struct StatsView: View {
             VStack(spacing: 12) {
                 if let pick = summary.underrated {
                     pickRow(pick, title: "Most Underrated Pick",
-                            detail: "You rank it #\(pick.rank); TMDb gives it \(String(format: "%.1f", pick.voteAverage)).")
+                            detail: "\(isMine ? "You rank" : "They rank") it #\(pick.rank); TMDb gives it \(String(format: "%.1f", pick.voteAverage)).")
                 }
                 if let pick = summary.deepCut, pick.title != summary.underrated?.title {
                     pickRow(pick, title: "Deepest Cut",
-                            detail: "Your #\(pick.rank), and one of the least-rated films on TMDb in your top 100.")
+                            detail: "\(isMine ? "Your" : "Their") #\(pick.rank), and one of the least-rated films on TMDb in \(theirs) top 100.")
                 }
             }
         }
