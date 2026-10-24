@@ -4,7 +4,7 @@ const { deleteUser, createUser } = require("../models/userModel");
 const verifyToken = require("../middleware/authMiddleware");
 const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
 const pool = require("../config/db");
-const { TERMS_VERSION, TERMS_UPDATED, loadTerms } = require("../config/terms");
+const { TERMS_VERSION, TERMS_UPDATED, PRIVACY_VERSION, PRIVACY_UPDATED, loadTerms, loadPrivacy } = require("../config/terms");
 
 const router = express.Router();
 
@@ -70,6 +70,17 @@ router.get("/terms", (req, res) => {
         res.json({ version: TERMS_VERSION, updated: TERMS_UPDATED, markdown: loadTerms() });
     } catch (error) {
         console.error("Error loading terms:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The Privacy Policy, for reading in the app, signed in or not
+// -> { "version": "2026-10-24", "updated": "October 24, 2026", "markdown": "# CineList Privacy Policy ..." }
+router.get("/privacy", (req, res) => {
+    try {
+        res.json({ version: PRIVACY_VERSION, updated: PRIVACY_UPDATED, markdown: loadPrivacy() });
+    } catch (error) {
+        console.error("Error loading privacy policy:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

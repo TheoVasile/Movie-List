@@ -360,8 +360,9 @@ struct UserProfile: Decodable {
     }
 }
 
-/// CineList's Terms of Service as Markdown, with its version and when it last changed (e.g. "October 23, 2026")
-struct TermsDocument: Decodable {
+/// One of CineList's legal documents (the Terms of Service or Privacy Policy) as Markdown, with its version and
+/// when it last changed (e.g. "October 23, 2026")
+struct LegalDocumentText: Decodable {
     let version: String
     let updated: String
     let markdown: String
@@ -618,15 +619,15 @@ class APIService {
         }.resume()
     }
 
-    /// CineList's current Terms of Service. Works signed out too, so it can be read before signing up
-    func fetchTerms(completion: @escaping (Result<TermsDocument, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/auth/terms") else { return }
+    /// The current Terms of Service or Privacy Policy. Works signed out too, so they can be read before signing up
+    func fetchLegalDocument(_ document: LegalDocument, completion: @escaping (Result<LegalDocumentText, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/\(document.path)") else { return }
         // Public, so it goes without a token
         URLSession.shared.dataTask(with: url) { data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let result: Result<TermsDocument, Error>
-            if let data, status == 200, let terms = try? JSONDecoder().decode(TermsDocument.self, from: data) {
-                result = .success(terms)
+            let result: Result<LegalDocumentText, Error>
+            if let data, status == 200, let text = try? JSONDecoder().decode(LegalDocumentText.self, from: data) {
+                result = .success(text)
             } else {
                 result = .failure(error ?? NSError(domain: "Request failed", code: status, userInfo: nil))
             }

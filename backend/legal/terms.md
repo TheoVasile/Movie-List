@@ -192,7 +192,7 @@ Subject to these Terms, we grant you a personal, limited, non-exclusive, non-tra
 
 ## 15. Privacy
 
-Your privacy matters to us. Our Privacy Policy explains what information we collect, how we use and share it, how long we keep it, and the choices and rights you have. By using the App, you acknowledge that we will handle your information as described there.
+Your privacy matters to us. Our Privacy Policy explains what information we collect, how we use and share it, how long we keep it, and the choices and rights you have. You can read it at any time in the App under **Settings**, **Legal**, **Privacy Policy**, or on the web at the /privacy page of the same site as these Terms. By using the App, you acknowledge that we will handle your information as described there.
 
 In brief: we store your account details (such as your email address, display name, @username, profile photo and, if you add one, your verified phone number), your lists, rankings, watched history, notes, social connections, groups, notification and streaming preferences, and the device tokens needed to send you notifications. Some settings, such as your age range and pronouns, are kept on your iPhone and are only sent with AI requests as described in Section 9. Location used by the App's location features stays on your iPhone. We do not sell your personal information.
 

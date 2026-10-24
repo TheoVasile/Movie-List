@@ -6,24 +6,31 @@ const path = require("path");
 const TERMS_VERSION = "2026-10-23";
 const TERMS_UPDATED = "October 23, 2026";
 
-// Filled into the Terms text; TERMS_COMPANY_NAME and TERMS_CONTACT_EMAIL override them
+// The Privacy Policy. Nobody accepts it, so its version is only for reference
+const PRIVACY_VERSION = "2026-10-24";
+const PRIVACY_UPDATED = "October 24, 2026";
+
+// Filled into the Terms and Privacy Policy text; TERMS_COMPANY_NAME and TERMS_CONTACT_EMAIL override them
 const COMPANY_NAME = "{{COMPANY_NAME}}";
 const CONTACT_EMAIL = "{{CONTACT_EMAIL}}";
 
-const TERMS_FILE = path.join(__dirname, "..", "legal", "terms.md");
-let cached = null;
+const cached = new Map();
 
-// The Terms as markdown, with the company name and contact email filled in. Read once, then kept in memory
-function loadTerms() {
-    if (cached === null) {
+// A document in legal/ as markdown, with the company name and contact email filled in. Read once, then kept
+// in memory
+function loadDocument(name) {
+    if (!cached.has(name)) {
         const company = process.env.TERMS_COMPANY_NAME || COMPANY_NAME;
         const email = process.env.TERMS_CONTACT_EMAIL || CONTACT_EMAIL;
-        cached = fs.readFileSync(TERMS_FILE, "utf8")
+        cached.set(name, fs.readFileSync(path.join(__dirname, "..", "legal", `${name}.md`), "utf8")
             .replaceAll("{{COMPANY_NAME}}", company)
-            .replaceAll("{{CONTACT_EMAIL}}", email);
+            .replaceAll("{{CONTACT_EMAIL}}", email));
     }
-    return cached;
+    return cached.get(name);
 }
+
+const loadTerms = () => loadDocument("terms");
+const loadPrivacy = () => loadDocument("privacy");
 
 const escapeHTML = (text) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -38,7 +45,7 @@ function renderInline(text) {
         .replace(/(^|[^\w])_([^_\s][^_]*?)_(?!\w)/g, "$1<em>$2</em>");
 }
 
-// Just enough markdown for the Terms: headings, paragraphs, bullet and numbered lists, bold, italic and links.
+// Just enough markdown for the Terms and Privacy Policy: headings, paragraphs, bullet and numbered lists, bold, italic and links.
 // Everything is escaped first, so the file can't add its own HTML
 function renderMarkdown(markdown) {
     const html = [];
@@ -87,14 +94,14 @@ function renderMarkdown(markdown) {
     return html.join("\n");
 }
 
-// The Terms as a web page, for the App Store listing and the website
-function termsPage() {
+// A legal document as a web page, for the App Store listing and the website
+function documentPage(title, markdown, updated) {
     return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Terms of Service</title>
+<title>${escapeHTML(title)}</title>
 <style>
     :root { color-scheme: light dark; }
     body { margin: 0; padding: 24px 16px 48px; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; color: #1c1c1e; }
@@ -117,11 +124,17 @@ function termsPage() {
 </head>
 <body>
 <main>
-${renderMarkdown(loadTerms()).replace("</h1>", `</h1>
-<p class="updated">Last updated ${escapeHTML(TERMS_UPDATED)}</p>`)}
+${renderMarkdown(markdown).replace("</h1>", `</h1>
+<p class="updated">Last updated ${escapeHTML(updated)}</p>`)}
 </main>
 </body>
 </html>`;
 }
 
-module.exports = { TERMS_VERSION, TERMS_UPDATED, loadTerms, renderMarkdown, termsPage };
+const termsPage = () => documentPage("Terms of Service", loadTerms(), TERMS_UPDATED);
+const privacyPage = () => documentPage("Privacy Policy", loadPrivacy(), PRIVACY_UPDATED);
+
+module.exports = {
+    TERMS_VERSION, TERMS_UPDATED, PRIVACY_VERSION, PRIVACY_UPDATED,
+    loadTerms, loadPrivacy, renderMarkdown, termsPage, privacyPage,
+};
