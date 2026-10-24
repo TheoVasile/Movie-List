@@ -42,6 +42,8 @@ struct ListView: View {
     @State private var editingDetails = false
     // Who's on the list, for shared lists and inviting people
     @ObservedObject private var sharing = ListSharing.shared
+    @ObservedObject private var streaming = StreamingNowStore.shared
+    @State private var choosingServices = false
     @State private var showSharing = false
     // Whether the big title at the top of the list has scrolled away, so the bar shows a small one
     @State private var showBarTitle = false
@@ -49,15 +51,21 @@ struct ListView: View {
     
     // Search and genre filters only change which rows are shown; ranks stay as they are
     var filteredMovies: [CDMovie] {
-        viewModel.movies.filter { movie in
+        _ = streaming.version
+        let shown = viewModel.movies.filter { movie in
             (viewModel.searchText.isEmpty || (movie.title ?? "").localizedCaseInsensitiveContains(viewModel.searchText))
                 && viewModel.matchesGenreFilter(movie)
                 && (!viewModel.showAIPlacedOnly || viewModel.isAIPlaced(movie))
+                && (!viewModel.showStreamingOnly || streaming.isStreaming(Int64(movie.tmdb_id)))
         }
+        guard viewModel.showStreamingOnly && viewModel.shortestFirst else { return shown }
+        // Films with no known length go last
+        let length = { (movie: CDMovie) in viewModel.info(of: movie)?.runtime.flatMap { $0 > 0 ? $0 : nil } ?? Int.max }
+        return shown.sorted { length($0) < length($1) }
     }
 
     var isFiltering: Bool {
-        !viewModel.searchText.isEmpty || !viewModel.selectedGenres.isEmpty || viewModel.showAIPlacedOnly
+        !viewModel.searchText.isEmpty || !viewModel.selectedGenres.isEmpty || viewModel.showAIPlacedOnly || viewModel.showStreamingOnly
     }
 
     var body: some View {
@@ -304,6 +312,27 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 14, trailing: 16))
                 }
+                if viewModel.showStreamingOnly && filteredMovies.isEmpty && !streaming.isChecking {
+                    VStack(spacing: 14) {
+                        Text(streaming.hasNoServices
+                             ? "Pick your streaming services to see which of these you can watch tonight."
+                             : "Nothing here is streaming on your services right now.")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+                            .multilineTextAlignment(.center)
+                        Button(streaming.hasNoServices ? "Pick Services" : "Change Services") {
+                            Haptics.tap()
+                            choosingServices = true
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Theme.accent)
+                        .buttonStyle(.borderless)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
                 if !viewModel.selectedGenres.isEmpty && filteredMovies.isEmpty {
                     Text("No films in this list match all of those genres.")
                         .font(.subheadline)
@@ -314,7 +343,7 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), ranked: viewModel.isRanked, onAddToLists: { addingToLists = movie }) {
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), ranked: viewModel.isRanked, streamingOn: viewModel.showStreamingOnly ? streaming.services(for: Int64(movie.tmdb_id)) ?? [] : [], onAddToLists: { addingToLists = movie }) {
                         viewModel.setWatched(movie, !movie.watched)
                     }
                         .contentShape(Rectangle())
@@ -589,6 +618,13 @@ private extension ListView {
     var genreFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                streamingChip
+                if viewModel.showStreamingOnly {
+                    filterChip("Shortest First", icon: "clock", selected: viewModel.shortestFirst) {
+                        viewModel.shortestFirst.toggle()
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
                 // Only offered while some films were placed by the AI and not yet approved
                 if viewModel.hasAIPlacedFilms || viewModel.showAIPlacedOnly {
                     Button {
@@ -638,6 +674,83 @@ private extension ListView {
             .padding(.horizontal, 16)
             .animation(Theme.spring, value: viewModel.selectedGenres)
         }
+    }
+
+    // "What can I watch tonight?": narrows the list to films streaming on the user's services
+    var streamingChip: some View {
+        Button {
+            Haptics.tap()
+            if streaming.hasNoServices {
+                choosingServices = true
+                return
+            }
+            withAnimation(Theme.spring) { viewModel.showStreamingOnly.toggle() }
+            if viewModel.showStreamingOnly {
+                streaming.check(viewModel.movies.map { Int64($0.tmdb_id) }) {
+                    if streaming.hasNoServices {
+                        withAnimation(Theme.spring) { viewModel.showStreamingOnly = false }
+                        choosingServices = true
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if viewModel.showStreamingOnly && streaming.isChecking {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 12, height: 12)
+                        .tint(Theme.onAccent)
+                } else {
+                    Image(systemName: "play.tv.fill")
+                }
+                Text("On My Services")
+            }
+            .font(.caption.weight(.bold))
+            .foregroundColor(viewModel.showStreamingOnly ? Theme.onAccent : Theme.textPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(viewModel.showStreamingOnly ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .accessibilityHint("Shows only films streaming on your services")
+        .accessibilityAddTraits(viewModel.showStreamingOnly ? .isSelected : [])
+        .sheet(isPresented: $choosingServices) {
+            NavigationStack {
+                StreamingServicesView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                choosingServices = false
+                                // Picked some: show what's on them straight away
+                                withAnimation(Theme.spring) { viewModel.showStreamingOnly = true }
+                                streaming.check(viewModel.movies.map { Int64($0.tmdb_id) }) {
+                                    if streaming.hasNoServices {
+                                        withAnimation(Theme.spring) { viewModel.showStreamingOnly = false }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    func filterChip(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            withAnimation(Theme.spring) { action() }
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.bold))
+                .foregroundColor(selected ? Theme.onAccent : Theme.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.92))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     func genreChip(_ genre: Int, count: Int) -> some View {

@@ -11,6 +11,12 @@ import SwiftUI
 import CoreData
 
 /// What TMDb says about a film: its genres, US age rating and average user score
+/// A director or a franchise (TMDb collection), by TMDb id
+struct CreditPerson: Codable, Hashable {
+    let id: Int
+    let name: String
+}
+
 struct MovieInfo: Codable {
     let genres: [Int]
     // "G", "PG", "PG-13", "R", ...; empty when the film was never rated in the US
@@ -23,6 +29,10 @@ struct MovieInfo: Codable {
     // For TV shows
     var seasons: Int? = nil
     var episodes: Int? = nil
+    // Who directed it (empty for shows) and the franchise it's part of. nil directors means info cached before
+    // these were kept
+    var directors: [CreditPerson]? = nil
+    var collection: CreditPerson? = nil
     let fetched: Date
 
     /// The length as "2h 14m", or "45m" for a show's episodes, nil when unknown
@@ -59,8 +69,8 @@ final class MovieInfoCache {
     private func needsFetch(_ tmdbID: Int64) -> Bool {
         guard tmdbID != 0 else { return false }
         guard let info = infoByID[tmdbID] else { return true }
-        // Info cached before lengths were kept is fetched again to get them
-        return info.runtime == nil || Date().timeIntervalSince(info.fetched) > Self.maxAge
+        // Info cached before lengths, directors and franchises were kept is fetched again to get them
+        return info.runtime == nil || info.directors == nil || Date().timeIntervalSince(info.fetched) > Self.maxAge
     }
 
     /// Fetches the films that aren't cached or are out of date, two batches at a time so a big list
@@ -132,6 +142,9 @@ class ListViewModel: ObservableObject {
     @Published var selectedGenres: Set<Int> = []
     // Shows only films placed by Smart Placement and not yet approved
     @Published var showAIPlacedOnly = false
+    // "What can I watch tonight?": only films streaming on the user's services, optionally shortest first
+    @Published var showStreamingOnly = false
+    @Published var shortestFirst = false
     // Bumped when a film's AI mark changes, so rows showing it update
     @Published private(set) var placementVersion = 0
     @Published private(set) var isLoadingGenres = false

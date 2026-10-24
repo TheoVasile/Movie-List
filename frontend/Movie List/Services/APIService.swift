@@ -746,6 +746,12 @@ class APIService {
         sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
     }
 
+    /// Which of up to 200 films stream on the user's own services in their country
+    func fetchStreamingNow(tmdbIDs: [Int64], completion: @escaping (Result<StreamingNow, Error>) -> Void) {
+        sendJSON("POST", "/movies/streaming-now", body: ["ids": tmdbIDs, "region": Locale.current.region?.identifier ?? "US"],
+                 completion: completion)
+    }
+
     /// Streaming services in the user's country, most popular first
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
@@ -857,6 +863,11 @@ class APIService {
         sendJSON(following ? "POST" : "DELETE", path) { (result: Result<FollowResponse, Error>) in
             completion(result.map(\.following))
         }
+    }
+
+    /// What the people the user follows watched and ranked over the last two weeks, newest first
+    func fetchFriendActivity(completion: @escaping (Result<[FriendActivity], Error>) -> Void) {
+        sendJSON("GET", "/users/me/activity", query: [URLQueryItem(name: "days", value: "14")], completion: completion)
     }
 
     func fetchRecommendations(completion: @escaping (Result<[FilmRecommendation], Error>) -> Void) {
@@ -1303,6 +1314,8 @@ class APIService {
             let runtime: Int?
             let seasons: Int?
             let episodes: Int?
+            let directors: [CreditPerson]?
+            let collection: CreditPerson?
         }
         var components = URLComponents(string: "\(baseURL)/movies/info")
         components?.queryItems = [URLQueryItem(name: "ids", value: tmdbIDs.map(String.init).joined(separator: ","))]
@@ -1318,13 +1331,20 @@ class APIService {
                 let fetched = Date()
                 result = .success(Dictionary(films.map {
                     ($0.id, MovieInfo(genres: $0.genre_ids, certification: $0.certification, voteAverage: $0.vote_average, voteCount: $0.vote_count,
-                              runtime: $0.runtime ?? 0, seasons: $0.seasons, episodes: $0.episodes, fetched: fetched))
+                              runtime: $0.runtime ?? 0, seasons: $0.seasons, episodes: $0.episodes,
+                              // nil from a server that doesn't send them yet, so they're fetched again once it does
+                              directors: $0.directors, collection: $0.collection, fetched: fetched))
                 }, uniquingKeysWith: { first, _ in first }))
             } else {
                 result = .failure(error ?? NSError(domain: "Film info lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }
+    }
+
+    /// Every released film in a franchise, or directed by someone, oldest first
+    func fetchFilmography(_ kind: Filmography.Kind, id: Int, completion: @escaping (Result<Filmography, Error>) -> Void) {
+        sendJSON("GET", "/movies/\(kind.rawValue)/\(id)", completion: completion)
     }
 
     // MARK: TV episodes. showID is the app's (negative) TV id
