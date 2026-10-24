@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import CoreLocation
 
 struct UserSettingsView : View {
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
@@ -29,6 +30,9 @@ struct UserSettingsView : View {
     @State private var notifyRequests = true
     @State private var notifyActivity = true
     @AppStorage(NotificationManager.suggestionsKey) private var notifySuggestions = true
+    // Off until chosen, since it needs location access all the time
+    @AppStorage(TheatreCheckIns.enabledKey) private var theatreCheckIns = false
+    @ObservedObject private var checkIns = TheatreCheckIns.shared
     // Streaming alerts and how many services the user has picked for them, as last loaded from the server
     @State private var notifyStreaming = true
     @State private var savedNotifyStreaming = true
@@ -206,6 +210,14 @@ struct UserSettingsView : View {
                         }
                         .tint(Theme.accent)
                         .onChange(of: notifySuggestions) { _ in notifications.scheduleSuggestions() }
+                        Toggle(isOn: $theatreCheckIns) {
+                            Label("Theatre Check-ins", systemImage: "ticket")
+                        }
+                        .tint(Theme.accent)
+                        .onChange(of: theatreCheckIns) { wanted in checkIns.setEnabled(wanted) }
+                        if theatreCheckIns {
+                            theatreLocationWarning
+                        }
                         Toggle(isOn: $notifyStreaming) {
                             Label("Now Streaming", systemImage: "play.tv")
                         }
@@ -234,7 +246,7 @@ struct UserSettingsView : View {
                 } footer: {
                     Text(notifications.authorization == .denied
                          ? "Notifications for CineList are turned off in your iPhone's Settings."
-                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings. Now Streaming: when a film on your watchlist starts streaming on one of your services, or comes out.")
+                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings. Now Streaming: when a film on your watchlist starts streaming on one of your services, or comes out. Theatre Check-ins: when you leave a movie theatre after a film, CineList asks what you saw so you can add it to a list. Works at any theatre; your location stays on this iPhone.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -336,6 +348,32 @@ struct UserSettingsView : View {
 }
 
 extension UserSettingsView {
+    /// Check-ins only work with location set to Always and Precise Location on, since they notice leaving a
+    /// theatre in the background. Shown under the switch while either is missing, with a way to Settings.
+    /// Nothing shows while iOS is still asking
+    @ViewBuilder
+    private var theatreLocationWarning: some View {
+        let needsAlways = checkIns.authorization != .authorizedAlways && checkIns.authorization != .notDetermined
+        let needsPrecise = !needsAlways && checkIns.authorization == .authorizedAlways && !checkIns.preciseLocation
+        if needsAlways || needsPrecise {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(needsAlways
+                     ? "Theatre check-ins need CineList's location access set to \"Always\"."
+                     : "Theatre check-ins need Precise Location turned on for CineList.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Label("Open Settings", systemImage: "location")
+                        .foregroundColor(Theme.accent)
+                }
+            }
+        }
+    }
+
     private var savedName: String {
         authenticationViewModel.user?.displayName ?? ""
     }

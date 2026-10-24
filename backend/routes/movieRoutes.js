@@ -236,6 +236,36 @@ router.get("/discover", async (req, res) => {
     }
 });
 
+// Films in theatres in one country, most popular first, for theatre check-ins ("What did you see?"), e.g.
+// ?region=CA -> [discover movie...]. Cached per region for an hour, since TMDb's now-playing list changes slowly
+const nowPlayingCache = new Map();
+
+router.get("/now-playing", async (req, res) => {
+    const region = String(req.query.region ?? "US").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(region)) {
+        return res.status(400).json({ error: "region must be a two-letter country code." });
+    }
+    const cached = nowPlayingCache.get(region);
+    if (cached && Date.now() - cached.at < 60 * 60 * 1000) return res.json(cached.movies);
+    try {
+        const pages = await Promise.all([1, 2].map((page) => axios.get("https://api.themoviedb.org/3/movie/now_playing", {
+            params: { api_key: process.env.API_KEY, language: "en-US", region, page },
+            timeout: 15000,
+        })));
+        const seen = new Set();
+        const movies = pages.flatMap((response) => response.data.results ?? [])
+            .map(toDiscoverMovie)
+            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
+            .sort((a, b) => b.popularity - a.popularity)
+            .slice(0, 40);
+        nowPlayingCache.set(region, { at: Date.now(), movies });
+        res.json(movies);
+    } catch (error) {
+        console.error("Error fetching now playing movies:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Short strings from the app, trimmed and capped so a request can't inflate the AI prompt
 function cleanText(value, maxLength = 120) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";

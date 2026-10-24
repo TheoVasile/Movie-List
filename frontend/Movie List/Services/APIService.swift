@@ -1217,6 +1217,37 @@ class APIService {
         }
     }
 
+    /// Films in theatres in a country (e.g. "US"), most popular first, for theatre check-ins
+    func fetchNowPlaying(region: String, completion: @escaping (Result<[Movie], Error>) -> Void) {
+        var components = URLComponents(string: "\(baseURL)/movies/now-playing")
+        components?.queryItems = [URLQueryItem(name: "region", value: region)]
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: 0, userInfo: nil)))
+            return
+        }
+
+        send(URLRequest(url: url)) { data, response, error in
+            guard let data = data, error == nil,
+                  let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                DispatchQueue.main.async {
+                    completion(.failure(error ?? NSError(domain: "Now playing failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil)))
+                }
+                return
+            }
+
+            do {
+                let decodedResponse = try JSONDecoder().decode([Movie].self, from: data)
+                DispatchQueue.main.async {
+                    completion(.success(decodedResponse))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+
     /// Films picked by AI from the user's lists, swipes and anything they chose to share. Fails with
     /// code 503 when AI isn't set up on the server and 429 at the daily limit
     /// AI picks, streamed: onMovie gets each film as soon as the server has it, then completion gets how many

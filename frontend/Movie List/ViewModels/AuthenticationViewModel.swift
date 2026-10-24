@@ -136,6 +136,8 @@ extension AuthenticationViewModel {
     do {
         // Before signing out, while the request can still be signed in
         NotificationManager.shared.unregisterDevice()
+        // Stops watching for movie theatres and forgets the ones found
+        TheatreCheckIns.shared.setEnabled(false)
         PersistenceController.shared.deleteAllCoreDataObjects()
         SyncStatus.shared.reset()
         // The next person to sign in shouldn't see this account's films on the Home Screen

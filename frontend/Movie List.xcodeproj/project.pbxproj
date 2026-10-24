@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA7E5A012F000000000000A4 /* TheatreCheckInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F000000000000A3 /* TheatreCheckInSheet.swift */; };
+		FA7E5A012F000000000000A2 /* TheatreCheckIns.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */; };
 		FA7E5A012F0000000000000F /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000E /* DiscoverViewModel.swift */; };
 		FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000C /* DiscoverView.swift */; };
 		FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */; };
@@ -124,6 +126,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA7E5A012F000000000000A3 /* TheatreCheckInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheatreCheckInSheet.swift; sourceTree = "<group>"; };
+		FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheatreCheckIns.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000013 /* Movie 3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Movie 3.xcdatamodel"; sourceTree = "<group>"; };
 		FA7E5A012F00000000000010 /* Movie 2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Movie 2.xcdatamodel"; sourceTree = "<group>"; };
 		FA7E5A012F0000000000000E /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverViewModel.swift; sourceTree = "<group>"; };
@@ -298,6 +302,7 @@
 				FA2609A12D599679000A692D /* APIService.swift */,
 				02462785648178177F4101D5 /* ContactsFinder.swift */,
 				58660986FCF41669AACB301E /* NotificationManager.swift */,
+				FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */,
 				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 			);
@@ -340,6 +345,7 @@
 				136D73C186092B82C1D05137 /* StreamingServicesView.swift */,
 				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
 				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
+				FA7E5A012F000000000000A3 /* TheatreCheckInSheet.swift */,
 				7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */,
 				19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */,
 				516C04920FFE5E41C8B08A86 /* DiaryView.swift */,
@@ -527,6 +533,8 @@
 				B696E18D05D767827A57F334 /* StreamingServicesView.swift in Sources */,
 				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
 				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
+				FA7E5A012F000000000000A4 /* TheatreCheckInSheet.swift in Sources */,
+				FA7E5A012F000000000000A2 /* TheatreCheckIns.swift in Sources */,
 				A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */,
 				77256AACB4B7F27835914928 /* AvatarCropView.swift in Sources */,
 				EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */,

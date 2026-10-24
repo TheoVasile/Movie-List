@@ -27,6 +27,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     Personalization.migrateAIConsent()
 
     NotificationManager.shared.configure(application)
+    // Region events relaunch the app in the background, so the location manager has to be ready at launch
+    TheatreCheckIns.shared.configure()
     return true
     }
 
