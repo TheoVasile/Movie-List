@@ -6,6 +6,7 @@ const letterboxdRoutes = require("./routes/letterboxdRoutes");
 const userRoutes = require("./routes/userRoutes");
 const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
+const { perAddress, perUser } = require("./middleware/rateLimit");
 const cors = require("cors");
 const pool = require("./config/db");
 const { termsPage, privacyPage } = require("./config/terms");
@@ -13,19 +14,21 @@ const { sendDailyDigests } = require("./services/digestService");
 const { sendStreamingAlerts } = require("./services/streamingAlerts");
 const { sendSeasonAlerts } = require("./services/tvEpisodes");
 
+// Whether to create and update tables when the server starts. In production the host runs npm run migrate once
+// before each deploy (render.yaml's preDeployCommand) instead, so several servers starting at once don't all
+// migrate. Locally it's on unless MIGRATE_ON_BOOT=false
+const MIGRATE_ON_BOOT = (process.env.MIGRATE_ON_BOOT ?? (process.env.NODE_ENV === "production" ? "false" : "true")) === "true";
+
 const app = express();
 // Letterboxd imports can carry thousands of films in one request
 app.use(express.json({ limit: "5mb" }));
 app.use(cors());
 
-// Then closes movie night votes on time, which needs their tables
-createTables().then(() => require("./models/pollModel").scheduleOpenPolls());
-
 // For the host's health checks, so it needs no sign-in
 app.get("/health", (req, res) => res.send("ok"));
 
 // The Terms of Service as a web page, for the App Store listing and the website
-app.get("/terms", (req, res) => {
+app.get("/terms", perAddress, (req, res) => {
     try {
         res.type("html").send(termsPage());
     } catch (error) {
@@ -35,7 +38,7 @@ app.get("/terms", (req, res) => {
 });
 
 // The Privacy Policy as a web page, for the App Store listing and the website
-app.get("/privacy", (req, res) => {
+app.get("/privacy", perAddress, (req, res) => {
     try {
         res.type("html").send(privacyPage());
     } catch (error) {
@@ -44,56 +47,83 @@ app.get("/privacy", (req, res) => {
     }
 });
 
-// Sends the daily friends digest. Called once a day by a scheduled GitHub Action, since the free host
-// sleeps and can't keep its own timer. Needs the DIGEST_SECRET shared with that workflow
-app.post("/internal/digest", async (req, res) => {
-    const secret = process.env.DIGEST_SECRET;
-    if (!secret) return res.status(503).json({ error: "The digest isn't set up." });
-    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
-    try {
-        res.json(await sendDailyDigests());
-    } catch (error) {
-        console.error("Error sending digests:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+// The daily jobs, called once a day by a scheduled GitHub Action with the DIGEST_SECRET shared with that workflow.
+// Each answers 202 straight away and carries on here, so the Action doesn't sit waiting (and time out) while
+// thousands of people are notified; the result is logged when it's done. A job that's still running isn't started
+// again. ?wait=1 waits and answers with the result instead, for trying one out. Every job can safely run again
+// after being cut short (by a deploy, say), since each person's last digest and every alert sent are recorded
+const running = new Set();
 
-// Sends the day's streaming alerts, from the same daily GitHub Action as the digest, with the same secret
-app.post("/internal/streaming-alerts", async (req, res) => {
-    const secret = process.env.DIGEST_SECRET;
-    if (!secret) return res.status(503).json({ error: "Alerts aren't set up." });
-    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
-    try {
-        res.json(await sendStreamingAlerts());
-    } catch (error) {
-        console.error("Error sending streaming alerts:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+function dailyJob(path, name, notSetUp, job) {
+    app.post(path, async (req, res) => {
+        const secret = process.env.DIGEST_SECRET;
+        if (!secret) return res.status(503).json({ error: notSetUp });
+        if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
+        if (running.has(name)) return res.status(202).json({ started: false, running: true });
+        running.add(name);
+        const started = Date.now();
+        const run = job()
+            .then((result) => {
+                console.log(`✅ ${name} done in ${Math.round((Date.now() - started) / 1000)}s:`, JSON.stringify(result));
+                return result;
+            })
+            .finally(() => running.delete(name));
+        if (req.query.wait !== "1") {
+            run.catch((error) => console.error(`Error sending ${name}:`, error));
+            return res.status(202).json({ started: true });
+        }
+        try {
+            res.json(await run);
+        } catch (error) {
+            console.error(`Error sending ${name}:`, error);
+            res.status(500).json({ error: "Internal server error" });
+        }
+    });
+}
 
-// Tells people when a new season of a show in their lists starts. Same daily GitHub Action and secret
-app.post("/internal/season-alerts", async (req, res) => {
-    const secret = process.env.DIGEST_SECRET;
-    if (!secret) return res.status(503).json({ error: "Alerts aren't set up." });
-    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
-    try {
-        res.json(await sendSeasonAlerts());
-    } catch (error) {
-        console.error("Error sending season alerts:", error);
-        res.status(500).json({ error: "Internal server error" });
-    }
-});
+// The daily friends digest
+dailyJob("/internal/digest", "digests", "The digest isn't set up.", sendDailyDigests);
+// The day's streaming alerts
+dailyJob("/internal/streaming-alerts", "streaming alerts", "Alerts aren't set up.", sendStreamingAlerts);
+// Tells people when a new season of a show in their lists starts
+dailyJob("/internal/season-alerts", "season alerts", "Alerts aren't set up.", sendSeasonAlerts);
 
-app.use("/auth", authRoutes);
+app.use("/auth", perAddress, authRoutes);
 // Everything except account setup needs a signed-in user; /auth checks tokens per route
-app.use("/lists", verifyToken, listRoutes);
-app.use("/movies", verifyToken, movieRoutes);
-app.use("/letterboxd", verifyToken, letterboxdRoutes);
-app.use("/users", verifyToken, userRoutes);
+app.use("/lists", verifyToken, perUser, listRoutes);
+app.use("/movies", verifyToken, perUser, movieRoutes);
+app.use("/letterboxd", verifyToken, perUser, letterboxdRoutes);
+app.use("/users", verifyToken, perUser, userRoutes);
 
 // Hosts like Render choose the port; locally it's 3000
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server running on port ${port}`));
+
+// Takes requests only once the database answers, so the host's health check (and a deploy) only passes when the
+// server can actually serve. Supabase can take a few tries to answer from a fresh server
+async function start() {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await pool.query("SELECT 1");
+            break;
+        } catch (error) {
+            if (attempt >= 5) throw error;
+            console.error(`Database not reachable (try ${attempt} of 5):`, error.message);
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+    }
+    if (MIGRATE_ON_BOOT) {
+        // Locally a failed migration is logged and the server starts anyway, as before
+        await createTables().catch(() => {});
+    }
+    app.listen(port, () => console.log(`Server running on port ${port}`));
+    // Closes movie night votes on time
+    require("./models/pollModel").scheduleOpenPolls();
+}
+
+start().catch((error) => {
+    console.error("Couldn't start the server:", error);
+    process.exit(1);
+});
 
 const shutdown = () => {
     console.log("\n🔻 Closing database connection pool...");

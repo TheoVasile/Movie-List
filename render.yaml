@@ -4,16 +4,32 @@ services:
   - type: web
     name: movie-list-backend
     runtime: node
-    plan: free
+    # A paid plan, which never sleeps: the free one sleeps when idle, so the first request after a quiet spell takes
+    # most of a minute. Paid plans also allow preDeployCommand below
+    plan: starter
+    # To scale: raise the plan for a bigger server, or numInstances for more of them (or set up autoscaling in the
+    # dashboard). With more than one instance, the request limits in middleware/rateLimit.js apply per instance, and
+    # numInstances x DB_POOL_MAX must stay under the Supabase pooler's client limit
+    numInstances: 1
     rootDir: backend
     buildCommand: npm ci
+    # Creates and updates tables once per deploy, before the new version starts taking requests. If it fails, the
+    # deploy stops and the running version stays up
+    preDeployCommand: npm run migrate
     startCommand: node server.js
     healthCheckPath: /health
     autoDeploy: true
     branch: main
     envVars:
+      # Also stops the server migrating when it starts, since preDeployCommand does it (see server.js)
+      - key: NODE_ENV
+        value: production
+      # Supabase's pooled connection string in transaction mode: port 6543 on *.pooler.supabase.com (see config/db.js)
       - key: DATABASE_URL
         sync: false
+      # Database connections each instance keeps open
+      - key: DB_POOL_MAX
+        value: "10"
       - key: DATABASE_PASSWORD
         sync: false
       - key: API_KEY
@@ -30,3 +46,11 @@ services:
         generateValue: true
       - key: AI_DAILY_LIMIT
         value: "40"
+      # AI requests a day from everyone together, a cap on the daily AI bill
+      - key: AI_GLOBAL_DAILY_LIMIT
+        value: "5000"
+      # Requests a minute per address on routes that need no sign-in, and per signed-in user on the rest
+      - key: RATE_LIMIT_IP_PER_MINUTE
+        value: "120"
+      - key: RATE_LIMIT_USER_PER_MINUTE
+        value: "300"
