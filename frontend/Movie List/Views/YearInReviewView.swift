@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import CoreData
+import StoreKit
 
 /// The user's year in film as a story: swipe or tap through slides, each of which can be shared as an image.
 /// Counts, months, favourites and the closest friend come from the server's diary; genres and TMDb scores from
@@ -15,6 +16,7 @@ import CoreData
 struct YearInReviewView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.requestReview) private var requestReview
     @FetchRequest(fetchRequest: CDMovieList.fetch()) private var movieLists: FetchedResults<CDMovieList>
 
     @State private var year = Calendar.current.component(.year, from: Date())
@@ -49,6 +51,10 @@ struct YearInReviewView: View {
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    // Reaching the end of the story is a good moment to ask for a rating
+                    .onChange(of: page) { page in
+                        if page == slides.count - 1 { ReviewPrompter.ask(requestReview, after: .yearInReview) }
+                    }
                     Button {
                         share(slides[min(page, slides.count - 1)], review: review)
                     } label: {
@@ -84,7 +90,7 @@ struct YearInReviewView: View {
             }
         }
         .sheet(item: $shareItem) { item in
-            ShareSheet(items: item.items)
+            ShareSheet(item: item)
                 .presentationDetents([.medium, .large])
         }
         .onAppear { if review == nil { load() } }
@@ -190,7 +196,7 @@ struct YearInReviewView: View {
             let renderer = ImageRenderer(content: card)
             renderer.scale = 3
             if let image = renderer.uiImage {
-                shareItem = ShareItem(items: [image])
+                shareItem = ShareItem(items: [image], kind: .yearInReview)
             }
         }
     }

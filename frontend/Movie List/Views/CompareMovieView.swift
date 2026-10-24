@@ -7,9 +7,11 @@
 
 import Foundation
 import SwiftUI
+import StoreKit
 
 struct CompareMovieView: View {
     @EnvironmentObject var network: NetworkService
+    @Environment(\.requestReview) private var requestReview
     
     @Binding var movies: [CDMovie]
     @Binding var movie: CDMovie
@@ -169,6 +171,8 @@ struct CompareMovieView: View {
         if low >= high {
             Haptics.success()
             AppAnalytics.log(.filmRanked(.compare))
+            // Only rankings that took at least one head-to-head pick count towards asking for a rating
+            if !otherMovies.isEmpty { ReviewPrompter.rankingFinished(requestReview) }
             onRankingUpdate(movie, low + 1)
             return
         }

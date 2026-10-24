@@ -1,23 +1,14 @@
-const axios = require("axios");
 const pool = require("../config/db");
 const { notifyUser } = require("./pushService");
+const { cached, fetchTmdb, HOUR: HOURS } = require("./tmdbCache");
+const { mapWithConcurrency } = require("./letterboxdService");
 
 // TV episode tracking: a show's seasons and episodes from TMDb, which episodes each person has watched, and a
 // daily push when a new season of a show in someone's lists starts. Shows are stored by their positive TMDb id;
 // the app's negative TV ids (services/tmdbMedia.js) are turned around on the way in
 
-const HOURS = 60 * 60 * 1000;
-const cache = new Map();
-
-async function cached(key, maxAge, load) {
-    const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < maxAge) return hit.value;
-    const value = await load();
-    cache.set(key, { at: Date.now(), value });
-    return value;
-}
-
-const tmdb = (path) => axios.get(`https://api.themoviedb.org/3/${path}`, { params: { api_key: process.env.API_KEY }, timeout: 15000 });
+// Shows checked at once by the daily new-season alerts, and alerts sent at once
+const CONCURRENCY = 6;
 
 const episodeRef = (episode) => episode
     ? { season: episode.season_number, episode: episode.episode_number, name: episode.name ?? "", air_date: episode.air_date ?? "" }
@@ -26,7 +17,7 @@ const episodeRef = (episode) => episode
 /// A show's seasons (specials left out), its latest aired and next episode, and its status, e.g. "Returning Series"
 async function showDetails(showId) {
     return cached(`show:${showId}`, 6 * HOURS, async () => {
-        const show = (await tmdb(`tv/${showId}`)).data;
+        const show = await fetchTmdb(`tv/${showId}`);
         return {
             name: show.name ?? "",
             status: show.status ?? "",
@@ -48,7 +39,7 @@ async function showDetails(showId) {
 /// One season's episodes in order
 async function seasonEpisodes(showId, season) {
     return cached(`season:${showId}:${season}`, 6 * HOURS, async () => {
-        const data = (await tmdb(`tv/${showId}/season/${season}`)).data;
+        const data = await fetchTmdb(`tv/${showId}/season/${season}`);
         return {
             season,
             name: data.name ?? `Season ${season}`,
@@ -117,31 +108,35 @@ async function sendSeasonAlerts() {
     )).rows;
     const today = new Date().toISOString().slice(0, 10);
     const premieres = new Map();
-    for (const showId of new Set(rows.map((row) => row.show_id))) {
+    await mapWithConcurrency([...new Set(rows.map((row) => row.show_id))], async (showId) => {
         try {
             const found = premiere(await showDetails(showId), today);
             if (found) premieres.set(showId, found);
         } catch (error) {
             console.error(`Couldn't check show ${showId}:`, error.message);
         }
-    }
-    let sent = 0;
-    for (const row of rows) {
+    }, CONCURRENCY);
+    const due = rows.filter((row) => premieres.has(row.show_id));
+    if (!due.length) return { shows: premieres.size, sent: 0 };
+    // Every alert due is recorded in one query, which returns the ones not sent before
+    const fresh = await pool.query(
+        `INSERT INTO season_alerts_sent (user_id, show_id, season)
+         SELECT unnest($1::text[]), unnest($2::int[]), unnest($3::int[]) ON CONFLICT DO NOTHING
+         RETURNING user_id, show_id`,
+        [due.map((row) => row.firebase_uid), due.map((row) => row.show_id), due.map((row) => premieres.get(row.show_id).season)]
+    );
+    const isFresh = new Set(fresh.rows.map((row) => `${row.user_id}:${row.show_id}`));
+    // delete() is true only the first time, so a show listed under two titles is announced once
+    const sent = await mapWithConcurrency(due.filter((row) => isFresh.delete(`${row.firebase_uid}:${row.show_id}`)), async (row) => {
         const found = premieres.get(row.show_id);
-        if (!found) continue;
-        const fresh = await pool.query(
-            "INSERT INTO season_alerts_sent (user_id, show_id, season) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-            [row.firebase_uid, row.show_id, found.season]
-        );
-        if (!fresh.rowCount) continue;
         const when = found.today ? "starts today" : "is out now";
-        sent += await notifyUser(row.firebase_uid, "streaming", {
+        return await notifyUser(row.firebase_uid, "streaming", {
             title: found.season === 1 ? row.title : "New season",
             body: found.season === 1 ? `${row.title} ${when}` : `Season ${found.season} of ${row.title} ${when}`,
             data: { tmdb_id: String(-row.show_id) },
         }) > 0 ? 1 : 0;
-    }
-    return { shows: premieres.size, sent };
+    }, CONCURRENCY);
+    return { shows: premieres.size, sent: sent.reduce((sum, n) => sum + n, 0) };
 }
 
 module.exports = { showDetails, seasonEpisodes, watchedEpisodes, setEpisodesWatched, sendSeasonAlerts, premiere };

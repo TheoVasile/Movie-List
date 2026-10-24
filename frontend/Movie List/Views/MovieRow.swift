@@ -87,6 +87,7 @@ struct MovieRow: View {
                 if let addedBy {
                     HStack(spacing: 4) {
                         Image(systemName: "person.fill")
+                            .accessibilityHidden(true)
                         Text("Added by \(addedBy)")
                     }
                         .font(.caption2.weight(.semibold))

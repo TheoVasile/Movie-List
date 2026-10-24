@@ -1075,6 +1075,7 @@ struct FriendProfileView: View {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundStyle(Theme.accentGradient)
+                .accessibilityHidden(true)
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundColor(Theme.textPrimary)

@@ -223,18 +223,25 @@ struct ListShareCard: View {
 
 // MARK: - Share sheet
 
-/// Something to hand to the system share sheet: an image or a file
+/// Something to hand to the system share sheet: an image or a file, and what it is for analytics
 struct ShareItem: Identifiable {
     let id = UUID()
     let items: [Any]
+    let kind: AppAnalytics.ShareKind
 }
 
 /// The system share sheet (AirDrop, Messages, Save to Files, ...)
 struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
+    let item: ShareItem
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: item.items, applicationActivities: nil)
+        // Called once the sheet closes, whether something was sent or saved or not
+        let kind = item.kind
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            AppAnalytics.log(.shareCompleted(kind, completed: completed))
+        }
+        return controller
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}

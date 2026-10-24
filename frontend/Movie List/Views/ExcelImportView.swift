@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import StoreKit
 import UniformTypeIdentifiers
 
 struct ExcelImportView: View {
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var existingLists: FetchedResults<CDMovieList>
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var viewModel: AuthenticationViewModel
+    @Environment(\.requestReview) private var requestReview
 
     private enum Step {
         case chooseFile
@@ -42,6 +44,8 @@ struct ExcelImportView: View {
     // Films sent so far out of all the chosen sheets', for the progress bar
     @State private var progress = (done: 0, total: 0)
     @State private var currentSheet = ""
+    // Whether the chosen file was a .csv or an Excel workbook, for analytics
+    @State private var source: AppAnalytics.ImportSource = .excel
 
     // The backend matches each batch on TMDb before answering, so small batches keep the progress bar moving
     private static let batchSize = 25
@@ -383,6 +387,7 @@ private extension ExcelImportView {
             guard let url = urls.first else { return }
             do {
                 let sheets = try SpreadsheetImport.sheets(from: url)
+                source = url.pathExtension.lowercased() == "csv" ? .csv : .excel
                 // Skip sheets that look like they came over in an earlier import
                 let fresh = sheets.filter { !alreadyImported($0) }
                 selected = Set((fresh.isEmpty ? sheets : fresh).map(\.id))
@@ -455,12 +460,13 @@ private extension ExcelImportView {
                 if failed {
                     errorMessage = "The import stopped partway, so some films weren't added. Check your connection and import into the same list again; films already in it are skipped."
                 } else {
-                    // TODO(#109): log import_completed + review prompt
+                    AppAnalytics.log(.importCompleted(source, films: results.reduce(0) { $0 + $1.added }))
                     Haptics.success()
                 }
                 withAnimation(Theme.spring) {
                     step = .finished(results)
                 }
+                if !failed { ReviewPrompter.ask(requestReview, after: .importCompleted) }
             }
         }
     }

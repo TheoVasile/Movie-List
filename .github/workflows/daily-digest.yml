@@ -1,5 +1,5 @@
-# Sends the daily friends digest, streaming alerts and new-season alerts. The backend's free host sleeps when idle and can't run a
-# timer, so this wakes it once a day. Needs the repository secret DIGEST_SECRET, matching the backend's
+# Sends the daily friends digest, streaming alerts and new-season alerts. Each call only starts the job: the backend answers
+# 202 straight away and carries on by itself, logging the result. Needs the repository secret DIGEST_SECRET, matching the backend's
 name: Daily friends digest
 
 on:
@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wake the backend
-        # The first request after a sleep can take most of a minute
+        # Only needed on a host that sleeps when idle; on an always-on plan this answers at once
         run: curl --silent --retry 5 --retry-delay 10 --max-time 90 https://movie-list-backend-dgct.onrender.com/health
       - name: Send digests
         env:
           DIGEST_SECRET: ${{ secrets.DIGEST_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --max-time 120 -X POST \
+          curl --fail-with-body --silent --show-error --max-time 60 -X POST \
             -H "x-digest-secret: $DIGEST_SECRET" \
             https://movie-list-backend-dgct.onrender.com/internal/digest
       - name: Send streaming alerts
@@ -28,7 +28,7 @@ jobs:
         env:
           DIGEST_SECRET: ${{ secrets.DIGEST_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --max-time 300 -X POST \
+          curl --fail-with-body --silent --show-error --max-time 60 -X POST \
             -H "x-digest-secret: $DIGEST_SECRET" \
             https://movie-list-backend-dgct.onrender.com/internal/streaming-alerts
       - name: Send new-season alerts
@@ -37,6 +37,6 @@ jobs:
         env:
           DIGEST_SECRET: ${{ secrets.DIGEST_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --max-time 300 -X POST \
+          curl --fail-with-body --silent --show-error --max-time 60 -X POST \
             -H "x-digest-secret: $DIGEST_SECRET" \
             https://movie-list-backend-dgct.onrender.com/internal/season-alerts

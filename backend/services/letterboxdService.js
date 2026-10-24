@@ -1,4 +1,4 @@
-const axios = require("axios");
+const { fetchTmdb } = require("./tmdbCache");
 
 const CONCURRENCY = 5;
 
@@ -44,12 +44,11 @@ function normalizeTitle(title) {
         .replace(/[^a-z0-9]/g, "");
 }
 
+// Not cached: an import searches for thousands of films once, which would only fill the cache. fetchTmdb still
+// waits and tries again when TMDb says there are too many requests, which a big import can cause
 async function searchTmdb(name, params) {
-    const response = await axios.get("https://api.themoviedb.org/3/search/movie", {
-        params: { query: name, include_adult: false, language: "en-US", api_key: process.env.API_KEY, ...params },
-        timeout: 15000,
-    });
-    return response.data.results ?? [];
+    const data = await fetchTmdb("search/movie", { query: name, include_adult: false, language: "en-US", ...params });
+    return data.results ?? [];
 }
 
 // Letterboxd exports only carry a title and year, so prefer an exact title match within that year,

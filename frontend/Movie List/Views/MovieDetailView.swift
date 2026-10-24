@@ -352,6 +352,7 @@ struct MovieDetailView: View {
                 if let onApprovePlacement, !placementApproved {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
+                            .accessibilityHidden(true)
                         Text("Placed by AI")
                         Text("·")
                         Button("Keep This Spot") {
