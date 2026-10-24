@@ -17,6 +17,7 @@ struct DiscoverView: View {
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.birthdayKey) private var birthday = ""
 
     @State private var dragOffset: CGSize = .zero
     @State private var showDetails = false
@@ -269,7 +270,7 @@ private extension DiscoverView {
     }
 
     var isUnder18: Bool {
-        ageRange == Personalization.under18
+        Personalization.ageRange(birthday: birthday, legacy: ageRange) == Personalization.under18
     }
 
     // AI Picks can be chosen only while AI features are allowed in Settings

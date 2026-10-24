@@ -7,7 +7,7 @@ This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects
 ## 1. The Short Version
 
 - We collect what we need to run CineList: your account details, your profile, the films and lists you add, and the people you connect with.
-- A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your age range and pronouns are kept on your device, and are only sent anywhere in the limited ways described below.
+- A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your birthday and pronouns are kept on your device, and are only sent anywhere in the limited ways described below.
 - AI features are off unless you turn them on. When you use them, we send your film lists and preferences to our AI provider, Anthropic, but not your name, email address, phone number or contacts.
 - We do not sell your personal information, we do not show ads, and we do not track you across other companies' apps or websites.
 - We use Google Analytics for Firebase to count which features are used, without your advertising identifier or your name, email address or content. You can turn it off in Settings.
@@ -77,7 +77,7 @@ Analytics are on unless you turn them off. You can turn them off at any time wit
 Some features work only on your device. This information is not sent to us, except as described here:
 
 - **Discover.** The films you like, skip or mark "not for me" in Discover, your Discover filters, and the taste profile built from them are stored on your iPhone. They are sent to our servers only when you use AI Picks, so that the AI can make suggestions (see Section 7).
-- **Age range and pronouns.** If you choose to share an age range or pronouns for better recommendations, they are stored on your iPhone and only sent with AI Discover requests. If you tell us you are under 18, the App turns AI features off for you.
+- **Birthday and pronouns.** If you choose to add your birthday or pronouns for better recommendations, they are stored on your iPhone. Your birthday itself is never sent to us or to our AI provider: the App works out your age range from it (such as 25–34), and only that age range, and your pronouns, are sent with AI Discover requests, and only while AI features are on. If you chose an age range in an earlier version of the App instead, that age range is used in the same way until you add a birthday. If your birthday or age range shows you are under 18, the App turns AI features off for you.
 - **Daylight appearance.** If you choose the Daylight appearance, the App uses your approximate location, rounded to about 10 kilometres, to work out sunrise and sunset. It is stored on your iPhone and is not sent to us.
 - **Theatre check-ins.** If you turn on Theatre Check-ins, the App uses your iPhone's location, including in the background and with precise location, to notice when you spend about a film's length at a movie theatre and then leave. The theatres near you, when you arrived and where you are stay on your iPhone. To find nearby theatres, the App asks Apple Maps, which means Apple receives your approximate location under Apple's own privacy policy. If you then choose what you saw, we receive only the film and the date, like any other diary entry, and not the theatre or your location.
 - **Widgets.** To show your top films and tonight's suggestions on your Home Screen, the App saves a small copy of that information in a space on your iPhone shared with its widgets. It is removed when you sign out.
@@ -108,7 +108,7 @@ When you use an AI feature, our servers send our AI provider, Anthropic, the inf
 - The names of your lists and the titles, years, original languages, rankings and watched status of the films and shows in them (for Movie Night, only lists that are not private)
 - The films you liked, skipped or marked "not for me" in Discover, how many you liked, and the films already suggested
 - Your genre preferences and filters, your chosen streaming services, and your country and language
-- Your age range and pronouns, if you chose to share them (Discover only)
+- The age range worked out from your birthday, and your pronouns, if you chose to share them (Discover only). Never your birthday itself
 - For Movie Night, the same kind of list information for each friend you are planning with, identified by their @username, and the films your group has liked, turned down or shortlisted
 
 We do not send your name, email address, phone number, notes, photo or contacts. Anthropic processes this information on our behalf to generate suggestions. Under its commercial terms, Anthropic may not use it to train its models, and it keeps it only for a limited time. AI suggestions we show you, such as the reason a film was picked, may be saved with your lists or groups.
@@ -221,7 +221,7 @@ You can permanently delete your account at any time in Settings by tapping **Del
 - Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to, along with your votes and reactions in them
 - Your sign-in account with Google Firebase is deleted at the same time. If that fails, nothing is deleted and you can try again
 - Films you added to someone else's shared list, and films you suggested in a group you did not own, stay there without your name
-- The App signs you out and removes what it kept on your iPhone for your account, such as your lists, Discover history and preferences, AI and personalization settings (including any age range and pronouns), Theatre Check-ins and notification settings. Device-wide preferences, such as appearance, are kept
+- The App signs you out and removes what it kept on your iPhone for your account, such as your lists, Discover history and preferences, AI and personalization settings (including any birthday, age range and pronouns), Theatre Check-ins and notification settings. Device-wide preferences, such as appearance, are kept
 
 Usage analytics are not linked to your account, so they are not deleted with it; they are deleted automatically after the period in Section 12. The Share Usage Analytics setting belongs to your iPhone rather than your account, so it is kept. Deleted information may remain in encrypted backups for a limited period until they are overwritten. Deleting the App from your iPhone does not delete your account. You can also ask us to delete your account by emailing {{CONTACT_EMAIL}} from the email address on your account.
 
