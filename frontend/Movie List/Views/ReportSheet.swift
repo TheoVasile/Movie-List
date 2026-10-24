@@ -162,6 +162,7 @@ struct ReportSheet: View {
                     .font(.system(size: 54))
                     .foregroundStyle(Theme.accentGradient)
                     .padding(.top, 30)
+                    .accessibilityHidden(true)
                 Text("Thanks — we review reports within 24 hours")
                     .font(.title3.weight(.bold))
                     .foregroundColor(Theme.textPrimary)

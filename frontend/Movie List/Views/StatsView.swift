@@ -228,6 +228,7 @@ struct StatsView: View {
                         Image(systemName: "square.and.arrow.up")
                     }
                     .disabled(summary.filmCount == 0)
+                    .accessibilityLabel("Share Stats")
                 }
             }
         }

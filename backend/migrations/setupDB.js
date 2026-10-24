@@ -342,17 +342,66 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, movie_id)
             );
+
+            -- AI requests each user made each day, for the daily limit. Kept in the database so a restart or a
+            -- second server doesn't reset it; rows older than a couple of days are deleted as new ones come in
+            CREATE TABLE IF NOT EXISTS ai_usage (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                day DATE NOT NULL,
+                count INT NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, day)
+            );
+            -- Everyone's AI requests each day together, for the cap on the daily AI bill (AI_GLOBAL_DAILY_LIMIT)
+            CREATE TABLE IF NOT EXISTS ai_usage_total (
+                day DATE PRIMARY KEY,
+                count INT NOT NULL DEFAULT 0
+            );
+
+            -- TMDb answers shared by every server and kept across restarts, so the same search or film isn't
+            -- fetched again for a while. Expired rows are deleted every so often (services/tmdbCache.js)
+            CREATE TABLE IF NOT EXISTS tmdb_cache (
+                key TEXT PRIMARY KEY,
+                body JSONB NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS tmdb_cache_expires ON tmdb_cache (expires_at);
+
+            -- Indexes for the busiest lookups that no primary key or unique constraint already starts with
+            CREATE INDEX IF NOT EXISTS lists_user ON lists (user_id);
+            -- A user's followers and follow requests
+            CREATE INDEX IF NOT EXISTS follows_followee ON follows (followee_id, accepted);
+            -- Which lists a film is in, and deleting films
+            CREATE INDEX IF NOT EXISTS list_movies_movie ON list_movies (movie_id);
+            -- Friends' recent watches, for the activity feed and digest
+            CREATE INDEX IF NOT EXISTS watched_movies_recent ON watched_movies (user_id, watched_at);
+            -- Lists shared with someone, and who follows a list
+            CREATE INDEX IF NOT EXISTS list_editors_user ON list_editors (user_id);
+            CREATE INDEX IF NOT EXISTS list_follows_list ON list_follows (list_id);
+            -- A user's movie night groups, as owner or member
+            CREATE INDEX IF NOT EXISTS watch_groups_owner ON watch_groups (owner_id);
+            CREATE INDEX IF NOT EXISTS watch_group_members_user ON watch_group_members (user_id);
+            -- A group's votes, and the open ones to close on time
+            CREATE INDEX IF NOT EXISTS group_polls_group ON group_polls (group_id);
+            CREATE INDEX IF NOT EXISTS group_polls_open ON group_polls (closes_at) WHERE closed_at IS NULL;
+            -- Reports about one user, for review and when their account is deleted
+            CREATE INDEX IF NOT EXISTS reports_reported ON reports (reported_user_id);
+            -- @username search matches by prefix (LIKE 'the%'), which the plain unique index can't serve
+            CREATE INDEX IF NOT EXISTS users_handle_prefix ON users (handle text_pattern_ops);
         `);
 
         console.log("Tables created successfully");
     } catch (error) {
         console.error("Error creating tables:", error);
-    } finally {
-        //await client.release();
+        // So a deploy whose migration failed stops before the new code starts
+        throw error;
     }
 };
 
-// Run the script
-//createTables();
+// npm run migrate: runs once before each deploy (render.yaml's preDeployCommand), then exits
+if (require.main === module) {
+    createTables()
+        .then(() => pool.end())
+        .catch(() => pool.end(() => process.exit(1)));
+}
 
 module.exports = createTables;

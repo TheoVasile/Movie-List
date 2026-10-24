@@ -87,6 +87,7 @@ struct Home: View {
                             .font(.title3)
                             .foregroundStyle(Theme.accentGradient)
                     }
+                    .accessibilityLabel("New List or Import")
                 }
             }
         }

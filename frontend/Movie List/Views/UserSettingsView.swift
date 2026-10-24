@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import CoreLocation
+import FirebaseCrashlytics
 
 struct UserSettingsView : View {
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
@@ -328,12 +329,15 @@ struct UserSettingsView : View {
 
                 Section {
                     Toggle(isOn: $shareAnalytics) {
-                        Label("Share Usage Analytics", systemImage: "chart.bar")
+                        Label("Share Usage & Crash Data", systemImage: "chart.bar")
                     }
                     .tint(Theme.accent)
-                    .onChange(of: shareAnalytics) { _ in AppAnalytics.applySetting() }
+                    .onChange(of: shareAnalytics) { on in
+                        AppAnalytics.applySetting()
+                        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(on)
+                    }
                 } footer: {
-                    Text("Counts which features are used, like adding or ranking a film, with Google Analytics. Never your films, lists, name or contacts, and never used for ads.")
+                    Text("Counts which features are used, like adding or ranking a film, with Google Analytics, and sends crash reports with Firebase Crashlytics. Never your films, lists, name or contacts, and never used for ads.")
                 }
                 .listRowBackground(Theme.surface)
 
