@@ -348,6 +348,23 @@ struct UserProfile: Decodable {
     let is_private: Bool?
     // Films friends sent that the user hasn't looked at yet
     let recommendations_unseen: Int?
+    // The Terms of Service version the user agreed to (nil if they never have) and the one in force now.
+    // current_terms_version is missing from older servers, which don't ask for agreement
+    let terms_version: String?
+    let current_terms_version: String?
+
+    /// Whether the user has to agree to the current terms before using the app
+    var needsTermsAcceptance: Bool {
+        guard let current_terms_version else { return false }
+        return terms_version != current_terms_version
+    }
+}
+
+/// CineList's Terms of Service as Markdown, with its version and when it last changed (e.g. "October 23, 2026")
+struct TermsDocument: Decodable {
+    let version: String
+    let updated: String
+    let markdown: String
 }
 
 /// Follow requests waiting on the user, and the @usernames the user has asked to follow
@@ -601,6 +618,22 @@ class APIService {
         }.resume()
     }
 
+    /// CineList's current Terms of Service. Works signed out too, so it can be read before signing up
+    func fetchTerms(completion: @escaping (Result<TermsDocument, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/terms") else { return }
+        // Public, so it goes without a token
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result: Result<TermsDocument, Error>
+            if let data, status == 200, let terms = try? JSONDecoder().decode(TermsDocument.self, from: data) {
+                result = .success(terms)
+            } else {
+                result = .failure(error ?? NSError(domain: "Request failed", code: status, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
+        }.resume()
+    }
+
     func createUser(firebase_id: String, email: String, name: String, handle: String? = nil, completion: @escaping (Result<UserResponse, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/create") else { return }
         
@@ -680,6 +713,15 @@ class APIService {
     func fetchMyProfile(completion: @escaping (Result<UserProfile, Error>) -> Void) {
         sendJSON("GET", "/users/me", completion: completion)
     }
+
+    /// Records that the user agreed to this version of the terms. Fails with code 400 when it's no longer the current one
+    func acceptTerms(version: String, completion: @escaping (Result<String, Error>) -> Void) {
+        sendJSON("POST", "/users/terms/accept", body: ["version": version]) { (result: Result<TermsAcceptance, Error>) in
+            completion(result.map(\.terms_version))
+        }
+    }
+
+    private struct TermsAcceptance: Decodable { let terms_version: String }
 
     /// Fails with code 409 when the username is taken, 400 when it isn't allowed
     func setHandle(_ handle: String, completion: @escaping (Result<String, Error>) -> Void) {

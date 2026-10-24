@@ -37,6 +37,15 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Reloads just the user's profile, e.g. after agreeing to new terms. Calls back once it has, whether or not it worked
+    func reloadProfile(completion: (() -> Void)? = nil) {
+        APIService.shared.fetchMyProfile { result in
+            if case .success(let profile) = result { self.profile = profile }
+            self.hasLoaded = true
+            completion?()
+        }
+    }
+
     /// Accepts or declines someone's request, taking it off the list straight away
     func answer(_ person: UserSummary, accept: Bool) {
         let previous = requests

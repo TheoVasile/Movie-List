@@ -57,6 +57,10 @@ const createTables = async () => {
             -- Private profiles approve each follower; public ones (the default, and every account from before
             -- this existed) are followed straight away
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+            -- Which version of the Terms of Service the user last accepted, and when. Null until they accept, and
+            -- the app asks again whenever it's older than the current one
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (

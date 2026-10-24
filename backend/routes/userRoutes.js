@@ -10,6 +10,8 @@ const { availableServices } = require("../services/filmFilters");
 const { MIN_FILMS, MAX_FILMS, startPoll, currentPoll, vote, scheduleOpenPolls } = require("../models/pollModel");
 const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUser } = require("../services/pushService");
 const admin = require("../config/firebase");
+const pool = require("../config/db");
+const { TERMS_VERSION } = require("../config/terms");
 const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
@@ -20,9 +22,29 @@ router.get("/me", async (req, res) => {
     try {
         const profile = await getProfile(req.user.uid);
         if (!profile) return res.status(404).json({ error: "Account not found." });
-        res.json(profile);
+        // terms_version is what the user last accepted; the app asks them to accept again when it isn't current
+        res.json({ ...profile, current_terms_version: TERMS_VERSION });
     } catch (error) {
         console.error("Error fetching profile:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Records that the user accepted the Terms of Service, e.g. { "version": "2026-10-23" }. Only the current
+// version can be accepted -> { "terms_version": "2026-10-23" }
+router.post("/terms/accept", async (req, res) => {
+    if (req.body?.version !== TERMS_VERSION) {
+        return res.status(400).json({ error: "Those aren't the current Terms of Service." });
+    }
+    try {
+        const result = await pool.query(
+            "UPDATE users SET terms_version = $2, terms_accepted_at = NOW() WHERE firebase_uid = $1 RETURNING terms_version",
+            [req.user.uid, TERMS_VERSION]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: "Account not found." });
+        res.json({ terms_version: result.rows[0].terms_version });
+    } catch (error) {
+        console.error("Error accepting terms:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
