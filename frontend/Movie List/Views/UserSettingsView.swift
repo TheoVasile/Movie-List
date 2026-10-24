@@ -286,13 +286,24 @@ struct UserSettingsView : View {
 
                 Section("Legal") {
                     NavigationLink {
-                        TermsOfServiceView()
+                        LegalDocumentView(document: .terms)
                     } label: {
                         Label {
                             Text("Terms of Service")
                                 .foregroundColor(Theme.textPrimary)
                         } icon: {
                             Image(systemName: "doc.text")
+                                .foregroundStyle(Theme.accentGradient)
+                        }
+                    }
+                    NavigationLink {
+                        LegalDocumentView(document: .privacy)
+                    } label: {
+                        Label {
+                            Text("Privacy Policy")
+                                .foregroundColor(Theme.textPrimary)
+                        } icon: {
+                            Image(systemName: "hand.raised")
                                 .foregroundStyle(Theme.accentGradient)
                         }
                     }

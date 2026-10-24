@@ -8,13 +8,32 @@
 import Foundation
 import SwiftUI
 
+/// CineList's legal documents, which the server serves as Markdown at /auth/<path>
+enum LegalDocument: String, Identifiable {
+    case terms
+    case privacy
+
+    var id: String { rawValue }
+    var path: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .terms: return "Terms of Service"
+        case .privacy: return "Privacy Policy"
+        }
+    }
+
+    /// Links to the document in text, e.g. in TermsNotice; opening one shows the document in a sheet
+    var link: URL? { URL(string: "cinelist://\(rawValue)") }
+}
+
 // MARK: - Rendering the terms
 
-/// Draws the terms' Markdown: #, ## and ### headings, paragraphs and "- " bullets, with bold, italics and
-/// links inside them. The server's document uses nothing else
+/// Draws a legal document's Markdown: #, ## and ### headings, paragraphs and "- " bullets, with bold, italics
+/// and links inside them. The server's documents use nothing else
 struct TermsText: View {
     let markdown: String
-    // The screens around it already say "Terms of Service", so the document's own title can be left out
+    // The screens around it already show the document's name, so its own title can be left out
     var skipsTitle = false
 
     private enum Block {
@@ -90,8 +109,9 @@ struct TermsText: View {
     }
 }
 
-/// Shown in place of the terms while they load, or when they couldn't be
+/// Shown in place of a document while it loads, or when it couldn't be
 private struct TermsStatusView: View {
+    var document = LegalDocument.terms
     let failed: Bool
     let retry: () -> Void
 
@@ -101,7 +121,7 @@ private struct TermsStatusView: View {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 36, weight: .semibold))
                     .foregroundStyle(Theme.accentGradient)
-                Text("Couldn't load the Terms of Service")
+                Text("Couldn't load the \(document.title)")
                     .font(.headline)
                     .foregroundColor(Theme.textPrimary)
                 Text("Check your connection and try again.")
@@ -124,12 +144,13 @@ private struct TermsStatusView: View {
 
 // MARK: - Reading the terms
 
-/// The Terms of Service, read-only. Pushed from Settings, or shown as a sheet (with its own Done button)
-/// from sign-up
-struct TermsOfServiceView: View {
+/// The Terms of Service or Privacy Policy, read-only. Pushed from Settings, or shown as a sheet (with its own
+/// Done button) from sign-up and the terms screen
+struct LegalDocumentView: View {
+    var document = LegalDocument.terms
     var isSheet = false
     @Environment(\.dismiss) private var dismiss
-    @State private var terms: TermsDocument? = nil
+    @State private var text: LegalDocumentText? = nil
     @State private var loadFailed = false
 
     var body: some View {
@@ -150,41 +171,42 @@ struct TermsOfServiceView: View {
 
     private var content: some View {
         ScrollView {
-            if let terms {
+            if let text {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Last updated \(terms.updated)")
+                    Text("Last updated \(text.updated)")
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(Theme.textTertiary)
-                    TermsText(markdown: terms.markdown, skipsTitle: true)
+                    TermsText(markdown: text.markdown, skipsTitle: true)
                 }
                 .padding(20)
             } else {
-                TermsStatusView(failed: loadFailed, retry: load)
+                TermsStatusView(document: document, failed: loadFailed, retry: load)
             }
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("Terms of Service")
+        .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { if terms == nil { load() } }
+        .onAppear { if text == nil { load() } }
     }
 
     private func load() {
         loadFailed = false
-        APIService.shared.fetchTerms { result in
+        APIService.shared.fetchLegalDocument(document) { result in
             switch result {
-            case .success(let loaded): terms = loaded
+            case .success(let loaded): text = loaded
             case .failure: loadFailed = true
             }
         }
     }
 }
 
-/// "By continuing, you agree to CineList's Terms of Service." under the sign-in and sign-up buttons, where
-/// "Terms of Service" opens them in a sheet. On sign-up it also mentions the minimum age
+/// "By continuing, you agree to CineList's Terms of Service and acknowledge the Privacy Policy." under the
+/// sign-in and sign-up buttons, where each document's name opens it in a sheet. On sign-up it also mentions the
+/// minimum age
 struct TermsNotice: View {
     var action = "continuing"
     var confirmsAge = false
-    @State private var showTerms = false
+    @State private var shown: LegalDocument? = nil
 
     var body: some View {
         Text(notice)
@@ -193,24 +215,29 @@ struct TermsNotice: View {
             .tint(Theme.accent)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
-            // The link only opens the sheet
-            .environment(\.openURL, OpenURLAction { _ in
-                showTerms = true
+            // The links only open the sheet
+            .environment(\.openURL, OpenURLAction { url in
+                shown = LegalDocument(rawValue: url.host ?? "") ?? .terms
                 return .handled
             })
-            .sheet(isPresented: $showTerms) {
-                TermsOfServiceView(isSheet: true)
+            .sheet(item: $shown) { document in
+                LegalDocumentView(document: document, isSheet: true)
             }
     }
 
     private var notice: AttributedString {
+        func link(_ document: LegalDocument) -> AttributedString {
+            var link = AttributedString(document.title)
+            link.link = document.link
+            link.font = .caption.weight(.semibold)
+            return link
+        }
         var notice = AttributedString(confirmsAge
-            ? "By \(action), you confirm you're 13 or older and agree to CineList's "
+            ? "By \(action), you confirm you're 13 or older, agree to CineList's "
             : "By \(action), you agree to CineList's ")
-        var link = AttributedString("Terms of Service")
-        link.link = URL(string: "cinelist://terms")
-        link.font = .caption.weight(.semibold)
-        notice.append(link)
+        notice.append(link(.terms))
+        notice.append(AttributedString(" and acknowledge the "))
+        notice.append(link(.privacy))
         notice.append(AttributedString("."))
         return notice
     }
@@ -223,10 +250,11 @@ struct TermsNotice: View {
 struct TermsAcceptanceView: View {
     let onDecline: () -> Void
     @ObservedObject private var social = SocialStore.shared
-    @State private var terms: TermsDocument? = nil
+    @State private var terms: LegalDocumentText? = nil
     @State private var loadFailed = false
     @State private var isAccepting = false
     @State private var confirmDecline = false
+    @State private var showPrivacy = false
     @State private var ageConfirmed = false
     @State private var showUnder13 = false
     @State private var errorMessage: String? = nil
@@ -256,6 +284,28 @@ struct TermsAcceptanceView: View {
                             .font(.subheadline)
                             .foregroundColor(Theme.textSecondary)
                     }
+                    // The Privacy Policy isn't agreed to separately, but the terms refer to it, so it's a tap away
+                    Button {
+                        Haptics.tap()
+                        showPrivacy = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "hand.raised.fill")
+                                .foregroundStyle(Theme.accentGradient)
+                            Text("How we handle your information: read our **Privacy Policy**")
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textSecondary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                        .padding(14)
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                     if let terms {
                         TermsText(markdown: terms.markdown, skipsTitle: true)
                     } else {
@@ -305,6 +355,9 @@ struct TermsAcceptanceView: View {
         .background(Theme.background.ignoresSafeArea())
         .interactiveDismissDisabled()
         .onAppear { if terms == nil { load() } }
+        .sheet(isPresented: $showPrivacy) {
+            LegalDocumentView(document: .privacy, isSheet: true)
+        }
         .confirmationDialog("Decline the Terms of Service?", isPresented: $confirmDecline, titleVisibility: .visible) {
             Button("Decline and Sign Out", role: .destructive, action: onDecline)
         } message: {
@@ -325,7 +378,7 @@ struct TermsAcceptanceView: View {
 
     private func load() {
         loadFailed = false
-        APIService.shared.fetchTerms { result in
+        APIService.shared.fetchLegalDocument(.terms) { result in
             switch result {
             case .success(let loaded): terms = loaded
             case .failure: loadFailed = true

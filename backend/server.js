@@ -8,7 +8,7 @@ const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
 const pool = require("./config/db");
-const { termsPage } = require("./config/terms");
+const { termsPage, privacyPage } = require("./config/terms");
 const { sendDailyDigests } = require("./services/digestService");
 const { sendStreamingAlerts } = require("./services/streamingAlerts");
 const { sendSeasonAlerts } = require("./services/tvEpisodes");
@@ -31,6 +31,16 @@ app.get("/terms", (req, res) => {
     } catch (error) {
         console.error("Error showing terms:", error);
         res.status(500).send("The Terms of Service couldn't be loaded.");
+    }
+});
+
+// The Privacy Policy as a web page, for the App Store listing and the website
+app.get("/privacy", (req, res) => {
+    try {
+        res.type("html").send(privacyPage());
+    } catch (error) {
+        console.error("Error showing privacy policy:", error);
+        res.status(500).send("The Privacy Policy couldn't be loaded.");
     }
 });
 
