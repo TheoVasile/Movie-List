@@ -4,6 +4,7 @@ const { deleteUser, createUser } = require("../models/userModel");
 const verifyToken = require("../middleware/authMiddleware");
 const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
 const pool = require("../config/db");
+const { TERMS_VERSION, TERMS_UPDATED, loadTerms } = require("../config/terms");
 
 const router = express.Router();
 
@@ -58,6 +59,17 @@ router.get("/handle-available", async (req, res) => {
         res.json({ valid: true, available: taken.rowCount === 0 });
     } catch (error) {
         console.error("Error checking username:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The Terms of Service, for the screen that asks people to accept them, before and after sign-up
+// -> { "version": "2026-10-23", "updated": "October 23, 2026", "markdown": "# Terms of Service ..." }
+router.get("/terms", (req, res) => {
+    try {
+        res.json({ version: TERMS_VERSION, updated: TERMS_UPDATED, markdown: loadTerms() });
+    } catch (error) {
+        console.error("Error loading terms:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

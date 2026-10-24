@@ -18,7 +18,7 @@ function isValidHandle(handle) {
 async function getProfile(user_id) {
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.notify_requests, u.notify_activity,
-                u.phone IS NOT NULL AS has_phone, u.phone, u.is_private,
+                u.phone IS NOT NULL AS has_phone, u.phone, u.is_private, u.terms_version,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests,

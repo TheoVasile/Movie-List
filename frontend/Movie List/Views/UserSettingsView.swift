@@ -279,6 +279,21 @@ struct UserSettingsView : View {
                 }
                 .listRowBackground(Theme.surface)
 
+                Section("Legal") {
+                    NavigationLink {
+                        TermsOfServiceView()
+                    } label: {
+                        Label {
+                            Text("Terms of Service")
+                                .foregroundColor(Theme.textPrimary)
+                        } icon: {
+                            Image(systemName: "doc.text")
+                                .foregroundStyle(Theme.accentGradient)
+                        }
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
                 Section {
                     Button {
                         Haptics.tap()

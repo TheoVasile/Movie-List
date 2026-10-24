@@ -18,10 +18,23 @@ struct ContentView: View {
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
     @ObservedObject private var social = SocialStore.shared
-    // Everyone needs an @username, which is how people know each other here. Accounts without one (Google
-    // sign-ins, accounts from before usernames, or a sign-up whose username was taken) pick one before going on
-    private var needsUsername: Binding<Bool> {
-        Binding(get: { social.hasLoaded && social.profile != nil && social.profile?.handle == nil }, set: { _ in })
+    // What has to be done before using the app, one at a time. First, agreeing to the current Terms of
+    // Service, whenever the agreed version isn't the current one. Then an @username, which is how people
+    // know each other here: accounts without one (Google sign-ins, accounts from before usernames, or a
+    // sign-up whose username was taken) pick one before going on. Nothing is asked until the profile has
+    // loaded, so a server that can't be reached doesn't lock anyone out
+    private var gate: Binding<Gate?> {
+        Binding(get: {
+            guard social.hasLoaded, let profile = social.profile else { return nil }
+            if profile.needsTermsAcceptance { return .terms }
+            return profile.handle == nil ? .username : nil
+        }, set: { _ in })
+    }
+
+    // One cover that switches between them, so finishing one can't collide with presenting the next
+    enum Gate: Identifiable {
+        case terms, username
+        var id: Self { self }
     }
     @State private var tab = Tab.lists
     @ObservedObject private var notifications = NotificationManager.shared
@@ -94,8 +107,13 @@ struct ContentView: View {
         }
         .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
         .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
-        .fullScreenCover(isPresented: needsUsername) {
-            UsernameSetupView(required: true) { viewModel.signOut() }
+        .fullScreenCover(item: gate) { gate in
+            switch gate {
+            case .terms:
+                TermsAcceptanceView { viewModel.signOut() }
+            case .username:
+                UsernameSetupView(required: true) { viewModel.signOut() }
+            }
         }
         .sheet(item: $linkedMovie) { movie in
             MovieDetailView(movie: movie)

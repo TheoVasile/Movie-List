@@ -8,6 +8,7 @@ const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
 const cors = require("cors");
 const pool = require("./config/db");
+const { termsPage } = require("./config/terms");
 const { sendDailyDigests } = require("./services/digestService");
 const { sendStreamingAlerts } = require("./services/streamingAlerts");
 const { sendSeasonAlerts } = require("./services/tvEpisodes");
@@ -22,6 +23,16 @@ createTables().then(() => require("./models/pollModel").scheduleOpenPolls());
 
 // For the host's health checks, so it needs no sign-in
 app.get("/health", (req, res) => res.send("ok"));
+
+// The Terms of Service as a web page, for the App Store listing and the website
+app.get("/terms", (req, res) => {
+    try {
+        res.type("html").send(termsPage());
+    } catch (error) {
+        console.error("Error showing terms:", error);
+        res.status(500).send("The Terms of Service couldn't be loaded.");
+    }
+});
 
 // Sends the daily friends digest. Called once a day by a scheduled GitHub Action, since the free host
 // sleeps and can't keep its own timer. Needs the DIGEST_SECRET shared with that workflow

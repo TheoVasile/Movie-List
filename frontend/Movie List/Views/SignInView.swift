@@ -98,6 +98,10 @@ struct SignInView: View {
                         .buttonStyle(SecondaryButtonStyle())
                         .appearAnimation(delay: 0.24)
 
+                        // Signing in with Google can create the account, so it's agreed to here too
+                        TermsNotice()
+                            .appearAnimation(delay: 0.26)
+
                         HStack{
                             Text("Don't have an account?")
                                 .foregroundColor(Theme.textSecondary)

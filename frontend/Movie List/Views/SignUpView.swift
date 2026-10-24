@@ -125,6 +125,9 @@ struct SignUpView: View {
                     .padding(.top, 8)
                     .appearAnimation(delay: 0.25)
 
+                    TermsNotice()
+                        .appearAnimation(delay: 0.27)
+
                     HStack {
                         Text("Already have an account?")
                             .foregroundColor(Theme.textSecondary)
