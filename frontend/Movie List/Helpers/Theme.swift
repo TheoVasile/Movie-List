@@ -332,6 +332,7 @@ struct MetaChip: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.caption2.weight(.bold))
+                .accessibilityHidden(true)
             Text(text)
                 .font(.caption.weight(.semibold))
         }

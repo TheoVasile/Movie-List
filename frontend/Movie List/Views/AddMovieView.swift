@@ -64,6 +64,7 @@ struct AddMovieView: View {
                         .foregroundColor(Theme.textTertiary)
                 }
                 .transition(.scale.combined(with: .opacity))
+                .accessibilityLabel("Clear Search")
             }
         }
         .padding(14)
