@@ -714,9 +714,10 @@ class APIService {
         sendJSON("GET", "/users/me", completion: completion)
     }
 
-    /// Records that the user agreed to this version of the terms. Fails with code 400 when it's no longer the current one
+    /// Records that the user agreed to this version of the terms, having confirmed they're old enough to. Fails with
+    /// code 400 when it's no longer the current one
     func acceptTerms(version: String, completion: @escaping (Result<String, Error>) -> Void) {
-        sendJSON("POST", "/users/terms/accept", body: ["version": version]) { (result: Result<TermsAcceptance, Error>) in
+        sendJSON("POST", "/users/terms/accept", body: ["version": version, "age_confirmed": true]) { (result: Result<TermsAcceptance, Error>) in
             completion(result.map(\.terms_version))
         }
     }

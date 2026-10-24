@@ -16,7 +16,7 @@ If a change is material, we will tell you in the App before it takes effect and 
 
 ## 3. Eligibility and Age Requirements
 
-You must be at least **13 years old** to create an account or use the App. If we learn that someone under 13 has created an account, we will delete it.
+You must be at least **13 years old** to create an account or use the App. When you sign up, and whenever you accept these Terms, you confirm that you are at least 13 and, if you are under the age of majority where you live, that your parent or legal guardian has agreed to these Terms on your behalf. If we learn that someone under 13 has created an account, we will delete it and its content.
 
 If you are under the age of majority where you live (for example, 18 or 19 depending on your province or territory in Canada, or 18 in most U.S. states), you may use the App only with the involvement and consent of a parent or legal guardian, who must review and agree to these Terms on your behalf.
 
