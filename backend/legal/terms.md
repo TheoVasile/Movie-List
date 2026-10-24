@@ -16,7 +16,7 @@ If a change is material, we will tell you in the App before it takes effect and 
 
 ## 3. Eligibility and Age Requirements
 
-You must be at least **13 years old** to create an account or use the App. If we learn that someone under 13 has created an account, we will delete it.
+You must be at least **13 years old** to create an account or use the App. When you sign up, and whenever you accept these Terms, you confirm that you are at least 13 and, if you are under the age of majority where you live, that your parent or legal guardian has agreed to these Terms on your behalf. If we learn that someone under 13 has created an account, we will delete it and its content.
 
 If you are under the age of majority where you live (for example, 18 or 19 depending on your province or territory in Canada, or 18 in most U.S. states), you may use the App only with the involvement and consent of a parent or legal guardian, who must review and agree to these Terms on your behalf.
 
@@ -212,7 +212,7 @@ If you send us ideas, suggestions or other feedback about the App, you agree tha
 
 ### Deleting your account
 
-You can stop using the App at any time. You can permanently delete your account from Settings using **Deactivate Account**. This deletes your account and your lists, and removes your profile, notes, watched history, social connections and other data associated with your account from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Content other people already received, such as recommendations you sent, may remain with them, and a list you were invited to edit will stay with its owner. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
+You can stop using the App at any time. You can permanently delete your account from Settings using **Delete Account**. This deletes your account and your sign-in, together with the data associated with your account, including your profile, lists and rankings, watched history and diary, notes, social connections, film recommendations, groups and votes, from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Films you added to a list or group owned by someone else stay there without your name, and copies other people kept (for example, a list you shared through your iPhone's share sheet) are not affected. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
 
 ### Suspension and termination by us
 

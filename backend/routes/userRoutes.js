@@ -31,15 +31,18 @@ router.get("/me", async (req, res) => {
     }
 });
 
-// Records that the user accepted the Terms of Service, e.g. { "version": "2026-10-24" }. Only the current
-// version can be accepted -> { "terms_version": "2026-10-24" }
+// Records that the user accepted the Terms of Service, e.g. { "version": "2026-10-24", "age_confirmed": true }.
+// Only the current version can be accepted, and only once they've confirmed their age -> { "terms_version": "2026-10-24" }
 router.post("/terms/accept", async (req, res) => {
     if (req.body?.version !== TERMS_VERSION) {
         return res.status(400).json({ error: "Those aren't the current Terms of Service." });
     }
+    if (req.body?.age_confirmed !== true) {
+        return res.status(400).json({ error: "Confirm that you're 13 or older to accept the Terms of Service." });
+    }
     try {
         const result = await pool.query(
-            "UPDATE users SET terms_version = $2, terms_accepted_at = NOW() WHERE firebase_uid = $1 RETURNING terms_version",
+            "UPDATE users SET terms_version = $2, terms_accepted_at = NOW(), age_confirmed_at = NOW() WHERE firebase_uid = $1 RETURNING terms_version",
             [req.user.uid, TERMS_VERSION]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: "Account not found." });
