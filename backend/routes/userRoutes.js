@@ -13,7 +13,7 @@ const admin = require("../config/firebase");
 const pool = require("../config/db");
 const { TERMS_VERSION } = require("../config/terms");
 const { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, notifyOperator, fetchOpenReports } = require("../models/reportsModel");
-const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
+const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
 
@@ -522,6 +522,47 @@ router.put("/me/ai", async (req, res) => {
         res.json({ allowed: req.body.allowed });
     } catch (error) {
         console.error("Error saving AI setting:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The youngest anyone can be to use Marquee, per the Terms of Service
+const MINIMUM_AGE = 13;
+
+// Whole years old on a day, both "yyyy-MM-dd". Someone born on 29 February turns a year older on 1 March in
+// other years, the same as in the app
+function ageOn(today, birthday) {
+    const [year, month, day] = today.split("-").map(Number);
+    const [bornYear, bornMonth, bornDay] = birthday.split("-").map(Number);
+    const hadBirthday = month > bornMonth || (month === bornMonth && day >= bornDay);
+    return year - bornYear - (hadBirthday ? 0 : 1);
+}
+
+// Saves the user's birthday, e.g. { "birthday": "2001-03-04" }, or removes it with { "birthday": null }. It has to
+// be a real date that's already happened, and make them 13 or older. Only the user ever sees it
+router.put("/me/birthday", async (req, res) => {
+    const { birthday } = req.body ?? {};
+    if (birthday !== null) {
+        const parts = typeof birthday === "string" && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday.split("-").map(Number) : null;
+        const date = parts && new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        if (!date || parts[0] < 1900 || date.toISOString().slice(0, 10) !== birthday) {
+            return res.status(400).json({ error: "birthday must be a date as yyyy-MM-dd, or null." });
+        }
+        // Today where it's latest (UTC+14), so nobody's birthday is turned away for being in the future anywhere
+        const today = new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        if (birthday > today) {
+            return res.status(400).json({ error: "Your birthday can't be in the future." });
+        }
+        if (ageOn(today, birthday) < MINIMUM_AGE) {
+            return res.status(400).json({ error: "The minimum age for Marquee is 13, per the Terms of Service." });
+        }
+    }
+    try {
+        const saved = await setBirthday(req.user.uid, birthday);
+        if (!saved) return res.status(404).json({ error: "Account not found." });
+        res.json(saved);
+    } catch (error) {
+        console.error("Error saving birthday:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

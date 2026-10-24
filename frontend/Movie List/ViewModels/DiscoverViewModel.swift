@@ -14,7 +14,8 @@ import CoreData
 /// One setting, "Allow AI features", decides whether anything is sent to the AI; Discover then lets the
 /// user choose AI Picks or Classic recommendations, but only while AI is allowed. Everything here stays on
 /// this device and is only sent along with AI requests, apart from the allowed setting itself, which the
-/// server keeps so a friend's Movie Night can check both people agreed
+/// server keeps so a friend's Movie Night can check both people agreed, and the birthday, which is saved
+/// with the account so it isn't lost with the app
 enum Personalization {
     // Whether the user allows AI features at all
     static let aiAllowedKey = "ai.allowed"
@@ -23,10 +24,12 @@ enum Personalization {
     // Whether the user has been asked about AI yet
     static let aiConsentAskedKey = "discover.aiConsentAsked"
     static let under18 = "Under 18"
-    // Earlier builds asked for an age range. Still used when there's no birthday, so existing answers carry on
+    // Earlier builds asked for an age range. No longer shown, but still used when there's no birthday, so
+    // anyone who said they were under 18 keeps AI switched off
     static let ageRangeKey = "personalization.ageRange"
-    // The user's birthday, as yyyy-MM-dd so it doesn't shift with time zones. Never sent anywhere: only the
-    // age range worked out from it goes with AI Discover requests
+    // The user's birthday, as yyyy-MM-dd so it doesn't shift with time zones. A copy of the one saved with the
+    // account, which only the user sees. Never sent to the AI: only the age range worked out from it goes with
+    // AI Discover requests
     static let birthdayKey = "personalization.birthday"
     // The youngest anyone can be to use Marquee, per the Terms of Service
     static let minimumAge = 13
@@ -112,6 +115,21 @@ enum Personalization {
     /// A birthday as it's stored
     static func birthdayString(_ date: Date) -> String {
         birthdayFormatter.string(from: date)
+    }
+
+    /// Keeps the birthday on this iPhone the same as the one saved with the account, so it comes back after
+    /// reinstalling. A birthday added before it was saved with the account goes up to the account instead
+    static func mirrorBirthday(from profile: UserProfile) {
+        let defaults = UserDefaults.standard
+        let local = defaults.string(forKey: birthdayKey) ?? ""
+        if let saved = profile.birthday, birthdayDate(saved) != nil {
+            guard saved != local else { return }
+            defaults.set(saved, forKey: birthdayKey)
+            // A birthday replaces an age range chosen in earlier builds
+            defaults.removeObject(forKey: ageRangeKey)
+        } else if !local.isEmpty {
+            APIService.shared.setBirthday(local) { _ in }
+        }
     }
 
     /// Earlier builds asked for gender as well as pronouns. Carries a saved gender answer over to

@@ -59,7 +59,7 @@ final class SocialStore: ObservableObject {
             guard generation == self.generation else { return }
             switch result {
             case .success(let profile):
-                self.profile = profile
+                self.received(profile)
                 self.profileFailed = false
                 self.retryDelay = 2
             case .failure(let error):
@@ -72,6 +72,12 @@ final class SocialStore: ObservableObject {
             }
             completion?()
         }
+    }
+
+    /// Keeps the profile, and copies the birthday saved with the account onto this iPhone
+    private func received(_ profile: UserProfile) {
+        self.profile = profile
+        Personalization.mirrorBirthday(from: profile)
     }
 
     private func scheduleRetry() {

@@ -352,6 +352,8 @@ struct UserProfile: Decodable {
     // current_terms_version is missing from older servers, which don't ask for agreement
     let terms_version: String?
     let current_terms_version: String?
+    // The user's birthday as yyyy-MM-dd, nil when they haven't added one. Only ever sent to the user themselves
+    let birthday: String?
 
     /// Whether the user has to agree to the current terms before using the app
     var needsTermsAcceptance: Bool {
@@ -1003,6 +1005,16 @@ class APIService {
     func setProfilePrivate(_ isPrivate: Bool, completion: @escaping (Bool) -> Void) {
         sendJSON("PUT", "/users/me/privacy", body: ["private": isPrivate]) { (result: Result<PrivacyResponse, Error>) in
             completion((try? result.get()) != nil)
+        }
+    }
+
+    private struct BirthdayResponse: Decodable { let birthday: String? }
+
+    /// Saves the user's birthday (yyyy-MM-dd) with their account, or removes it with nil. Only the user sees it.
+    /// A failure's code is the HTTP status: 400 when it's not a real past date or makes them younger than 13
+    func setBirthday(_ birthday: String?, completion: @escaping (Result<String?, Error>) -> Void) {
+        sendJSON("PUT", "/users/me/birthday", body: ["birthday": birthday.map { $0 as Any } ?? NSNull()]) { (result: Result<BirthdayResponse, Error>) in
+            completion(result.map(\.birthday))
         }
     }
 

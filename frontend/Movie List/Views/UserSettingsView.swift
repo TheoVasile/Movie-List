@@ -48,16 +48,19 @@ struct UserSettingsView : View {
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    // A copy of the birthday saved with the account
     @AppStorage(Personalization.birthdayKey) private var birthday = ""
     // The birthday being picked, until it's saved; nil while not changing it
     @State private var birthdayDraft: Date? = nil
     @State private var birthdayTooYoung = false
+    @State private var savingBirthday = false
+    @State private var birthdayMessage: String? = nil
     @AppStorage(Personalization.pronounsKey) private var pronouns = Personalization.notShared
 
     var body : some View {
         NavigationStack {
             Form {
-                Section("Profile") {
+                Section {
                     if social.profileFailed {
                         HStack {
                             Label("Couldn't load your profile.", systemImage: "wifi.exclamationmark")
@@ -111,6 +114,11 @@ struct UserSettingsView : View {
                             Text(option).tag(option)
                         }
                     }
+                    birthdayRow
+                } header: {
+                    Text("Profile")
+                } footer: {
+                    Text("Your birthday is optional and only you can see it. It's saved with your account to check you're old enough for Marquee and its AI features.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -306,52 +314,13 @@ struct UserSettingsView : View {
                             discoverUsesAI = true
                         }
                     }
-                    if aiAllowed || isUnder18 {
-                        // Optional. Saved with Save, so scrolling through years doesn't save each one on the way
-                        HStack {
-                            Text("Birthday")
-                            Spacer()
-                            if let shown = birthdayDraft ?? Personalization.birthdayDate(birthday) {
-                                DatePicker("Birthday", selection: Binding(get: { shown }, set: { birthdayDraft = $0 }),
-                                           in: ...Date(), displayedComponents: .date)
-                                    .labelsHidden()
-                                    .datePickerStyle(.compact)
-                                if birthdayChanged {
-                                    Button("Save", action: saveBirthday)
-                                        .font(.body.weight(.semibold))
-                                        .foregroundColor(Theme.accent)
-                                        .buttonStyle(.borderless)
-                                }
-                            } else {
-                                // An age range chosen in earlier builds shows until a birthday replaces it
-                                Button(ageRange == Personalization.notShared ? "Not shared" : ageRange) {
-                                    birthdayDraft = Calendar.current.date(byAdding: .year, value: -18, to: Date())
-                                }
-                                .foregroundColor(Theme.textSecondary)
-                                .buttonStyle(.borderless)
-                            }
-                            if birthdayDraft != nil || !birthday.isEmpty || ageRange != Personalization.notShared {
-                                Button(action: removeBirthday) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(Theme.textSecondary)
-                                }
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Don't share birthday")
-                            }
-                        }
-                        .alert("You must be 13 or older", isPresented: $birthdayTooYoung) {
-                            Button("OK", role: .cancel) {}
-                        } message: {
-                            Text("The minimum age for Marquee is 13, per the Terms of Service. Your birthday wasn't changed.")
-                        }
-                    }
                 } header: {
                     Text("AI")
                 } footer: {
                     Text(isUnder18
                          ? "AI features aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
                          : aiAllowed
-                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Your birthday and pronouns are optional. Your birthday stays on this iPhone: only the age range it falls in goes with Discover requests, along with your pronouns. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
+                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Discover requests also include your pronouns, if you've chosen them, and the age range worked out from your birthday in Profile, never the birthday itself. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
                          : "Nothing is sent to an AI. Discover uses TMDb's recommendations for films in your lists, and friends can't plan a Movie Night with you.")
                 }
                 .listRowBackground(Theme.surface)
@@ -605,8 +574,58 @@ extension UserSettingsView {
         }
     }
 
+    /// Under 18 by the birthday, or by an age range chosen in earlier builds while there's no birthday
     private var isUnder18: Bool {
         Personalization.ageRange(birthday: birthday, legacy: ageRange) == Personalization.under18
+    }
+
+    /// The user's birthday, always as a full date, saved with their account. Optional, and saved with Save, so
+    /// scrolling through years doesn't save each one on the way. An age range chosen in earlier builds isn't
+    /// shown: those users are asked for their birthday. Waits for the profile, which the birthday comes with
+    @ViewBuilder private var birthdayRow: some View {
+        HStack {
+            Text("Birthday")
+            Spacer()
+            if let shown = birthdayDraft ?? Personalization.birthdayDate(birthday) {
+                DatePicker("Birthday", selection: Binding(get: { shown }, set: { birthdayDraft = $0 }),
+                           in: ...Date(), displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                if birthdayChanged {
+                    Button(savingBirthday ? "Saving…" : "Save", action: saveBirthday)
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(Theme.accent)
+                        .buttonStyle(.borderless)
+                }
+            } else {
+                Button("Add your birthday") {
+                    birthdayMessage = nil
+                    birthdayDraft = Calendar.current.date(byAdding: .year, value: -18, to: Date())
+                }
+                .foregroundColor(Theme.textSecondary)
+                .buttonStyle(.borderless)
+            }
+            if birthdayDraft != nil || !birthday.isEmpty {
+                Button(action: removeBirthday) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Remove birthday")
+            }
+        }
+        .disabled(savingBirthday)
+        .loading(!social.hasLoaded)
+        .alert("You must be 13 or older", isPresented: $birthdayTooYoung) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The minimum age for Marquee is 13, per the Terms of Service. Your birthday wasn't changed.")
+        }
+        if let birthdayMessage {
+            Text(birthdayMessage)
+                .font(.footnote)
+                .foregroundColor(Theme.accentSecondary)
+        }
     }
 
     private var birthdayChanged: Bool {
@@ -614,26 +633,55 @@ extension UserSettingsView {
         return Personalization.birthdayString(birthdayDraft) != birthday
     }
 
-    /// Saves the picked birthday, unless it makes the user younger than the Terms allow, which keeps the
-    /// one before. A birthday replaces an age range chosen in earlier builds
+    /// Saves the picked birthday with the account, then on this iPhone, unless it makes the user younger than the
+    /// Terms allow, which keeps the one before. A birthday replaces an age range chosen in earlier builds
     private func saveBirthday() {
-        guard let birthdayDraft else { return }
-        self.birthdayDraft = nil
+        guard let birthdayDraft, !savingBirthday else { return }
         guard Personalization.age(on: Date(), bornOn: birthdayDraft) >= Personalization.minimumAge else {
+            self.birthdayDraft = nil
             birthdayTooYoung = true
             return
         }
-        Haptics.success()
-        birthday = Personalization.birthdayString(birthdayDraft)
-        UserDefaults.standard.removeObject(forKey: Personalization.ageRangeKey)
+        savingBirthday = true
+        birthdayMessage = nil
+        APIService.shared.setBirthday(Personalization.birthdayString(birthdayDraft)) { result in
+            savingBirthday = false
+            switch result {
+            case .success(let saved):
+                Haptics.success()
+                self.birthdayDraft = nil
+                birthday = saved ?? Personalization.birthdayString(birthdayDraft)
+                UserDefaults.standard.removeObject(forKey: Personalization.ageRangeKey)
+            case .failure(let error):
+                if (error as NSError).code == 400 {
+                    self.birthdayDraft = nil
+                    birthdayTooYoung = true
+                } else {
+                    birthdayMessage = "Couldn't save your birthday. Check your connection and try again."
+                }
+            }
+        }
     }
 
-    /// Stops sharing an age: forgets the birthday, and any age range from earlier builds
+    /// Removes the birthday from the account and this iPhone, or stops adding one that isn't saved yet. An age
+    /// range from earlier builds stays, so anyone who said they were under 18 keeps AI switched off
     private func removeBirthday() {
         Haptics.tap()
-        birthdayDraft = nil
-        birthday = ""
-        UserDefaults.standard.removeObject(forKey: Personalization.ageRangeKey)
+        birthdayMessage = nil
+        guard !birthday.isEmpty else {
+            birthdayDraft = nil
+            return
+        }
+        savingBirthday = true
+        APIService.shared.setBirthday(nil) { result in
+            savingBirthday = false
+            if case .success = result {
+                birthdayDraft = nil
+                birthday = ""
+            } else {
+                birthdayMessage = "Couldn't remove your birthday. Check your connection and try again."
+            }
+        }
     }
 
     private var appearanceFooter: String {

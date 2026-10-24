@@ -64,6 +64,9 @@ const createTables = async () => {
             -- When the user last confirmed they're 13 or older (and have a parent's or guardian's agreement if
             -- they're under the age of majority), which they do each time they accept the Terms
             ALTER TABLE users ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMP;
+            -- The user's birthday, if they added one. Only ever shown to them, and never sent to the AI: the app
+            -- works out an age range from it for AI picks and to check they're old enough
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday DATE;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (
