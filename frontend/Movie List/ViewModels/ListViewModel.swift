@@ -132,6 +132,9 @@ class ListViewModel: ObservableObject {
     @Published var selectedGenres: Set<Int> = []
     // Shows only films placed by Smart Placement and not yet approved
     @Published var showAIPlacedOnly = false
+    // "What can I watch tonight?": only films streaming on the user's services, optionally shortest first
+    @Published var showStreamingOnly = false
+    @Published var shortestFirst = false
     // Bumped when a film's AI mark changes, so rows showing it update
     @Published private(set) var placementVersion = 0
     @Published private(set) var isLoadingGenres = false
