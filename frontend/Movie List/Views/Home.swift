@@ -145,7 +145,7 @@ private extension Home {
                 .tracking(1.5)
                 .foregroundStyle(Theme.accentGradient)
             Text(movieLists.isEmpty
-                 ? "Start your first collection"
+                 ? sync.isFirstSync ? "Loading your lists…" : "Start your first collection"
                  : "\(movieLists.count) \(movieLists.count == 1 ? "list" : "lists") · \(totalTitles)")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
@@ -198,7 +198,7 @@ private extension Home {
 
     var movieListsView: some View {
         Group {
-            if movieLists.isEmpty && sync.isSyncing {
+            if movieLists.isEmpty && (sync.isSyncing || sync.isFirstSync) {
                 VStack(spacing: 14) {
                     ProgressView()
                         .tint(Theme.accent)

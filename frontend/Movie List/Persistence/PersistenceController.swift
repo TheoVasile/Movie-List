@@ -268,6 +268,10 @@ final class SyncStatus: ObservableObject {
     @Published private(set) var lastError: String? = nil
     @Published private(set) var lastSynced: Date? = nil
 
+    /// Whether the lists are still on their way for the first time, so no lists on the phone doesn't yet mean
+    /// the user has none
+    var isFirstSync: Bool { lastSynced == nil && (isSyncing || lastError == nil) }
+
     private static let retryDelays: [TimeInterval] = [2, 5]
     private var waiting: [() -> Void] = []
 

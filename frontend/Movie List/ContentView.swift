@@ -23,7 +23,8 @@ struct ContentView: View {
     // Service, whenever the agreed version isn't the current one. Then an @username, which is how people
     // know each other here: accounts without one (Google sign-ins, accounts from before usernames, or a
     // sign-up whose username was taken) pick one before going on. Nothing is asked until the profile has
-    // loaded, so a server that can't be reached doesn't lock anyone out
+    // loaded, so a server that can't be reached doesn't lock anyone out, and a request that failed is never
+    // taken to mean the account has no username
     private var gate: Binding<Gate?> {
         Binding(get: {
             guard social.hasLoaded, let profile = social.profile else { return nil }
@@ -39,6 +40,7 @@ struct ContentView: View {
     }
     @State private var tab = Tab.lists
     @ObservedObject private var notifications = NotificationManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     enum Tab { case lists, discover, profile }
     // A film opened from a Home Screen widget
@@ -106,6 +108,32 @@ struct ContentView: View {
             // right for settings chosen before the server kept it
             Personalization.syncAIAllowed()
         }
+        // Coming back to the app is a good moment to try again, e.g. once the network is back
+        .onChange(of: scenePhase) { phase in
+            if phase == .active && social.profileFailed { social.retry() }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if social.profileFailed {
+                // Still usable without it (lists are saved on the phone); it keeps trying in the background
+                Button {
+                    Haptics.tap()
+                    social.retry()
+                } label: {
+                    Label("Couldn't load your profile · Retry", systemImage: "wifi.exclamationmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Theme.surfaceRaised, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Theme.background)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Theme.spring, value: social.profileFailed)
         .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
         .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
         .onChange(of: birthday) { _ in Personalization.syncAIAllowed() }
