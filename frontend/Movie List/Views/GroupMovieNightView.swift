@@ -114,9 +114,12 @@ struct GroupMovieNightView: View {
                 })
             }
             .sheet(isPresented: $showMembers) {
-                GroupMembersSheet(group: group) { updated in
+                GroupMembersSheet(group: group, onChange: { updated in
                     group = updated
-                }
+                }, onLeave: {
+                    // Once the members sheet has closed
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dismiss() }
+                })
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
@@ -351,6 +354,17 @@ struct GroupMovieNightView: View {
                 .padding(.top, 2)
             }
             Spacer(minLength: 0)
+            // Only suggestions have actions: taking them off, or reporting someone else's
+            if pick.suggested_by != nil {
+                Menu {
+                    pickMenuItems(pick)
+                } label: {
+                    MoreActionsLabel()
+                }
+                .padding(.top, -10)
+                .padding(.trailing, -8)
+                .accessibilityLabel("\(pick.title) Options")
+            }
         }
         .padding(14)
         .cardStyle(cornerRadius: 18)
@@ -358,22 +372,28 @@ struct GroupMovieNightView: View {
         .contentShape(Rectangle())
         .onTapGesture { showDetails(pick.movie) }
         .accessibilityAction(named: "Show Details") { showDetails(pick.movie) }
+        // A shortcut for the ⋮
         .contextMenu {
-            // Whoever suggested a film, or the group's owner, can take it off
-            if let by = pick.suggested_by, by == social.profile?.handle || group.is_owner {
-                Button(role: .destructive) {
-                    remove(pick)
-                } label: {
-                    Label("Remove Suggestion", systemImage: "trash")
-                }
+            pickMenuItems(pick)
+        }
+    }
+
+    @ViewBuilder
+    private func pickMenuItems(_ pick: GroupPick) -> some View {
+        // Whoever suggested a film, or the group's owner, can take it off
+        if let by = pick.suggested_by, by == social.profile?.handle || group.is_owner {
+            Button(role: .destructive) {
+                remove(pick)
+            } label: {
+                Label("Remove Suggestion", systemImage: "trash")
             }
-            // Someone else's suggestion can be reported
-            if let by = pick.suggested_by, by != social.profile?.handle {
-                Button {
-                    reporting = ReportTarget(handle: by, kind: .group, contentID: "\(group.id)/\(pick.tmdb_id)")
-                } label: {
-                    Label("Report Suggestion", systemImage: "flag")
-                }
+        }
+        // Someone else's suggestion can be reported
+        if let by = pick.suggested_by, by != social.profile?.handle {
+            Button {
+                reporting = ReportTarget(handle: by, kind: .group, contentID: "\(group.id)/\(pick.tmdb_id)")
+            } label: {
+                Label("Report Suggestion", systemImage: "flag")
             }
         }
     }

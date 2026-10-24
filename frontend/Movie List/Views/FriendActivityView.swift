@@ -202,14 +202,25 @@ struct FriendActivityView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
+            Menu {
+                reportButton(item)
+            } label: {
+                MoreActionsLabel()
+            }
+            .accessibilityLabel("Options for @\(item.handle)'s activity")
         }
         .listRowBackground(Color.clear)
+        // A shortcut for the ⋮
         .contextMenu {
-            Button {
-                reporting = ReportTarget(handle: item.handle, kind: .activity, contentID: "\(item.kind)-\(item.tmdb_id)")
-            } label: {
-                Label("Report @\(item.handle)", systemImage: "flag")
-            }
+            reportButton(item)
+        }
+    }
+
+    private func reportButton(_ item: FriendActivity) -> some View {
+        Button {
+            reporting = ReportTarget(handle: item.handle, kind: .activity, contentID: "\(item.kind)-\(item.tmdb_id)")
+        } label: {
+            Label("Report @\(item.handle)", systemImage: "flag")
         }
     }
 

@@ -8,16 +8,20 @@
 import Foundation
 import SwiftUI
 
-/// "Shared with Edie" / "Owen's list, shared with you" above a shared list's films, with everyone's faces.
-/// Tapping it shows who's on the list
-struct SharedListBanner: View {
+/// Who can edit a list, above its films: "Shared with Edie" / "Owen's list, shared with you" with everyone's faces,
+/// or, on a list that isn't shared yet, an invitation to share it. Tapping it shows the contributors, where the owner adds people
+struct ContributorsRow: View {
     let listID: Int64
     let action: () -> Void
     @ObservedObject private var sharing = ListSharing.shared
 
+    private var isShared: Bool { sharing.isShared(listID) }
+    private var isOwner: Bool { sharing.isOwner(listID) }
+
     private var text: String {
+        guard isShared else { return "Just you. Invite friends to add and rank films with you." }
         let others = sharing.others(on: listID)
-        if !sharing.isOwner(listID), let owner = others.first(where: \.is_owner) {
+        if !isOwner, let owner = others.first(where: \.is_owner) {
             let rest = others.filter { !$0.is_owner }.map { "@\($0.handle)" }
             return rest.isEmpty ? "@\(owner.handle)'s list, shared with you"
                 : "@\(owner.handle)'s list, shared with you and \(Self.names(rest))"
@@ -37,27 +41,47 @@ struct SharedListBanner: View {
             action()
         } label: {
             HStack(spacing: 10) {
-                HStack(spacing: -10) {
-                    ForEach(sharing.others(on: listID).prefix(4)) { person in
-                        Avatar(name: person.display_name, size: 28, handle: person.handle, version: person.avatar_version)
-                            .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+                if isShared {
+                    HStack(spacing: -10) {
+                        ForEach(sharing.others(on: listID).prefix(4)) { person in
+                            Avatar(name: person.display_name, size: 28, handle: person.handle, version: person.avatar_version)
+                                .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+                        }
                     }
+                } else {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(Theme.surfaceRaised, in: Circle())
                 }
                 Text(text)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(Theme.textPrimary)
+                    .font(isShared ? .subheadline.weight(.semibold) : .subheadline)
+                    .foregroundColor(isShared ? Theme.textPrimary : Theme.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(Theme.textTertiary)
+                // Spelled out, so it's clear this is where people are added
+                if isOwner {
+                    Label("Invite", systemImage: "person.badge.plus")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(Theme.onAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Theme.accentGradient, in: Capsule())
+                        .fixedSize()
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(Theme.textTertiary)
+                }
             }
             .padding(12)
             .cardStyle(cornerRadius: 16)
         }
         .buttonStyle(PressableButtonStyle(scale: 0.98))
-        .accessibilityHint("Shows who can edit this list")
+        .accessibilityLabel(isOwner ? "Contributors. \(text)" : text)
+        .accessibilityHint(isOwner ? "Shows who can edit this list and invites people" : "Shows who can edit this list")
     }
 }
 

@@ -53,7 +53,7 @@ struct DiaryView: View {
                     ForEach(months, id: \.title) { month in
                         Section {
                             ForEach(month.entries, id: \.entryID) { entry in
-                                DiaryRow(entry: entry)
+                                DiaryRow(entry: entry, onRemove: entry.id.map { id in { deleteRewatch(id) } })
                                     .swipeActions {
                                         if let id = entry.id {
                                             Button(role: .destructive) {
@@ -134,6 +134,8 @@ struct DiaryView: View {
 struct DiaryRow: View {
     let entry: DiaryEntry
     var showsDate = true
+    // Logged watches can be taken back, from the row's ⋮ or a swipe
+    var onRemove: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -165,6 +167,16 @@ struct DiaryRow: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.accentGradient)
                     .accessibilityLabel("Rewatch")
+            }
+            if let onRemove {
+                Menu {
+                    Button(role: .destructive, action: onRemove) {
+                        Label("Remove from Diary", systemImage: "trash")
+                    }
+                } label: {
+                    MoreActionsLabel()
+                }
+                .accessibilityLabel("\(entry.title) Options")
             }
         }
         .padding(.vertical, 2)

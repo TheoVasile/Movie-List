@@ -193,7 +193,7 @@ struct RecommendFilmSheet: View {
 }
 
 /// Films friends sent the user, newest first. Opening the screen marks them all as seen. Tapping one shows its
-/// info, where it can be added to lists; swiping one away removes it
+/// info, where it can be added to lists; its ⋮ removes or reports it
 struct RecommendationsView: View {
     @ObservedObject private var store = RecommendationsStore.shared
     @Environment(\.managedObjectContext) private var context
@@ -216,22 +216,13 @@ struct RecommendationsView: View {
                     .listRowSeparator(.hidden)
             }
             ForEach(store.received) { recommendation in
+                // Swiping and touching and holding are shortcuts for the row's ⋮
                 row(recommendation)
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Haptics.tap()
-                            store.remove(recommendation)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
+                        removeButton(recommendation)
                     }
                     .contextMenu {
-                        Button {
-                            reporting = ReportTarget(handle: recommendation.sender_handle, kind: .recommendation,
-                                                     contentID: String(recommendation.id))
-                        } label: {
-                            Label("Report @\(recommendation.sender_handle)", systemImage: "flag")
-                        }
+                        reportButton(recommendation)
                     }
             }
         }
@@ -271,7 +262,39 @@ struct RecommendationsView: View {
         }
     }
 
+    private func removeButton(_ recommendation: FilmRecommendation) -> some View {
+        Button(role: .destructive) {
+            Haptics.tap()
+            store.remove(recommendation)
+        } label: {
+            Label("Remove", systemImage: "trash")
+        }
+    }
+
+    private func reportButton(_ recommendation: FilmRecommendation) -> some View {
+        Button {
+            reporting = ReportTarget(handle: recommendation.sender_handle, kind: .recommendation,
+                                     contentID: String(recommendation.id))
+        } label: {
+            Label("Report @\(recommendation.sender_handle)", systemImage: "flag")
+        }
+    }
+
     private func row(_ recommendation: FilmRecommendation) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            filmButton(recommendation)
+            Menu {
+                removeButton(recommendation)
+                reportButton(recommendation)
+            } label: {
+                MoreActionsLabel()
+            }
+            .accessibilityLabel("\(recommendation.title) Options")
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private func filmButton(_ recommendation: FilmRecommendation) -> some View {
         Button {
             Haptics.tap()
             detailsMovie = recommendation.movie
@@ -324,8 +347,8 @@ struct RecommendationsView: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
+        // Borderless, so tapping the ⋮ beside it doesn't also open the film
+        .buttonStyle(.borderless)
     }
 }
 

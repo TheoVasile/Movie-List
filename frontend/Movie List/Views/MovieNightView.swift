@@ -467,6 +467,7 @@ struct MovieNightGroupsSection: View {
                     .cardStyle(cornerRadius: 16)
                 }
                 .buttonStyle(PressableButtonStyle(scale: 0.98))
+                // A shortcut: the group's members screen has the same button
                 .contextMenu {
                     Button(role: .destructive) {
                         leave(group)
@@ -516,9 +517,12 @@ struct GroupMembersSheet: View {
     @ObservedObject private var social = SocialStore.shared
     @State var group: MovieGroup
     let onChange: (MovieGroup) -> Void
+    // Called after the user leaves or deletes the group, so the group's screen can close too
+    var onLeave: () -> Void = {}
     @State private var busy: Set<String> = []
     @State private var failed = false
     @State private var reporting: ReportTarget? = nil
+    @State private var confirmingLeave = false
 
     private static let maxMembers = 7
 
@@ -535,26 +539,31 @@ struct GroupMembersSheet: View {
                     row(name: social.profile?.display_name ?? "You", handle: social.profile?.handle, version: social.profile?.avatar_version,
                         isMe: true, isOwner: group.is_owner)
                     ForEach(group.members) { person in
-                        row(name: person.display_name, handle: person.handle, version: person.avatar_version,
-                            isMe: false, isOwner: person.is_owner == true)
-                            .swipeActions {
-                                if group.is_owner {
-                                    Button("Remove", role: .destructive) { remove(person) }
-                                }
+                        HStack(spacing: 4) {
+                            row(name: person.display_name, handle: person.handle, version: person.avatar_version,
+                                isMe: false, isOwner: person.is_owner == true)
+                            Menu {
+                                memberMenuItems(person)
+                            } label: {
+                                MoreActionsLabel()
                             }
-                            .contextMenu {
-                                Button {
-                                    reporting = ReportTarget(handle: person.handle, kind: .group, contentID: String(group.id))
-                                } label: {
-                                    Label("Report @\(person.handle)", systemImage: "flag")
-                                }
+                            .accessibilityLabel("Options for @\(person.handle)")
+                        }
+                        // Shortcuts for the ⋮
+                        .swipeActions {
+                            if group.is_owner {
+                                Button("Remove", role: .destructive) { remove(person) }
                             }
+                        }
+                        .contextMenu {
+                            memberMenuItems(person)
+                        }
                     }
                 } header: {
                     Text("In This Group · \(group.members.count + 1)")
                 } footer: {
                     if group.is_owner {
-                        Text("Swipe left on someone to remove them.")
+                        Text("Use ⋮ or swipe left on someone to remove them.")
                     } else {
                         Text("Only the person who made the group can add or remove people.")
                     }
@@ -603,9 +612,21 @@ struct GroupMembersSheet: View {
                     }
                     .listRowBackground(Theme.surface)
                 }
+
+                // Also on a long press of the group on Movie Night
+                Section {
+                    Button(group.is_owner ? "Delete Group" : "Leave Group", role: .destructive) { confirmingLeave = true }
+                } footer: {
+                    Text(group.is_owner ? "The group is deleted for everyone in it." : "You'll stop seeing this group and its picks.")
+                }
+                .listRowBackground(Theme.surface)
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
+            .confirmationDialog(group.is_owner ? "Delete \(group.name)?" : "Leave \(group.name)?",
+                                isPresented: $confirmingLeave, titleVisibility: .visible) {
+                Button(group.is_owner ? "Delete Group" : "Leave Group", role: .destructive, action: leave)
+            }
             .navigationTitle(group.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -649,6 +670,34 @@ struct GroupMembersSheet: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.accentGradient)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func memberMenuItems(_ person: UserSummary) -> some View {
+        Button {
+            reporting = ReportTarget(handle: person.handle, kind: .group, contentID: String(group.id))
+        } label: {
+            Label("Report @\(person.handle)", systemImage: "flag")
+        }
+        if group.is_owner {
+            Button(role: .destructive) {
+                remove(person)
+            } label: {
+                Label("Remove from Group", systemImage: "person.badge.minus")
+            }
+        }
+    }
+
+    private func leave() {
+        APIService.shared.leaveGroup(group.id) { left in
+            guard left else {
+                failed = true
+                return
+            }
+            Haptics.success()
+            dismiss()
+            onLeave()
         }
     }
 

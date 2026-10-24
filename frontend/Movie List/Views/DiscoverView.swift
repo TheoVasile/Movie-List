@@ -137,6 +137,13 @@ struct DiscoverView: View {
                                 } label: {
                                     Label("Change List…", systemImage: "arrow.left.arrow.right")
                                 }
+                                // Also on a long press of the add button
+                                Button {
+                                    swipeRight(forceAsk: true)
+                                } label: {
+                                    Label("Choose Lists for This Film…", systemImage: "list.bullet")
+                                }
+                                .disabled(viewModel.topMovie == nil)
                             }
                         } label: {
                             Label("Adding Films", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
