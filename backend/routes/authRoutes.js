@@ -2,6 +2,7 @@ const express = require("express");
 const { loginUser } = require("../controllers/authController");
 const { deleteUser, createUser } = require("../models/userModel");
 const verifyToken = require("../middleware/authMiddleware");
+const { rateLimit } = require("../middleware/rateLimit");
 const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
 const pool = require("../config/db");
 const { TERMS_VERSION, TERMS_UPDATED, PRIVACY_VERSION, PRIVACY_UPDATED, loadTerms, loadPrivacy } = require("../config/terms");
@@ -35,23 +36,11 @@ router.post("/create", verifyToken, async (req, res) => {
 
 // How many availability checks one address can make a minute, so this can't be used to list usernames
 const MAX_CHECKS_PER_MINUTE = 30;
-const recentChecks = new Map();
+const limitChecks = rateLimit({ limit: MAX_CHECKS_PER_MINUTE, message: "Too many checks. Try again in a minute." });
 
 // Whether an @username is free, for the sign-up form before the account exists, e.g.
 // /auth/handle-available?handle=theo.v -> { "valid": true, "available": false }
-router.get("/handle-available", async (req, res) => {
-    // The last X-Forwarded-For entry is the one Render's proxy added; earlier ones come from the client
-    const address = String(req.headers["x-forwarded-for"] ?? req.ip ?? "").split(",").pop().trim();
-    const now = Date.now();
-    const recent = (recentChecks.get(address) ?? []).filter((time) => now - time < 60 * 1000);
-    if (recent.length >= MAX_CHECKS_PER_MINUTE) {
-        return res.status(429).json({ error: "Too many checks. Try again in a minute." });
-    }
-    recent.push(now);
-    // Old addresses are forgotten wholesale rather than one by one
-    if (recentChecks.size > 10000) recentChecks.clear();
-    recentChecks.set(address, recent);
-
+router.get("/handle-available", limitChecks, async (req, res) => {
     const handle = String(req.query.handle ?? "").trim().toLowerCase().replace(/^@/, "");
     if (!isValidHandle(handle)) return res.json({ valid: false, available: false });
     try {

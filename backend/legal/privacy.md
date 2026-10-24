@@ -56,10 +56,10 @@ If you email us, we collect your email address and whatever you include in your 
 ## 3. Information Collected Automatically
 
 - **Notification tokens.** If you allow notifications, Apple and Google Firebase Cloud Messaging give the App a token for your device, which we store with your account so we can send you notifications. When you sign out, we remove it.
-- **Technical information.** Like any online service, our servers and hosting providers receive technical information when the App connects to them, such as your IP address, the time of the request and the type of request. Our hosting providers keep server logs for a limited time for security, troubleshooting and abuse prevention. We use IP addresses briefly to limit how often someone can check whether a @username is taken.
+- **Technical information.** Like any online service, our servers and hosting providers receive technical information when the App connects to them, such as your IP address, the time of the request and the type of request. Our hosting providers keep server logs for a limited time for security, troubleshooting and abuse prevention. We use IP addresses and account identifiers briefly, in our server's memory only, to limit how many requests someone can make in a short time (for example, how often someone can check whether a @username is taken), to protect the App from abuse.
 - **Usage analytics.** The App uses Google Analytics for Firebase to count which features are used, as described below.
 - **Crash reports.** The App uses Firebase Crashlytics to tell us when it crashes, as described below.
-- **AI usage counts.** To keep AI features fair and affordable, we count how many AI requests each account makes per day. The count is kept in our server's memory and is not stored long term.
+- **AI usage counts.** To keep AI features fair and affordable, we count how many AI requests each account makes per day. The count is stored in our database with your account, is deleted after a few days, and is not stored long term.
 
 We do not use cookies in the App. We do not collect your device's advertising identifier, and the App does not ask for permission to track you.
 
@@ -226,7 +226,7 @@ We keep your information for as long as your account exists, because we need it 
 - Notification tokens are removed when you sign out, when your account is deleted, or when they stop working
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
 - Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
-- Daily AI usage counts are kept in memory only and are reset at least daily
+- Daily AI usage counts are deleted after a few days, and with your account
 - Usage analytics are kept by Google Analytics for 14 months and then deleted automatically
 - Crash reports are kept by Firebase Crashlytics for 90 days and then deleted automatically
 - Server logs are kept by our hosting providers for a limited time, usually no more than a few weeks
