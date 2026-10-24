@@ -24,12 +24,13 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- cinelist://film/<TMDb id>, used by the Home Screen widgets to open a film -->
+			<!-- cinelist://film/<TMDb id>, used by the Home Screen widgets to open a film; marquee:// works the same -->
 			<key>CFBundleURLName</key>
 			<string>Theodor-Vasile.Movie-List.widget</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>cinelist</string>
+				<string>marquee</string>
 			</array>
 		</dict>
 	</array>
@@ -39,7 +40,7 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSContactsUsageDescription</key>
-	<string>CineList checks which of your contacts are on CineList so you can follow them. Emails and numbers are scrambled on your iPhone first and never stored.</string>
+	<string>Marquee checks which of your contacts are on Marquee so you can follow them. Emails and numbers are scrambled on your iPhone first and never stored.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- The backend on the Mac is plain http, which iOS only allows for local network addresses -->
@@ -47,9 +48,9 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Daylight mode uses your approximate location to switch to the light theme at sunrise and the dark theme at sunset. Theatre check-ins use it to notice when you leave a movie theatre, so CineList can ask what you saw. Your location stays on this iPhone.</string>
+	<string>Daylight mode uses your approximate location to switch to the light theme at sunrise and the dark theme at sunset. Theatre check-ins use it to notice when you leave a movie theatre, so Marquee can ask what you saw. Your location stays on this iPhone.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Theatre check-ins use your location in the background only to notice when you leave a movie theatre after a film, so CineList can ask what you saw. Your location stays on this iPhone and is never sent anywhere.</string>
+	<string>Theatre check-ins use your location in the background only to notice when you leave a movie theatre after a film, so Marquee can ask what you saw. Your location stays on this iPhone and is never sent anywhere.</string>
 	<!-- Region monitoring needs precise location; asked for with requestTemporaryFullAccuracyAuthorization when only approximate is allowed -->
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
@@ -57,7 +58,7 @@
 		<string>Theatre check-ins need your precise location to tell when you're at a movie theatre. It stays on this iPhone.</string>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Movie List connects to its server on your local network to load and save your lists.</string>
+	<string>Marquee connects to its server on your local network to load and save your lists.</string>
 	<!-- Firebase Analytics: no ad personalisation, no SKAdNetwork registration and no IDFV; collection itself is
 	     turned on or off by Share Usage Analytics in Settings -->
 	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key>

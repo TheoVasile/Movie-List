@@ -1,12 +1,12 @@
-# CineList Privacy Policy
+# Marquee Privacy Policy
 
-This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects, uses, shares and protects personal information when you use the CineList mobile application, its Home Screen widgets and the online services that support them (together, the "App"). It also explains the choices and rights you have. It forms part of our Terms of Service, and words defined there have the same meaning here.
+This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects, uses, shares and protects personal information when you use the Marquee mobile application, its Home Screen widgets and the online services that support them (together, the "App"). It also explains the choices and rights you have. It forms part of our Terms of Service, and words defined there have the same meaning here.
 
 {{COMPANY_NAME}} is responsible for your personal information (in European terms, we are the "controller"). If you have any questions, contact us at {{CONTACT_EMAIL}}.
 
 ## 1. The Short Version
 
-- We collect what we need to run CineList: your account details, your profile, the films and lists you add, and the people you connect with.
+- We collect what we need to run Marquee: your account details, your profile, the films and lists you add, and the people you connect with.
 - A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your birthday and pronouns are kept on your device, and are only sent anywhere in the limited ways described below.
 - AI features are off unless you turn them on. When you use them, we send your film lists and preferences to our AI provider, Anthropic, but not your name, email address, phone number or contacts.
 - We do not sell your personal information, we do not show ads, and we do not track you across other companies' apps or websites.
@@ -27,7 +27,7 @@ We collect the **display name** and **@username** you choose, and, if you add on
 
 If you add a phone number so friends can find you from their contacts, Google Firebase verifies it by sending a code by text message. Once it is verified, we store the number on our servers and in your Firebase account. You can remove it at any time in Settings, which removes it from both.
 
-### What you add to CineList
+### What you add to Marquee
 
 We store the content you create and the things you do in the App, including:
 
@@ -60,7 +60,7 @@ We do not use cookies in the App. We do not collect your device's advertising id
 
 ### Usage analytics
 
-The App uses Google Analytics for Firebase, provided by Google, to understand how CineList is used so we can fix problems and improve it. It collects:
+The App uses Google Analytics for Firebase, provided by Google, to understand how Marquee is used so we can fix problems and improve it. It collects:
 
 - A random **app instance identifier** created when the App is installed. It is not your device's advertising identifier, and it changes if you delete and reinstall the App
 - **Events** recording that you used certain features: signing up, accepting the Terms, creating a list, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, sharing a list, and sending a report (only the type of content and the reason you picked). Events never include film or list names, notes, messages, @usernames or anything else you type
@@ -82,22 +82,22 @@ Some features work only on your device. This information is not sent to us, exce
 - **Theatre check-ins.** If you turn on Theatre Check-ins, the App uses your iPhone's location, including in the background and with precise location, to notice when you spend about a film's length at a movie theatre and then leave. The theatres near you, when you arrived and where you are stay on your iPhone. To find nearby theatres, the App asks Apple Maps, which means Apple receives your approximate location under Apple's own privacy policy. If you then choose what you saw, we receive only the film and the date, like any other diary entry, and not the theatre or your location.
 - **Widgets.** To show your top films and tonight's suggestions on your Home Screen, the App saves a small copy of that information in a space on your iPhone shared with its widgets. It is removed when you sign out.
 - **Offline copy.** The App keeps a copy of your lists and some settings on your iPhone so it can work quickly and offline. It is removed when you sign out.
-- **Imports and exports.** When you import a Letterboxd export or a spreadsheet, the file is read on your iPhone, and only the lists and films in it (such as titles, years, rankings and dates) are sent to our servers to look up the films and add them to your account. CineList does not connect to your Letterboxd account. When you export your lists, the file is created on your iPhone and goes only where you choose to share it.
+- **Imports and exports.** When you import a Letterboxd export or a spreadsheet, the file is read on your iPhone, and only the lists and films in it (such as titles, years, rankings and dates) are sent to our servers to look up the films and add them to your account. Marquee does not connect to your Letterboxd account. When you export your lists, the file is created on your iPhone and goes only where you choose to share it.
 
 ## 5. Permissions on Your iPhone
 
 The App asks for these permissions only when you use a feature that needs them, and you can change them at any time in your iPhone's Settings:
 
-- **Contacts**, to find friends who are on CineList (see Section 6)
+- **Contacts**, to find friends who are on Marquee (see Section 6)
 - **Location**, for the Daylight appearance and Theatre Check-ins (see Section 4)
 - **Notifications**, to send you the notifications you choose
 - **Photos**, only through Apple's photo picker, which gives the App just the photo you pick for your profile
 
 ## 6. Finding Friends From Your Contacts
 
-If you choose to find friends from your contacts, the App reads the email addresses and phone numbers in your iPhone's contacts and turns each one into a one-way code (a SHA-256 hash) on your iPhone. Only those codes are sent to us. We compare them with codes made in the same way from our users' email addresses and verified phone numbers, tell you which of your contacts are on CineList, and then discard the codes you sent. We do not store them, and names and other contact details never leave your iPhone.
+If you choose to find friends from your contacts, the App reads the email addresses and phone numbers in your iPhone's contacts and turns each one into a one-way code (a SHA-256 hash) on your iPhone. Only those codes are sent to us. We compare them with codes made in the same way from our users' email addresses and verified phone numbers, tell you which of your contacts are on Marquee, and then discard the codes you sent. We do not store them, and names and other contact details never leave your iPhone.
 
-This also means that other users who have your email address, or your phone number if you have added one, in their contacts may be able to find your CineList profile. You can remove your phone number in Settings at any time.
+This also means that other users who have your email address, or your phone number if you have added one, in their contacts may be able to find your Marquee profile. You can remove your phone number in Settings at any time.
 
 ## 7. AI Features
 
@@ -142,7 +142,7 @@ If data protection laws such as the GDPR or UK GDPR apply to you, we rely on the
 
 ## 9. What Other People Can See
 
-CineList is a social app, so some of your information is visible to other users:
+Marquee is a social app, so some of your information is visible to other users:
 
 - Your display name, @username, profile photo, and the number of people you follow and who follow you can be seen by other signed-in users, who can also find you by searching for your @username
 - Lists marked **Public** can be seen by any signed-in user, lists marked **Followers** only by people who follow you, and lists marked **Private** only by you and anyone you invite to edit them. If your account is private, only followers you have approved can see more than your basic profile
@@ -272,7 +272,7 @@ If we decline your request, we will explain why. Where the law allows, you can a
 
 ## 15. Children
 
-CineList is not intended for children under 13, and you must be at least 13 to create an account. When you sign up, and whenever you accept the Terms of Service, you confirm that you are at least 13. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has created an account, we will delete it and its information. If you believe a child under 13 has given us personal information, please contact us at {{CONTACT_EMAIL}}.
+Marquee is not intended for children under 13, and you must be at least 13 to create an account. When you sign up, and whenever you accept the Terms of Service, you confirm that you are at least 13. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has created an account, we will delete it and its information. If you believe a child under 13 has given us personal information, please contact us at {{CONTACT_EMAIL}}.
 
 If you are under the age at which you can consent to the processing of your personal information where you live, you may only use the App with the consent of a parent or guardian. AI features are not available to users who tell us they are under 18.
 
@@ -288,4 +288,4 @@ We may update this Policy from time to time, for example to reflect new features
 
 ## 18. Contact Us
 
-If you have questions about this Policy or how we handle your information, or want to exercise your rights, please contact {{COMPANY_NAME}}, the person responsible for privacy at CineList, at {{CONTACT_EMAIL}}.
+If you have questions about this Policy or how we handle your information, or want to exercise your rights, please contact {{COMPANY_NAME}}, the person responsible for privacy at Marquee, at {{CONTACT_EMAIL}}.

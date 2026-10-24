@@ -136,7 +136,7 @@ router.delete("/me/phone", async (req, res) => {
 // removing still works
 router.put("/me/phone", async (req, res) => {
     if (req.body?.phone_hash !== null) {
-        return res.status(410).json({ error: "Update CineList to add your phone number." });
+        return res.status(410).json({ error: "Update Marquee to add your phone number." });
     }
     try {
         await setPhone(req.user.uid, null);
@@ -147,7 +147,7 @@ router.put("/me/phone", async (req, res) => {
     }
 });
 
-// Which of the user's contacts are on CineList: { "emails": [sha256...], "phones": [sha256...] }. Nothing sent
+// Which of the user's contacts are on Marquee: { "emails": [sha256...], "phones": [sha256...] }. Nothing sent
 // here is stored
 router.post("/contacts/match", async (req, res) => {
     const clean = (list) => (Array.isArray(list) ? list : []).filter(isHash).slice(0, 5000);

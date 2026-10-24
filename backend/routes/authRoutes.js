@@ -75,7 +75,7 @@ router.get("/terms", (req, res) => {
 });
 
 // The Privacy Policy, for reading in the app, signed in or not
-// -> { "version": "2026-10-24", "updated": "October 24, 2026", "markdown": "# CineList Privacy Policy ..." }
+// -> { "version": "2026-10-24", "updated": "October 24, 2026", "markdown": "# Marquee Privacy Policy ..." }
 router.get("/privacy", (req, res) => {
     try {
         res.json({ version: PRIVACY_VERSION, updated: PRIVACY_UPDATED, markdown: loadPrivacy() });

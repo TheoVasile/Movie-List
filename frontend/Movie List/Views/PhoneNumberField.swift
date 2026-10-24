@@ -268,7 +268,7 @@ struct PhoneNumberField: View {
                     }
                 case .failure(let error):
                     message = (error as NSError).code == 409
-                        ? "That number is already on another CineList account."
+                        ? "That number is already on another Marquee account."
                         : "Your number was verified but couldn't be saved. Try again."
                 }
             }
@@ -301,7 +301,7 @@ struct PhoneNumberField: View {
         case .sessionExpired:
             return "That code has expired. Go back and send a new one."
         case .credentialAlreadyInUse:
-            return "That number is already on another CineList account."
+            return "That number is already on another Marquee account."
         case .tooManyRequests, .quotaExceeded:
             return "Too many tries. Wait a while and try again."
         case .operationNotAllowed:

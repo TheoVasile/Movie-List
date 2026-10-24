@@ -28,7 +28,7 @@ enum Personalization {
     // The user's birthday, as yyyy-MM-dd so it doesn't shift with time zones. Never sent anywhere: only the
     // age range worked out from it goes with AI Discover requests
     static let birthdayKey = "personalization.birthday"
-    // The youngest anyone can be to use CineList, per the Terms of Service
+    // The youngest anyone can be to use Marquee, per the Terms of Service
     static let minimumAge = 13
     static let pronounsKey = "personalization.pronouns"
     static let notShared = "Prefer not to say"

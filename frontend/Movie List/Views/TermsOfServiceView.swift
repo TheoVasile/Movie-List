@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-/// CineList's legal documents, which the server serves as Markdown at /auth/<path>
+/// Marquee's legal documents, which the server serves as Markdown at /auth/<path>
 enum LegalDocument: String, Identifiable {
     case terms
     case privacy
@@ -200,7 +200,7 @@ struct LegalDocumentView: View {
     }
 }
 
-/// "By continuing, you agree to CineList's Terms of Service and acknowledge the Privacy Policy." under the
+/// "By continuing, you agree to Marquee's Terms of Service and acknowledge the Privacy Policy." under the
 /// sign-in and sign-up buttons, where each document's name opens it in a sheet. On sign-up it also mentions the
 /// minimum age
 struct TermsNotice: View {
@@ -233,8 +233,8 @@ struct TermsNotice: View {
             return link
         }
         var notice = AttributedString(confirmsAge
-            ? "By \(action), you confirm you're 13 or older, agree to CineList's "
-            : "By \(action), you agree to CineList's ")
+            ? "By \(action), you confirm you're 13 or older, agree to Marquee's "
+            : "By \(action), you agree to Marquee's ")
         notice.append(link(.terms))
         notice.append(AttributedString(" and acknowledge the "))
         notice.append(link(.privacy))
@@ -280,7 +280,7 @@ struct TermsAcceptanceView: View {
                             .font(.system(size: 32, weight: .heavy, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                         Text(terms.map { "Last updated \($0.updated)" }
-                             ?? (isUpdate ? "Please review the changes to keep using CineList." : "Please review them to start using CineList."))
+                             ?? (isUpdate ? "Please review the changes to keep using Marquee." : "Please review them to start using Marquee."))
                             .font(.subheadline)
                             .foregroundColor(Theme.textSecondary)
                     }
@@ -361,13 +361,13 @@ struct TermsAcceptanceView: View {
         .confirmationDialog("Decline the Terms of Service?", isPresented: $confirmDecline, titleVisibility: .visible) {
             Button("Decline and Sign Out", role: .destructive, action: onDecline)
         } message: {
-            Text("You can't use CineList without agreeing to them, so you'll be signed out.")
+            Text("You can't use Marquee without agreeing to them, so you'll be signed out.")
         }
         .alert("You Need to Be 13 or Older", isPresented: $showUnder13) {
             Button("Sign Out", role: .destructive, action: onDecline)
             Button("Go Back", role: .cancel) {}
         } message: {
-            Text("CineList is only for people 13 and older, so you can't use it yet. You'll be signed out.")
+            Text("Marquee is only for people 13 and older, so you can't use it yet. You'll be signed out.")
         }
         .alert("Couldn't Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}

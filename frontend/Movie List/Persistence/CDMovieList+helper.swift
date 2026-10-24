@@ -170,7 +170,7 @@ enum ListVisibility: String, CaseIterable, Identifiable {
 
     var explanation: String {
         switch self {
-        case .public: return "Anyone on CineList can see and follow this list, even if they don't follow you."
+        case .public: return "Anyone on Marquee can see and follow this list, even if they don't follow you."
         case .followers: return "Only people you've accepted as followers can see and follow this list."
         case .private: return "Only you can see this list. It's also left out of Movie Night and your friends' digests."
         }

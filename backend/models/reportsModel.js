@@ -30,7 +30,7 @@ async function createReport(user_id, handle, report) {
     return { id: result.rows[0].id, duplicate: false, reported_id };
 }
 
-/// Tells whoever runs CineList about a new report: always in the server log, and also to REPORTS_WEBHOOK_URL
+/// Tells whoever runs Marquee about a new report: always in the server log, and also to REPORTS_WEBHOOK_URL
 /// (e.g. a Slack or Discord webhook) when it's set. Never throws, so a failed alert doesn't fail the report
 async function notifyOperator(report) {
     const summary = `New report #${report.id}: @${report.handle} (${report.content_type}${report.content_id ? ` ${report.content_id}` : ""}) for ${report.reason}${report.details ? ` - "${report.details}"` : ""}`;

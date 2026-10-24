@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-/// Picks the streaming services the user has, so CineList can say when a watchlist film arrives on one of them.
+/// Picks the streaming services the user has, so Marquee can say when a watchlist film arrives on one of them.
 /// Saved to the server as soon as one is tapped
 struct StreamingServicesView: View {
     // Called with how many services are picked, after each save

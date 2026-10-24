@@ -720,7 +720,7 @@ struct FindPeopleView: View {
     private var contactsSection: some View {
         if let fromContacts {
             VStack(alignment: .leading, spacing: 10) {
-                Text(fromContacts.isEmpty ? "None of your contacts are on CineList yet." : "From Your Contacts")
+                Text(fromContacts.isEmpty ? "None of your contacts are on Marquee yet." : "From Your Contacts")
                     .font(fromContacts.isEmpty ? .subheadline : .headline)
                     .foregroundColor(fromContacts.isEmpty ? Theme.textSecondary : Theme.textPrimary)
                 ForEach(fromContacts) { person in
@@ -798,7 +798,7 @@ struct FindPeopleView: View {
             case .success(let people):
                 fromContacts = people
             case .failure(.denied):
-                contactsMessage = "CineList doesn't have access to your contacts. You can allow it in Settings → Privacy & Security → Contacts."
+                contactsMessage = "Marquee doesn't have access to your contacts. You can allow it in Settings → Privacy & Security → Contacts."
             case .failure(.failed):
                 contactsMessage = "Couldn't check your contacts. Try again."
             }
