@@ -114,6 +114,7 @@ extension AuthenticationViewModel {
             change.displayName = displayName
             try? await change.commitChanges()
             self.user = Auth.auth().currentUser
+            AppAnalytics.log(.signUp(.email))
             
             APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: displayName,
                                          handle: handle) { result in
@@ -322,6 +323,10 @@ extension AuthenticationViewModel {
 
         let result = try await Auth.auth().signIn(with: credential)
         let firebaseUser = result.user
+        // Signing in with Google for the first time creates the account
+        if result.additionalUserInfo?.isNewUser == true {
+          AppAnalytics.log(.signUp(.google))
+        }
           
         APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
             if case .failure(let error) = result { print(error.localizedDescription) }

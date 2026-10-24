@@ -295,6 +295,7 @@ struct CollectionDetailView: View {
                 }
                 if !lists.isEmpty {
                     Haptics.success()
+                    AppAnalytics.log(.filmAdded(.collection))
                     added.insert(movie.id)
                 }
             }

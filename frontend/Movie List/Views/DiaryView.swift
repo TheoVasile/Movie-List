@@ -265,6 +265,7 @@ struct WatchHistoryCard: View {
             switch result {
             case .success:
                 showLogSheet = false
+                AppAnalytics.log(.filmWatched(.diary))
                 // The first watch marks the film watched everywhere it appears
                 if !movie.watched {
                     movie.watched = true

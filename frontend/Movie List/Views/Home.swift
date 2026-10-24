@@ -294,6 +294,7 @@ private extension Home {
                 ListVisibility.remember(visibility, for: serverList.id)
                 ListRanking.remember(ranked, for: serverList.id)
                 try? context.save()
+                AppAnalytics.log(.listCreated(ranked: ranked))
                 inviteEditors(editors, to: serverList.id)
             case .failure(let error):
                 print("Backend request failed, deleting from Core Data:", error.localizedDescription)

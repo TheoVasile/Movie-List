@@ -116,7 +116,10 @@ struct TheatreCheckInSheet: View {
             }
         }
         .onAppear {
-            if nowPlaying.isEmpty { load() }
+            if nowPlaying.isEmpty {
+                AppAnalytics.log(.theatreCheckInOpened)
+                load()
+            }
         }
     }
 
@@ -307,6 +310,7 @@ struct TheatreCheckInSheet: View {
     private func add(_ movie: Movie, to lists: [CDMovieList]) {
         guard !lists.isEmpty else { return }
         added.insert(movie.id)
+        AppAnalytics.log(.filmAdded(.checkIn))
         var saved = 0
         let group = DispatchGroup()
         for list in lists {
@@ -333,6 +337,7 @@ struct TheatreCheckInSheet: View {
             switch result {
             case .success:
                 Haptics.success()
+                AppAnalytics.log(.filmWatched(.checkIn))
                 logged.insert(movie.id)
                 let request = CDMovie.fetchRequest()
                 request.predicate = NSPredicate(format: "id == %lld", movieID)

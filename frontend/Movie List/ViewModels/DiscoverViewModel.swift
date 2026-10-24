@@ -495,6 +495,8 @@ class DiscoverViewModel: ObservableObject {
                     self.listedIDs.remove(movie.id)
                     self.deck.insert(movie, at: 0)
                 }
+            } else {
+                AppAnalytics.log(.filmAdded(.discover))
             }
             completion(lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } })
         }
@@ -731,6 +733,7 @@ class DiscoverViewModel: ObservableObject {
             self.isLoading = false
             switch result {
             case .success:
+                AppAnalytics.log(.aiPickUsed(.discover))
                 self.aiEmptyBatches = freshCount == 0 ? self.aiEmptyBatches + 1 : 0
                 if self.aiEmptyBatches >= 2 {
                     self.aiAvailable = false

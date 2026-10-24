@@ -42,6 +42,7 @@ struct UserSettingsView : View {
     @State private var notifyStreaming = true
     @State private var savedNotifyStreaming = true
     @State private var streamingServiceCount: Int? = nil
+    @AppStorage(AppAnalytics.enabledKey) private var shareAnalytics = true
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -281,6 +282,17 @@ struct UserSettingsView : View {
                          : aiAllowed
                          ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Your age range and pronouns are optional and only go with Discover requests. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
                          : "Nothing is sent to an AI. Discover uses TMDb's recommendations for films in your lists, and friends can't plan a Movie Night with you.")
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
+                    Toggle(isOn: $shareAnalytics) {
+                        Label("Share Usage Analytics", systemImage: "chart.bar")
+                    }
+                    .tint(Theme.accent)
+                    .onChange(of: shareAnalytics) { _ in AppAnalytics.applySetting() }
+                } footer: {
+                    Text("Counts which features are used, like adding or ranking a film, with Google Analytics. Never your films, lists, name or contacts, and never used for ads.")
                 }
                 .listRowBackground(Theme.surface)
 

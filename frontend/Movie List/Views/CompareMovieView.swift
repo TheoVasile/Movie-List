@@ -168,6 +168,7 @@ struct CompareMovieView: View {
     private func compare() {
         if low >= high {
             Haptics.success()
+            AppAnalytics.log(.filmRanked(.compare))
             onRankingUpdate(movie, low + 1)
             return
         }

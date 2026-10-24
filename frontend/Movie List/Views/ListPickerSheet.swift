@@ -247,6 +247,7 @@ struct ListPickerSheet: View {
                     print("Error saving new list:", error)
                 }
                 Haptics.success()
+                AppAnalytics.log(.listCreated(ranked: true))
                 withAnimation(Theme.spring) {
                     if singleChoice { selected = [list] } else { selected.append(list) }
                     showNewListField = false
