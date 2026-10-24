@@ -201,9 +201,11 @@ struct LegalDocumentView: View {
 }
 
 /// "By continuing, you agree to CineList's Terms of Service and acknowledge the Privacy Policy." under the
-/// sign-in and sign-up buttons, where each document's name opens it in a sheet
+/// sign-in and sign-up buttons, where each document's name opens it in a sheet. On sign-up it also mentions the
+/// minimum age
 struct TermsNotice: View {
     var action = "continuing"
+    var confirmsAge = false
     @State private var shown: LegalDocument? = nil
 
     var body: some View {
@@ -230,7 +232,9 @@ struct TermsNotice: View {
             link.font = .caption.weight(.semibold)
             return link
         }
-        var notice = AttributedString("By \(action), you agree to CineList's ")
+        var notice = AttributedString(confirmsAge
+            ? "By \(action), you confirm you're 13 or older, agree to CineList's "
+            : "By \(action), you agree to CineList's ")
         notice.append(link(.terms))
         notice.append(AttributedString(" and acknowledge the "))
         notice.append(link(.privacy))
@@ -251,6 +255,8 @@ struct TermsAcceptanceView: View {
     @State private var isAccepting = false
     @State private var confirmDecline = false
     @State private var showPrivacy = false
+    @State private var ageConfirmed = false
+    @State private var showUnder13 = false
     @State private var errorMessage: String? = nil
 
     // They agreed to an earlier version, so this is a change rather than their first time
@@ -311,6 +317,8 @@ struct TermsAcceptanceView: View {
 
             // Agree or decline, always in reach below the terms
             VStack(spacing: 10) {
+                AgeConfirmation(isConfirmed: $ageConfirmed)
+                    .disabled(isAccepting)
                 Button(action: accept) {
                     if isAccepting {
                         ProgressView().tint(Theme.onAccent)
@@ -319,14 +327,22 @@ struct TermsAcceptanceView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(terms == nil || isAccepting)
-                .opacity(terms == nil ? 0.5 : 1)
-                Button("Decline") {
-                    Haptics.tap()
-                    confirmDecline = true
+                .disabled(!canAccept)
+                .opacity(terms == nil || !ageConfirmed ? 0.5 : 1)
+                HStack(spacing: 20) {
+                    Button("Decline") {
+                        Haptics.tap()
+                        confirmDecline = true
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(Theme.textSecondary)
+                    Button("I'm under 13") {
+                        Haptics.tap()
+                        showUnder13 = true
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(Theme.textSecondary)
                 .disabled(isAccepting)
                 .padding(.vertical, 6)
             }
@@ -347,6 +363,12 @@ struct TermsAcceptanceView: View {
         } message: {
             Text("You can't use CineList without agreeing to them, so you'll be signed out.")
         }
+        .alert("You Need to Be 13 or Older", isPresented: $showUnder13) {
+            Button("Sign Out", role: .destructive, action: onDecline)
+            Button("Go Back", role: .cancel) {}
+        } message: {
+            Text("CineList is only for people 13 and older, so you can't use it yet. You'll be signed out.")
+        }
         .alert("Couldn't Save", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -364,9 +386,11 @@ struct TermsAcceptanceView: View {
         }
     }
 
+    private var canAccept: Bool { terms != nil && ageConfirmed && !isAccepting }
+
     /// Agrees to the version on screen, then reloads the profile, which closes this screen
     private func accept() {
-        guard let version = terms?.version else { return }
+        guard let version = terms?.version, ageConfirmed else { return }
         Haptics.tap()
         isAccepting = true
         APIService.shared.acceptTerms(version: version) { result in
@@ -387,6 +411,34 @@ struct TermsAcceptanceView: View {
                 }
             }
         }
+    }
+}
+
+/// The checkbox they tick to confirm they're old enough to agree to the terms, or have a parent's or guardian's
+/// agreement. "I Agree" stays off until it's ticked
+private struct AgeConfirmation: View {
+    @Binding var isConfirmed: Bool
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            isConfirmed.toggle()
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isConfirmed ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundColor(isConfirmed ? Theme.accent : Theme.textTertiary)
+                Text("I'm 13 or older, and if I'm under the age of majority where I live, my parent or guardian has agreed to these Terms for me.")
+                    .font(.footnote)
+                    .foregroundColor(Theme.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isConfirmed ? .isSelected : [])
     }
 }
 

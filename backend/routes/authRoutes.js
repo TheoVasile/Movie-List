@@ -85,17 +85,26 @@ router.get("/privacy", (req, res) => {
     }
 });
 
+// How recently someone must have signed in, or confirmed their password or Google account, to delete their account
+const DELETE_SIGN_IN_WINDOW_SECONDS = 5 * 60;
+
+// Permanently deletes the signed-in user's account, its data and its Firebase sign-in. Only their own: the uid has
+// to match the token's. The app has them confirm their password or Google account first, so a phone left signed in
+// isn't enough to delete the account
 router.delete("/delete/:uid", verifyToken, async (req, res) => {
     try {
         const { uid } = req.params;
         if (uid !== req.user.uid) {
             return res.status(403).json({ error: "You can only delete your own account." });
         }
-        const removedUser = await deleteUser(uid);
-        res.status(200).json(removedUser);
+        if (Date.now() / 1000 - (req.user.auth_time ?? 0) > DELETE_SIGN_IN_WINDOW_SECONDS) {
+            return res.status(401).json({ error: "For your security, confirm it's you again, then delete your account." });
+        }
+        const removed = await deleteUser(uid);
+        res.status(200).json({ deleted: true, removed });
     } catch (error) {
         console.error("Error removing user:", error);
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json({ error: "Couldn't delete your account. Try again in a moment." });
     }
 });
 

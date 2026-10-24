@@ -16,7 +16,7 @@ If a change is material, we will tell you in the App before it takes effect and 
 
 ## 3. Eligibility and Age Requirements
 
-You must be at least **13 years old** to create an account or use the App. If we learn that someone under 13 has created an account, we will delete it.
+You must be at least **13 years old** to create an account or use the App. When you sign up, and whenever you accept these Terms, you confirm that you are at least 13 and, if you are under the age of majority where you live, that your parent or legal guardian has agreed to these Terms on your behalf. If we learn that someone under 13 has created an account, we will delete it and its content.
 
 If you are under the age of majority where you live (for example, 18 or 19 depending on your province or territory in Canada, or 18 in most U.S. states), you may use the App only with the involvement and consent of a parent or legal guardian, who must review and agree to these Terms on your behalf.
 
@@ -113,11 +113,19 @@ CineList is social. When you follow someone, invite them to a list or a group, o
 
 ### Blocking
 
-You can block another user at any time from their profile. Blocking stops them from finding or following you, removes any follow between you in either direction, and removes them from lists you share with each other. You can see and undo your blocks in the App.
+You can block another user at any time from their profile, or right after reporting them. Blocking stops them from finding or following you, removes any follow between you in either direction, removes them from lists and groups you share with each other, and stops them sending you films. You can see and undo your blocks in the App.
 
 ### Reporting
 
-If someone is breaking these Terms, or you see content that is abusive, unsafe or illegal, please report it to us at {{CONTACT_EMAIL}} with the @username involved and a short description. We will review reports and may take action, including removing content or suspending or terminating accounts. In an emergency, contact your local emergency services.
+If someone is breaking these Terms, or you see content that is abusive, unsafe or illegal, you can report it in the App. Use **Report** on a user's profile, or on the list, note, recommendation, activity or group member you are concerned about, pick a reason and, if you like, add a few details. You can also block the user at the same time.
+
+We do not tolerate objectionable content or abusive users. When you report something:
+
+- We review reports **within 24 hours**
+- If we find that content or an account breaks these Terms, we may remove the content, and suspend or terminate the account that posted it
+- We do not tell the person you reported who reported them
+
+Please only report things in good faith; misusing reporting is itself a breach of these Terms. In an emergency, contact your local emergency services.
 
 ### Shared lists and groups
 
@@ -204,7 +212,7 @@ If you send us ideas, suggestions or other feedback about the App, you agree tha
 
 ### Deleting your account
 
-You can stop using the App at any time. You can permanently delete your account from Settings using **Deactivate Account**. This deletes your account and your lists, and removes your profile, notes, watched history, social connections and other data associated with your account from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Content other people already received, such as recommendations you sent, may remain with them, and a list you were invited to edit will stay with its owner. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
+You can stop using the App at any time. You can permanently delete your account from Settings using **Delete Account**. This deletes your account and your sign-in, together with the data associated with your account, including your profile, lists and rankings, watched history and diary, notes, social connections, film recommendations, groups and votes, from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Films you added to a list or group owned by someone else stay there without your name, and copies other people kept (for example, a list you shared through your iPhone's share sheet) are not affected. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
 
 ### Suspension and termination by us
 
@@ -273,4 +281,4 @@ If you downloaded the App from Apple's App Store, the following also applies, an
 
 ## 25. Contact Us
 
-If you have questions about these Terms, want to report a user or content, or need help with your account, please contact {{COMPANY_NAME}} at {{CONTACT_EMAIL}}.
+If you have questions about these Terms or need help with your account, please contact {{COMPANY_NAME}} at {{CONTACT_EMAIL}}. To report a user or content, please use **Report** in the App (see Section 8).

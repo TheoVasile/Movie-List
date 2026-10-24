@@ -73,6 +73,7 @@ struct FriendActivityView: View {
     @State private var detailsMovie: Movie? = nil
     @State private var adding: Movie? = nil
     @State private var openPerson: UserSummary? = nil
+    @State private var reporting: ReportTarget? = nil
 
     // Days, newest first, each with its activity
     private var days: [(day: Date, items: [FriendActivity])] {
@@ -120,6 +121,9 @@ struct FriendActivityView: View {
             }
         }
         .task { await load() }
+        .sheet(item: $reporting) { target in
+            ReportSheet(target: target)
+        }
         .sheet(item: $details) { preview in
             // Add to Lists closes the info screen and asks which lists
             MovieDetailView(movie: preview, onAddToLists: {
@@ -197,6 +201,13 @@ struct FriendActivityView: View {
             .buttonStyle(.borderless)
         }
         .listRowBackground(Color.clear)
+        .contextMenu {
+            Button {
+                reporting = ReportTarget(handle: item.handle, kind: .activity, contentID: "\(item.kind)-\(item.tmdb_id)")
+            } label: {
+                Label("Report @\(item.handle)", systemImage: "flag")
+            }
+        }
     }
 
     private func dayTitle(_ day: Date) -> String {

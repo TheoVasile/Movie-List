@@ -23,7 +23,12 @@ struct UserSettingsView : View {
     @State private var savingPrivacy = false
     @State private var confirmPublic = false
     @State private var showUsernameSetup = false
-    @State private var confirmDeactivate = false
+    @State private var confirmDelete = false
+    // Accounts with a password confirm deleting with it; Google accounts sign in to Google again instead
+    @State private var askDeletePassword = false
+    @State private var deletePassword = ""
+    @State private var deletingAccount = false
+    @State private var deleteError: String? = nil
     @ObservedObject private var appearance = AppearanceSettings.shared
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @ObservedObject private var notifications = NotificationManager.shared
@@ -302,6 +307,17 @@ struct UserSettingsView : View {
                                 .foregroundStyle(Theme.accentGradient)
                         }
                     }
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label {
+                            Text("About & Credits")
+                                .foregroundColor(Theme.textPrimary)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(Theme.accentGradient)
+                        }
+                    }
                 }
                 .listRowBackground(Theme.surface)
 
@@ -319,13 +335,27 @@ struct UserSettingsView : View {
                             .foregroundColor(Theme.textPrimary)
                     }
                     Button(role: .destructive) {
-                        confirmDeactivate = true
+                        confirmDelete = true
                     } label: {
-                        Label("Deactivate Account", systemImage: "person.crop.circle.badge.xmark")
+                        Label("Delete Account", systemImage: "person.crop.circle.badge.xmark")
                     }
                 }
                 .listRowBackground(Theme.surface)
             }
+            .disabled(deletingAccount)
+            .overlay {
+                if deletingAccount {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Deleting your account…")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .padding(24)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            .interactiveDismissDisabled(deletingAccount)
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .onAppear {
@@ -351,23 +381,58 @@ struct UserSettingsView : View {
             .sheet(isPresented: $showUsernameSetup) {
                 UsernameSetupView()
             }
-            .confirmationDialog("Deactivate your account?", isPresented: $confirmDeactivate, titleVisibility: .visible) {
-                Button("Deactivate Account", role: .destructive) {
-                    APIService.shared.deleteUser(firebase_id: authenticationViewModel.user!.uid) { result in
-                        switch result {
-                        case .success:
-                            Task {
-                                if await authenticationViewModel.deleteAccount() {
-                                    dismiss()
-                                }
-                            }
-                        case .failure(let error):
-                            print(error)
-                        }
+            .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete Account", role: .destructive) {
+                    if authenticationViewModel.signsInWithPassword {
+                        deletePassword = ""
+                        askDeletePassword = true
+                    } else {
+                        deleteAccount(password: nil)
                     }
                 }
             } message: {
-                Text("This permanently deletes your account and all of your lists.")
+                Text("This permanently deletes your CineList account and everything in it: your lists and rankings, diary and watched films, notes, followers and people you follow, film recommendations, and movie night groups. It can't be undone.")
+            }
+            .alert("Enter your password", isPresented: $askDeletePassword) {
+                SecureField("Password", text: $deletePassword)
+                Button("Delete Account", role: .destructive) {
+                    deleteAccount(password: deletePassword)
+                }
+                Button("Cancel", role: .cancel) { deletePassword = "" }
+            } message: {
+                Text("Confirm it's you to permanently delete your account.")
+            }
+            .alert("Couldn't delete your account", isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(deleteError ?? "")
+            }
+        }
+    }
+}
+
+extension UserSettingsView {
+    private func deleteAccount(password: String?) {
+        deletingAccount = true
+        Task {
+            let result = await authenticationViewModel.deleteAccount(password: password)
+            deletePassword = ""
+            deletingAccount = false
+            switch result {
+            case .deleted:
+                Haptics.success()
+                // Like Sign Out: close Settings first, then sign out once it has slid away
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    authenticationViewModel.signOutDeletedAccount()
+                }
+            case .cancelled:
+                break
+            case .failed(let message):
+                deleteError = message
             }
         }
     }

@@ -715,9 +715,10 @@ class APIService {
         sendJSON("GET", "/users/me", completion: completion)
     }
 
-    /// Records that the user agreed to this version of the terms. Fails with code 400 when it's no longer the current one
+    /// Records that the user agreed to this version of the terms, having confirmed they're old enough to. Fails with
+    /// code 400 when it's no longer the current one
     func acceptTerms(version: String, completion: @escaping (Result<String, Error>) -> Void) {
-        sendJSON("POST", "/users/terms/accept", body: ["version": version]) { (result: Result<TermsAcceptance, Error>) in
+        sendJSON("POST", "/users/terms/accept", body: ["version": version, "age_confirmed": true]) { (result: Result<TermsAcceptance, Error>) in
             completion(result.map(\.terms_version))
         }
     }
@@ -963,6 +964,19 @@ class APIService {
         sendJSON("GET", "/users/me/blocked", completion: completion)
     }
 
+    private struct ReportResponse: Decodable { let received: Bool }
+
+    /// Reports someone, or something of theirs (contentType "list", "note", ...; "user" for the person), for us to
+    /// review. Calls back with whether it was sent
+    func report(_ handle: String, contentType: String, contentID: String?, reason: String, details: String?, completion: @escaping (Bool) -> Void) {
+        var body: [String: Any] = ["handle": handle, "content_type": contentType, "reason": reason]
+        if let contentID { body["content_id"] = contentID }
+        if let details { body["details"] = details }
+        sendJSON("POST", "/users/reports", body: body) { (result: Result<ReportResponse, Error>) in
+            completion((try? result.get())?.received == true)
+        }
+    }
+
     func fetchFriendLists(_ handle: String, completion: @escaping (Result<FriendLists, Error>) -> Void) {
         sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/lists", completion: completion)
     }
@@ -1154,26 +1168,26 @@ class APIService {
         }
     }
 
-    func deleteUser(firebase_id: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    /// Permanently deletes the account, its data and its sign-in on the server. Needs a sign-in from the last few
+    /// minutes. Gives nil once it's deleted, or a message to show the user
+    func deleteAccount(firebase_id: String, completion: @escaping (String?) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/delete/\(firebase_id)") else { return }
-        
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+        // The free server can take most of a minute to wake up before it starts on the request
+        request.timeoutInterval = 90
         send(request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                completion(.success(()))
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let message: String?
+            if status == 200 {
+                message = nil
+            } else if error != nil {
+                message = "Couldn't reach the server. Check your connection and try again."
             } else {
-                completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
+                message = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["error"] as? String
+                    ?? "Couldn't delete your account. Try again in a moment."
             }
-
+            DispatchQueue.main.async { completion(message) }
         }
     }
     

@@ -816,6 +816,9 @@ struct FriendProfileView: View {
     @State private var showMovieNight = false
     @State private var confirmBlock = false
     @State private var blockFailed = false
+    @State private var reporting: ReportTarget? = nil
+    // Blocked from the report sheet, so the profile closes once that sheet does
+    @State private var blockedFromReport = false
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -907,6 +910,11 @@ struct FriendProfileView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    Button {
+                        reporting = ReportTarget(handle: person.handle)
+                    } label: {
+                        Label("Report @\(person.handle)", systemImage: "flag")
+                    }
                     Button(role: .destructive) {
                         confirmBlock = true
                     } label: {
@@ -922,6 +930,9 @@ struct FriendProfileView: View {
             Button("Block", role: .destructive, action: block)
         } message: {
             Text("They won't be able to find you, see your profile or lists, follow you or send you films, and you'll both stop following each other. They aren't told. You can unblock them in Settings.")
+        }
+        .sheet(item: $reporting, onDismiss: { if blockedFromReport { dismiss() } }) { target in
+            ReportSheet(target: target) { blockedFromReport = true }
         }
         .alert("Couldn't block @\(person.handle)", isPresented: $blockFailed) {
             Button("OK", role: .cancel) {}
@@ -1053,6 +1064,7 @@ struct FriendListView: View {
     @State private var adding: Movie? = nil
     // A film from this list picked for the user with the dice, shown at the top
     @State private var pick: FriendLists.Film? = nil
+    @State private var reporting: ReportTarget? = nil
     @FetchRequest(fetchRequest: CDMovieList.fetch()) private var myLists: FetchedResults<CDMovieList>
     @Environment(\.managedObjectContext) private var context
     @EnvironmentObject private var authViewModel: AuthenticationViewModel
@@ -1198,6 +1210,23 @@ struct FriendListView: View {
                     .accessibilityHint("Get updates in your daily digest when films are added")
                 }
             }
+            if let handle = list.owner_handle, handle != SocialStore.shared.profile?.handle {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            reporting = ReportTarget(handle: handle, kind: .list, contentID: String(list.id))
+                        } label: {
+                            Label("Report List", systemImage: "flag")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("More")
+                }
+            }
+        }
+        .sheet(item: $reporting) { target in
+            ReportSheet(target: target)
         }
     }
 
@@ -1301,6 +1330,9 @@ struct FollowedListsSection: View {
 /// where they ranked it. Shown only when at least one of them has it
 struct FriendTakesSection: View {
     let takes: [FriendTake]
+    // The film's TMDb id, so a reported note says which film it's on
+    var tmdbID: Int64? = nil
+    @State private var reporting: ReportTarget? = nil
 
     var body: some View {
         Group {
@@ -1341,6 +1373,15 @@ struct FriendTakesSection: View {
                                 }
                             }
                         }
+                        .contextMenu {
+                            Button {
+                                reporting = take.note == nil
+                                    ? ReportTarget(handle: take.handle)
+                                    : ReportTarget(handle: take.handle, kind: .note, contentID: tmdbID.map(String.init))
+                            } label: {
+                                Label(take.note == nil ? "Report @\(take.handle)" : "Report Note", systemImage: "flag")
+                            }
+                        }
                     }
                 }
                 .padding(14)
@@ -1348,6 +1389,9 @@ struct FriendTakesSection: View {
                 .cardStyle()
                 .transition(.opacity)
             }
+        }
+        .sheet(item: $reporting) { target in
+            ReportSheet(target: target)
         }
     }
 }

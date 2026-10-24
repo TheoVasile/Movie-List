@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const admin = require("../config/firebase");
 
 async function getUserByFirebaseUID(firebase_uid) {
     const result = await pool.query(
@@ -8,15 +9,28 @@ async function getUserByFirebaseUID(firebase_uid) {
     return result.rows[0];
 }
 
+// Permanently deletes an account: its row and everything that references it, then its Firebase sign-in. Every
+// table holding someone's data (lists and their films, watched films and the diary, episodes, notes, follows,
+// blocks, film recommendations sent and received, list editors and list follows, groups they own or are in, poll
+// votes and pick reactions, device tokens and alerts sent) references users ON DELETE CASCADE, so deleting the row
+// removes it all. Films they added to other people's lists and groups stay, with who added them cleared.
+// The Firebase user is deleted before committing, so if that fails nothing is deleted and they can try again.
+// Returns whether the account had a row
 async function deleteUser(firebase_uid) {
     const client = await pool.connect();
     try {
-        const result = await pool.query(
-            "DELETE FROM users WHERE firebase_uid = $1",
-            [firebase_uid]
-        );
-        return result.rows[0];
+        await client.query("BEGIN");
+        const result = await client.query("DELETE FROM users WHERE firebase_uid = $1", [firebase_uid]);
+        try {
+            await admin.auth().deleteUser(firebase_uid);
+        } catch (error) {
+            // Already gone, e.g. a second try after the first one's commit failed
+            if (error.code !== "auth/user-not-found") throw error;
+        }
+        await client.query("COMMIT");
+        return result.rowCount > 0;
     } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
         console.error("Error deleting user:", error);
         throw error;
     } finally {

@@ -435,7 +435,7 @@ struct MovieDetailView: View {
             }
 
             if !friendTakes.isEmpty {
-                FriendTakesSection(takes: friendTakes)
+                FriendTakesSection(takes: friendTakes, tmdbID: Int64(movie.tmdb_id))
             }
 
             if let providers {
@@ -445,6 +445,20 @@ struct MovieDetailView: View {
 
             imdbLink
                 .appearAnimation(delay: 0.32)
+
+            // TMDb's terms ask apps to credit them where their data is shown
+            HStack(spacing: 6) {
+                Text("Film data from")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textTertiary)
+                Image("TMDBLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 8)
+                    .accessibilityLabel("TMDB")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
