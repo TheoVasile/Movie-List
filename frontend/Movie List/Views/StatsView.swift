@@ -232,7 +232,7 @@ struct StatsView: View {
             }
         }
         .sheet(item: $shareItem) { item in
-            ShareSheet(items: item.items)
+            ShareSheet(item: item)
                 .presentationDetents([.medium, .large])
         }
         .onAppear(perform: loadInfo)
@@ -291,7 +291,7 @@ struct StatsView: View {
                 .environment(\.colorScheme, colorScheme))
             renderer.scale = 3
             if let image = renderer.uiImage {
-                shareItem = ShareItem(items: [image])
+                shareItem = ShareItem(items: [image], kind: .stats)
             }
         }
     }

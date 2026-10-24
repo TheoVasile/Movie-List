@@ -91,6 +91,7 @@ extension AuthenticationViewModel {
     do {
         let firebaseUser = try await Auth.auth().signIn(withEmail: self.email, password: self.password)
         PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.user.uid)
+        AppAnalytics.log(.signIn(.email))
         return true
     }
     catch  {
@@ -330,6 +331,8 @@ extension AuthenticationViewModel {
         // Signing in with Google for the first time creates the account
         if result.additionalUserInfo?.isNewUser == true {
           AppAnalytics.log(.signUp(.google))
+        } else {
+          AppAnalytics.log(.signIn(.google))
         }
           
         APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in

@@ -121,7 +121,7 @@ struct Home: View {
                 .environment(\.managedObjectContext, context)
         }
         .sheet(item: $exportItem) { item in
-            ShareSheet(items: item.items)
+            ShareSheet(item: item)
                 .presentationDetents([.medium, .large])
         }
     }
@@ -366,7 +366,7 @@ private extension Home {
     func exportAllLists() {
         Haptics.tap()
         do {
-            exportItem = ShareItem(items: [try ListExport.makeZip(lists: Array(movieLists))])
+            exportItem = ShareItem(items: [try ListExport.makeZip(lists: Array(movieLists))], kind: .export)
         } catch {
             print("Error exporting lists:", error)
         }

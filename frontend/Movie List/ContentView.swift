@@ -94,6 +94,7 @@ struct ContentView: View {
                 .toolbarBackground(.visible, for: .tabBar)
         }
         .onAppear {
+            ReviewPrompter.recordSession()
             social.load()
             notifications.registerDevice()
             // Asked once, shortly after the user first gets into the app
@@ -110,6 +111,7 @@ struct ContentView: View {
         }
         // Coming back to the app is a good moment to try again, e.g. once the network is back
         .onChange(of: scenePhase) { phase in
+            if phase == .active { ReviewPrompter.recordSession() }
             if phase == .active && social.profileFailed { social.retry() }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
