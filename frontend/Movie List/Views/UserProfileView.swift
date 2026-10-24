@@ -141,12 +141,15 @@ struct UserProfileView: View {
         .appearAnimation(delay: 0.14)
     }
 
-    // Friend Activity, Stats, Diary, Recommended to You and Liked & Not for Me as rows of one card, like a Settings group
+    // Friend Activity, Stats, Directors & Franchises, Diary, Recommended to You and Liked & Not for Me as rows of one
+    // card, like a Settings group
     private var links: some View {
         VStack(spacing: 0) {
             activityLink
             Divider().padding(.leading, 56)
             statsLink
+            Divider().padding(.leading, 56)
+            collectionsLink
             Divider().padding(.leading, 56)
             diaryLink
             Divider().padding(.leading, 56)
@@ -174,6 +177,38 @@ struct UserProfileView: View {
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
                     Text("What the people you follow are watching and ranking")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+
+    private var collectionsLink: some View {
+        NavigationLink {
+            CollectionsView()
+                .environment(\.managedObjectContext, context)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checklist")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accentGradient)
+                    // Same width for every icon, so the titles line up
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Directors & Franchises")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("How many you've seen, and what's left")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .lineLimit(1)

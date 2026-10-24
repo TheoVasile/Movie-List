@@ -1314,6 +1314,8 @@ class APIService {
             let runtime: Int?
             let seasons: Int?
             let episodes: Int?
+            let directors: [CreditPerson]?
+            let collection: CreditPerson?
         }
         var components = URLComponents(string: "\(baseURL)/movies/info")
         components?.queryItems = [URLQueryItem(name: "ids", value: tmdbIDs.map(String.init).joined(separator: ","))]
@@ -1329,13 +1331,20 @@ class APIService {
                 let fetched = Date()
                 result = .success(Dictionary(films.map {
                     ($0.id, MovieInfo(genres: $0.genre_ids, certification: $0.certification, voteAverage: $0.vote_average, voteCount: $0.vote_count,
-                              runtime: $0.runtime ?? 0, seasons: $0.seasons, episodes: $0.episodes, fetched: fetched))
+                              runtime: $0.runtime ?? 0, seasons: $0.seasons, episodes: $0.episodes,
+                              // nil from a server that doesn't send them yet, so they're fetched again once it does
+                              directors: $0.directors, collection: $0.collection, fetched: fetched))
                 }, uniquingKeysWith: { first, _ in first }))
             } else {
                 result = .failure(error ?? NSError(domain: "Film info lookup failed", code: (response as? HTTPURLResponse)?.statusCode ?? 0, userInfo: nil))
             }
             DispatchQueue.main.async { completion(result) }
         }
+    }
+
+    /// Every released film in a franchise, or directed by someone, oldest first
+    func fetchFilmography(_ kind: Filmography.Kind, id: Int, completion: @escaping (Result<Filmography, Error>) -> Void) {
+        sendJSON("GET", "/movies/\(kind.rawValue)/\(id)", completion: completion)
     }
 
     /// The film's IMDb id (e.g. "tt0099785"), or nil when TMDb doesn't have one
