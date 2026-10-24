@@ -822,6 +822,7 @@ struct FriendProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.birthdayKey) private var birthday = ""
 
     var body: some View {
         ScrollView {
@@ -905,7 +906,7 @@ struct FriendProfileView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMovieNight) {
-            MovieNightView(people: [person], canUseAI: aiAllowed && ageRange != Personalization.under18 && (lists?.ai_allowed ?? false))
+            MovieNightView(people: [person], canUseAI: aiAllowed && Personalization.ageRange(birthday: birthday, legacy: ageRange) != Personalization.under18 && (lists?.ai_allowed ?? false))
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -947,7 +948,7 @@ struct FriendProfileView: View {
     // otherwise it uses Classic recommendations
     @ViewBuilder
     private func movieNightButton(friendAllowsAI: Bool) -> some View {
-        let iAllowAI = aiAllowed && ageRange != Personalization.under18
+        let iAllowAI = aiAllowed && Personalization.ageRange(birthday: birthday, legacy: ageRange) != Personalization.under18
         VStack(alignment: .leading, spacing: 6) {
             Button {
                 Haptics.tap()

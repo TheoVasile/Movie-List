@@ -45,6 +45,10 @@ struct UserSettingsView : View {
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.birthdayKey) private var birthday = ""
+    // The birthday being picked, until it's saved; nil while not changing it
+    @State private var birthdayDraft: Date? = nil
+    @State private var birthdayTooYoung = false
     @AppStorage(Personalization.pronounsKey) private var pronouns = Personalization.notShared
 
     var body : some View {
@@ -269,8 +273,42 @@ struct UserSettingsView : View {
                         }
                     }
                     if aiAllowed || isUnder18 {
-                        Picker("Age Range", selection: $ageRange) {
-                            ForEach(Personalization.ageRanges, id: \.self) { Text($0).tag($0) }
+                        // Optional. Saved with Save, so scrolling through years doesn't save each one on the way
+                        HStack {
+                            Text("Birthday")
+                            Spacer()
+                            if let shown = birthdayDraft ?? Personalization.birthdayDate(birthday) {
+                                DatePicker("Birthday", selection: Binding(get: { shown }, set: { birthdayDraft = $0 }),
+                                           in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                                    .datePickerStyle(.compact)
+                                if birthdayChanged {
+                                    Button("Save", action: saveBirthday)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundColor(Theme.accent)
+                                        .buttonStyle(.borderless)
+                                }
+                            } else {
+                                // An age range chosen in earlier builds shows until a birthday replaces it
+                                Button(ageRange == Personalization.notShared ? "Not shared" : ageRange) {
+                                    birthdayDraft = Calendar.current.date(byAdding: .year, value: -18, to: Date())
+                                }
+                                .foregroundColor(Theme.textSecondary)
+                                .buttonStyle(.borderless)
+                            }
+                            if birthdayDraft != nil || !birthday.isEmpty || ageRange != Personalization.notShared {
+                                Button(action: removeBirthday) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Don't share birthday")
+                            }
+                        }
+                        .alert("You must be 13 or older", isPresented: $birthdayTooYoung) {
+                            Button("OK", role: .cancel) {}
+                        } message: {
+                            Text("The minimum age for CineList is 13, per the Terms of Service. Your birthday wasn't changed.")
                         }
                     }
                 } header: {
@@ -279,7 +317,7 @@ struct UserSettingsView : View {
                     Text(isUnder18
                          ? "AI features aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
                          : aiAllowed
-                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Your age range and pronouns are optional and only go with Discover requests. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
+                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Your birthday and pronouns are optional. Your birthday stays on this iPhone: only the age range it falls in goes with Discover requests, along with your pronouns. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
                          : "Nothing is sent to an AI. Discover uses TMDb's recommendations for films in your lists, and friends can't plan a Movie Night with you.")
                 }
                 .listRowBackground(Theme.surface)
@@ -511,7 +549,34 @@ extension UserSettingsView {
     }
 
     private var isUnder18: Bool {
-        ageRange == Personalization.under18
+        Personalization.ageRange(birthday: birthday, legacy: ageRange) == Personalization.under18
+    }
+
+    private var birthdayChanged: Bool {
+        guard let birthdayDraft else { return false }
+        return Personalization.birthdayString(birthdayDraft) != birthday
+    }
+
+    /// Saves the picked birthday, unless it makes the user younger than the Terms allow, which keeps the
+    /// one before. A birthday replaces an age range chosen in earlier builds
+    private func saveBirthday() {
+        guard let birthdayDraft else { return }
+        self.birthdayDraft = nil
+        guard Personalization.age(on: Date(), bornOn: birthdayDraft) >= Personalization.minimumAge else {
+            birthdayTooYoung = true
+            return
+        }
+        Haptics.success()
+        birthday = Personalization.birthdayString(birthdayDraft)
+        UserDefaults.standard.removeObject(forKey: Personalization.ageRangeKey)
+    }
+
+    /// Stops sharing an age: forgets the birthday, and any age range from earlier builds
+    private func removeBirthday() {
+        Haptics.tap()
+        birthdayDraft = nil
+        birthday = ""
+        UserDefaults.standard.removeObject(forKey: Personalization.ageRangeKey)
     }
 
     private var appearanceFooter: String {

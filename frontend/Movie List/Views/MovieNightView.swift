@@ -386,6 +386,7 @@ struct MovieNightGroupsSection: View {
     @ObservedObject private var social = SocialStore.shared
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.birthdayKey) private var birthday = ""
     @State private var groups: [MovieGroup] = []
     @State private var openGroup: MovieGroup? = nil
     @State private var showNewGroup = false
@@ -486,7 +487,7 @@ struct MovieNightGroupsSection: View {
         }
         .sheet(item: $openGroup, onDismiss: load) { group in
             GroupMovieNightView(group: group,
-                                canUseAI: group.ai_possible && aiAllowed && ageRange != Personalization.under18)
+                                canUseAI: group.ai_possible && aiAllowed && Personalization.ageRange(birthday: birthday, legacy: ageRange) != Personalization.under18)
         }
         .sheet(isPresented: $showNewGroup, onDismiss: load) {
             NewGroupSheet()
