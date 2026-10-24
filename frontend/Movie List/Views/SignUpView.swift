@@ -125,7 +125,7 @@ struct SignUpView: View {
                     .padding(.top, 8)
                     .appearAnimation(delay: 0.25)
 
-                    TermsNotice()
+                    TermsNotice(confirmsAge: true)
                         .appearAnimation(delay: 0.27)
 
                     HStack {
