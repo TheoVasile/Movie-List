@@ -23,6 +23,8 @@ final class NotificationManager: NSObject, ObservableObject {
         case group(id: Int64)
         case lists
         case film(tmdbID: Int64)
+        // Asks which film was just seen at this theatre
+        case theatreVisit(theatre: String)
     }
 
     @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
@@ -181,6 +183,8 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
             case "list_invite":
                 ListSharing.shared.refresh()
                 self.destination = .lists
+            case "theatre_visit":
+                self.destination = .theatreVisit(theatre: info["theatre"] as? String ?? "the theatre")
             default:
                 if let id = (info["tmdb_id"] as? String).flatMap(Int64.init) ?? (info["tmdb_id"] as? Int64) {
                     self.destination = .film(tmdbID: id)

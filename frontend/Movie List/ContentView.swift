@@ -29,6 +29,13 @@ struct ContentView: View {
     enum Tab { case lists, discover, profile }
     // A film opened from a Home Screen widget
     @State private var linkedMovie: CDMovie? = nil
+    // The theatre the user just left, from a check-in notification, while they say what they saw there
+    @State private var theatreVisit: TheatreVisit? = nil
+
+    struct TheatreVisit: Identifiable {
+        let theatre: String
+        let id = UUID()
+    }
 
     // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
     private var discoverIcon: String {
@@ -93,6 +100,11 @@ struct ContentView: View {
         .sheet(item: $linkedMovie) { movie in
             MovieDetailView(movie: movie)
         }
+        .sheet(item: $theatreVisit) { visit in
+            TheatreCheckInSheet(theatre: visit.theatre)
+                .environmentObject(viewModel)
+                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
         .onOpenURL(perform: openLink)
         .onChange(of: notifications.destination) { destination in
             switch destination {
@@ -105,6 +117,8 @@ struct ContentView: View {
                 tab = .lists
             case .film(let tmdbID):
                 if let url = URL(string: "cinelist://film/\(tmdbID)") { openLink(url) }
+            case .theatreVisit(let theatre):
+                theatreVisit = TheatreVisit(theatre: theatre)
             case nil:
                 break
             }

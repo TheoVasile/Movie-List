@@ -47,9 +47,15 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Daylight mode uses your approximate location to switch to the light theme at sunrise and the dark theme at sunset. It stays on this iPhone.</string>
-	<key>NSLocationDefaultAccuracyReduced</key>
-	<true/>
+	<string>Daylight mode uses your approximate location to switch to the light theme at sunrise and the dark theme at sunset. Theatre check-ins use it to notice when you leave a movie theatre, so CineList can ask what you saw. Your location stays on this iPhone.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Theatre check-ins use your location in the background only to notice when you leave a movie theatre after a film, so CineList can ask what you saw. Your location stays on this iPhone and is never sent anywhere.</string>
+	<!-- Region monitoring needs precise location; asked for with requestTemporaryFullAccuracyAuthorization when only approximate is allowed -->
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>TheatreCheckIns</key>
+		<string>Theatre check-ins need your precise location to tell when you're at a movie theatre. It stays on this iPhone.</string>
+	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Movie List connects to its server on your local network to load and save your lists.</string>
 	<key>GIDClientID</key>
