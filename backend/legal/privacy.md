@@ -37,7 +37,8 @@ We store the content you create and the things you do in the App, including:
 - People you follow, people who follow you, follow requests, and people you have blocked
 - Lists you follow, and lists you have invited others to edit or been invited to edit
 - Movie night groups you create or belong to, and the films, reactions and votes in them
-- The Terms of Service version you accepted and when
+- The Terms of Service version you accepted and when, and that you confirmed you are at least 13
+- Reports you make about other users or their content: who and what you reported, the reason you picked and any details you add
 
 ### Your settings
 
@@ -133,6 +134,7 @@ CineList is a social app, so some of your information is visible to other users:
 - People who follow you may see your watched films, rankings, notes on films, and recent activity, such as films you have added or watched
 - People you send recommendations to see the film and any message you add, and the people in your movie night groups and shared lists see your suggestions, reactions, votes and edits
 - Notifications to your friends may include your name or @username and the film involved
+- If you report someone, we do not tell them who reported them
 
 Blocking someone stops them from following you and seeing your profile and lists. Remember that anything you share with others can be copied or passed on by them.
 
@@ -188,6 +190,7 @@ We keep your information for as long as your account exists, because we need it 
 - Your phone number is kept until you remove it or delete your account
 - Notification tokens are removed when you sign out, when your account is deleted, or when they stop working
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
+- Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
 - Daily AI usage counts are kept in memory only and are reset at least daily
 - Server logs are kept by our hosting providers for a limited time, usually no more than a few weeks
 - Emails you send us are kept as long as needed to deal with your request and any follow-up
@@ -196,12 +199,13 @@ When you delete your account, we delete your information as described in Section
 
 ## 13. Deleting Your Account
 
-You can permanently delete your account at any time in Settings by tapping **Deactivate Account**. When you do:
+You can permanently delete your account at any time in Settings by tapping **Delete Account**. For your security, you first confirm it is you by entering your password or signing in with Google again, and our servers only accept a deletion request made shortly after that. Your account is then deleted in a single step on our servers:
 
-- Your account, profile, photo, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, blocks, recommendations you have sent and received, notification tokens and settings are deleted from our database
-- Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to
-- Your sign-in account with Google Firebase is deleted
-- Films you added to someone else's shared list, and films you suggested in a group you did not own, may remain there without your name
+- Your account, profile, photo, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
+- Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to, along with your votes and reactions in them
+- Your sign-in account with Google Firebase is deleted at the same time. If that fails, nothing is deleted and you can try again
+- Films you added to someone else's shared list, and films you suggested in a group you did not own, stay there without your name
+- The App signs you out and removes what it kept on your iPhone for your account, such as your lists, Discover history and preferences, AI and personalization settings (including any age range and pronouns), Theatre Check-ins and notification settings. Device-wide preferences, such as appearance, are kept
 
 Deleted information may remain in encrypted backups for a limited period until they are overwritten. Deleting the App from your iPhone does not delete your account. You can also ask us to delete your account by emailing {{CONTACT_EMAIL}} from the email address on your account.
 
@@ -252,7 +256,7 @@ If we decline your request, we will explain why. Where the law allows, you can a
 
 ## 15. Children
 
-CineList is not intended for children under 13, and you must be at least 13 to create an account. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has created an account, we will delete it and its information. If you believe a child under 13 has given us personal information, please contact us at {{CONTACT_EMAIL}}.
+CineList is not intended for children under 13, and you must be at least 13 to create an account. When you sign up, and whenever you accept the Terms of Service, you confirm that you are at least 13. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has created an account, we will delete it and its information. If you believe a child under 13 has given us personal information, please contact us at {{CONTACT_EMAIL}}.
 
 If you are under the age at which you can consent to the processing of your personal information where you live, you may only use the App with the consent of a parent or guardian. AI features are not available to users who tell us they are under 18.
 
