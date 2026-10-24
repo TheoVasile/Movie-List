@@ -123,6 +123,23 @@ struct LetterboxdImportRequest: Encodable {
     let lists: [LetterboxdList]
 }
 
+struct SpreadsheetImportRequest: Encodable {
+    // nil makes a new list called name
+    let list_id: Int64?
+    let name: String?
+    let films: [SpreadsheetFilm]
+}
+
+/// What happened to one batch of spreadsheet films
+struct SpreadsheetImportResponse: Decodable {
+    let list_id: Int64
+    let added: Int
+    // Matched films the list already had, which stay where they were
+    let already_in_list: Int
+    // Films that couldn't be matched to TMDb, as "Title (Year)"
+    let skipped: [String]
+}
+
 struct AIDiscoverRequest: Encodable {
     struct Film: Encodable {
         let title: String
@@ -604,6 +621,36 @@ class APIService {
                     completion(.failure(error))
                 }
             }
+        }
+    }
+
+    /// Adds one batch of spreadsheet films to the bottom of a list: an existing one by listID, or a new one called
+    /// name, whose id comes back for the batches after it. Calls back on the main thread
+    func importSpreadsheetFilms(listID: Int64?, name: String?, films: [SpreadsheetFilm], completion: @escaping (Result<SpreadsheetImportResponse, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/import/films") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Every film is matched against TMDb on the server
+        request.timeoutInterval = 180
+
+        do {
+            request.httpBody = try JSONEncoder().encode(SpreadsheetImportRequest(list_id: listID, name: name, films: films))
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        send(request) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result: Result<SpreadsheetImportResponse, Error>
+            if let data, (200...299).contains(status), let decoded = try? JSONDecoder().decode(SpreadsheetImportResponse.self, from: data) {
+                result = .success(decoded)
+            } else {
+                result = .failure(error ?? NSError(domain: "Import failed", code: status, userInfo: nil))
+            }
+            DispatchQueue.main.async { completion(result) }
         }
     }
 

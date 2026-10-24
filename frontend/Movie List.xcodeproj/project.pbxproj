@@ -52,7 +52,8 @@
 		FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA10A9E1296A755800FDF445 /* ContentView.swift */; };
 		FA10A9E4296A755900FDF445 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA10A9E3296A755900FDF445 /* Assets.xcassets */; };
 		FA10A9E7296A755900FDF445 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA10A9E6296A755900FDF445 /* Preview Assets.xcassets */; };
-		FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */; };
+		FA16136D2D6C394400CD99D0 /* ExcelImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA16136C2D6C394400CD99D0 /* ExcelImportView.swift */; };
+		FA1613E22D6C394400CD99D0 /* SpreadsheetImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */; };
 		FA1613702D6C3A1400CD99D0 /* CoreXLSX in Frameworks */ = {isa = PBXBuildFile; productRef = FA16136F2D6C3A1400CD99D0 /* CoreXLSX */; };
 		FA1613722D6C3C5B00CD99D0 /* Movies.xlsx in Resources */ = {isa = PBXBuildFile; fileRef = FA1613712D6C3C5B00CD99D0 /* Movies.xlsx */; };
 		FA2609A22D599679000A692D /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2609A12D599679000A692D /* APIService.swift */; };
@@ -174,7 +175,8 @@
 		FA10A9E1296A755800FDF445 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FA10A9E3296A755900FDF445 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FA10A9E6296A755900FDF445 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelFilePickerView.swift; sourceTree = "<group>"; };
+		FA16136C2D6C394400CD99D0 /* ExcelImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExcelImportView.swift; sourceTree = "<group>"; };
+		FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpreadsheetImport.swift; sourceTree = "<group>"; };
 		FA1613712D6C3C5B00CD99D0 /* Movies.xlsx */ = {isa = PBXFileReference; lastKnownFileType = file; path = Movies.xlsx; sourceTree = "<group>"; };
 		FA2609A12D599679000A692D /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		02462785648178177F4101D5 /* ContactsFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsFinder.swift; sourceTree = "<group>"; };
@@ -308,6 +310,7 @@
 				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				A11A7C5E2F00000000000001 /* Analytics.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
+				FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -346,7 +349,7 @@
 				FA096BC02D5D5D5E004FDFE8 /* SetRankView.swift */,
 				FA096BC22D5D97C3004FDFE8 /* UserSettingsView.swift */,
 				136D73C186092B82C1D05137 /* StreamingServicesView.swift */,
-				FA16136C2D6C394400CD99D0 /* ExcelFilePickerView.swift */,
+				FA16136C2D6C394400CD99D0 /* ExcelImportView.swift */,
 				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
 				7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */,
 				FA7E5A012F000000000000A3 /* TheatreCheckInSheet.swift */,
@@ -534,7 +537,8 @@
 				FA10A9E2296A755800FDF445 /* ContentView.swift in Sources */,
 				FA096BC32D5D97C3004FDFE8 /* UserSettingsView.swift in Sources */,
 				B696E18D05D767827A57F334 /* StreamingServicesView.swift in Sources */,
-				FA16136D2D6C394400CD99D0 /* ExcelFilePickerView.swift in Sources */,
+				FA16136D2D6C394400CD99D0 /* ExcelImportView.swift in Sources */,
+				FA1613E22D6C394400CD99D0 /* SpreadsheetImport.swift in Sources */,
 				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
 				7E2A5C1D9B3F4E6A8C0D2F12 /* TermsOfServiceView.swift in Sources */,
 				FA7E5A012F000000000000A4 /* TheatreCheckInSheet.swift in Sources */,
