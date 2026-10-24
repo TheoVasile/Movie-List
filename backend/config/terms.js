@@ -3,8 +3,8 @@ const path = require("path");
 
 // The Terms of Service everyone has to accept. Bump the version when the Terms change materially, so everyone
 // is asked to accept them again
-const TERMS_VERSION = "2026-10-23";
-const TERMS_UPDATED = "October 23, 2026";
+const TERMS_VERSION = "2026-10-24";
+const TERMS_UPDATED = "October 24, 2026";
 
 // Filled into the Terms text; TERMS_COMPANY_NAME and TERMS_CONTACT_EMAIL override them
 const COMPANY_NAME = "Blended Bits";
