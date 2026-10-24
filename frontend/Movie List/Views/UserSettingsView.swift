@@ -614,11 +614,9 @@ extension UserSettingsView {
         }
         if editingBirthday {
             VStack(spacing: 8) {
-                // Starts 18 years back when there's no birthday yet; nothing is saved until the wheel is turned
-                DatePicker("Birthday", selection: Binding(get: {
-                    birthdayDraft ?? Personalization.birthdayDate(birthday)
-                        ?? Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
-                }, set: { birthdayDraft = $0 }), in: ...Date(), displayedComponents: .date)
+                // Starts 18 years back when there's no birthday yet
+                DatePicker("Birthday", selection: Binding(get: { birthdayOnWheel }, set: { birthdayDraft = $0 }),
+                           in: ...Date(), displayedComponents: .date)
                     .labelsHidden()
                     .datePickerStyle(.wheel)
                     .tint(Theme.accent)
@@ -629,7 +627,11 @@ extension UserSettingsView {
                             .font(.subheadline)
                     }
                     Spacer()
-                    Button("Done", action: toggleBirthdayPicker)
+                    // Saves the date on the wheel even if it wasn't turned; tapping the row instead closes it unsaved
+                    Button("Done") {
+                        birthdayDraft = birthdayOnWheel
+                        toggleBirthdayPicker()
+                    }
                         .font(.body.weight(.semibold))
                         .foregroundColor(Theme.accent)
                 }
@@ -642,6 +644,12 @@ extension UserSettingsView {
                 .font(.footnote)
                 .foregroundColor(Theme.accentSecondary)
         }
+    }
+
+    /// The date the birthday wheel shows: the one being picked, the saved one, or 18 years back
+    private var birthdayOnWheel: Date {
+        birthdayDraft ?? Personalization.birthdayDate(birthday)
+            ?? Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
     }
 
     /// Opens the birthday wheel, or closes it and saves the date if it was changed
