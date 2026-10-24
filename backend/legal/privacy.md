@@ -17,7 +17,7 @@ This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects
 
 ### Your account
 
-When you create an account, we collect your **email address** and a **password**. Sign-in is handled by Google Firebase Authentication, which stores your password in a protected (hashed) form. We never see or store your password ourselves. If you sign in with Google, Google shares your name and email address with us so we can set up your account.
+When you create an account, we collect your **email address** and a **password**. Sign-in is handled by Google Firebase Authentication, which stores your password in a protected (hashed) form. We never see or store your password ourselves. If you sign in with Google, Google shares your name and email address with us so we can set up your account. If you sign in with Apple, Apple shares your name (the first time you sign in, and only if you choose to share it) and either your email address or, if you choose Hide My Email, a private relay address that forwards to your email. We use it in the same way as an email address you give us, and we never see your real address unless you share it.
 
 ### Your profile
 
@@ -167,11 +167,11 @@ We do not sell your personal information, and we do not share it for cross-conte
 
 We use trusted companies to run the App. They process personal information on our behalf and only for the purposes we set:
 
-- **Google Firebase** (Google LLC), for sign-in, phone number verification, push notifications and usage analytics (Google Analytics for Firebase, described in Section 3)
+- **Google Firebase** (Google LLC), for sign-in (including Sign in with Google and Sign in with Apple), phone number verification, push notifications and usage analytics (Google Analytics for Firebase, described in Section 3)
 - **Render** (Render Services, Inc.), which hosts our servers
 - **Supabase** (Supabase, Inc.), which hosts our database
 - **Anthropic** (Anthropic, PBC), which provides the AI model behind the optional AI features
-- **Apple**, which delivers push notifications to your iPhone and provides Apple Maps searches for Theatre Check-ins
+- **Apple**, which provides Sign in with Apple if you choose to use it, delivers push notifications to your iPhone and provides Apple Maps searches for Theatre Check-ins
 
 ### Content providers
 
@@ -222,11 +222,12 @@ When you delete your account, we delete your information as described in Section
 
 ## 13. Deleting Your Account
 
-You can permanently delete your account at any time in Settings by tapping **Delete Account**. For your security, you first confirm it is you by entering your password or signing in with Google again, and our servers only accept a deletion request made shortly after that. Your account is then deleted in a single step on our servers:
+You can permanently delete your account at any time in Settings by tapping **Delete Account**. For your security, you first confirm it is you by entering your password or signing in with Google or Apple again, and our servers only accept a deletion request made shortly after that. Your account is then deleted in a single step on our servers:
 
 - Your account, profile, photo, birthday, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
 - Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to, along with your votes and reactions in them
 - Your sign-in account with Google Firebase is deleted at the same time. If that fails, nothing is deleted and you can try again
+- If you signed in with Apple, the App also asks Apple to revoke Marquee's access to your Apple ID before your account is deleted, so Marquee no longer appears in your Apple ID's list of apps using Sign in with Apple
 - Films you added to someone else's shared list, and films you suggested in a group you did not own, stay there without your name
 - The App signs you out and removes what it kept on your iPhone for your account, such as your lists, Discover history and preferences, AI and personalization settings (including any birthday, age range and pronouns), Theatre Check-ins and notification settings. Device-wide preferences, such as appearance, are kept
 

@@ -10,6 +10,8 @@ import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
 import GoogleSignInSwift
+import AuthenticationServices
+import CryptoKit
 import CoreData
 import WidgetKit
 
@@ -37,6 +39,8 @@ class AuthenticationViewModel: ObservableObject {
   @Published var errorMessage: String = ""
   @Published var user: User?
   @Published var displayName: String = ""
+  // The nonce for the Apple sign-in in progress, whose hash went to Apple
+  var appleNonce: String?
 
   init() {
     registerAuthStateHandler()
@@ -58,7 +62,8 @@ class AuthenticationViewModel: ObservableObject {
       authStateHandler = Auth.auth().addStateDidChangeListener { auth, user in
         self.user = user
         self.authenticationState = user == nil ? .unauthenticated : .authenticated
-        self.displayName = user?.email ?? ""
+        // An Apple Hide My Email address means nothing to them, so their name is shown instead
+        self.displayName = self.shownEmail ?? user?.displayName ?? ""
       }
     }
   }
@@ -202,20 +207,38 @@ extension AuthenticationViewModel {
     }
   }
 
-  /// Whether the account has a password, so deleting it is confirmed with that rather than with Google
+  /// Whether the account has a password, so deleting it is confirmed with that rather than with Google or Apple
   var signsInWithPassword: Bool {
     user?.providerData.contains { $0.providerID == EmailAuthProviderID } ?? false
   }
 
+  /// Whether the account signs in with Apple, so deleting it is confirmed with Apple and its access revoked
+  var signsInWithApple: Bool {
+    user?.providerData.contains { $0.providerID == "apple.com" } ?? false
+  }
+
+  /// The account's email to show, or nil when there's none or it's an Apple Hide My Email address, which means
+  /// nothing to the user
+  var shownEmail: String? {
+    guard let email = user?.email, !email.isEmpty, !email.hasSuffix("@privaterelay.appleid.com") else { return nil }
+    return email
+  }
+
   /// Permanently deletes the account. The user confirms it's them first, with their password or (when password is
-  /// nil) their Google account, since the server only deletes accounts signed in to in the last few minutes. The
-  /// server then deletes their data and their sign-in in one go, so neither is left without the other
+  /// nil) their Apple or Google account, since the server only deletes accounts signed in to in the last few
+  /// minutes. The server then deletes their data and their sign-in in one go, so neither is left without the other
   func deleteAccount(password: String?) async -> AccountDeletionResult {
     guard let current = Auth.auth().currentUser else { return .failed("You're not signed in.") }
+    // Apple's one-time code from signing in again, used to revoke Marquee's access to the Apple ID
+    var appleAuthorizationCode: String? = nil
     do {
       let credential: AuthCredential
       if let password {
         credential = EmailAuthProvider.credential(withEmail: current.email ?? "", password: password)
+      } else if signsInWithApple {
+        let apple = try await AppleSignIn().signIn()
+        credential = try appleCredential(from: apple.credential, nonce: apple.nonce)
+        appleAuthorizationCode = apple.credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
       } else {
         credential = try await googleCredential()
       }
@@ -223,17 +246,30 @@ extension AuthenticationViewModel {
     }
     catch {
       if let error = error as? GIDSignInError, error.code == .canceled { return .cancelled }
+      if let error = error as? ASAuthorizationError, error.code == .canceled { return .cancelled }
       switch AuthErrorCode(rawValue: (error as NSError).code) {
       case .wrongPassword, .invalidCredential:
         return .failed("That password isn't right.")
       case .userMismatch:
-        return .failed("That's a different Google account. Choose the one you use for Marquee.")
+        return .failed(signsInWithApple
+                       ? "That's a different Apple ID. Use the one you use for Marquee."
+                       : "That's a different Google account. Choose the one you use for Marquee.")
       case .networkError:
         return .failed("Couldn't reach the server. Check your connection and try again.")
       case .tooManyRequests:
         return .failed("Too many attempts. Wait a few minutes and try again.")
       default:
         return .failed(error.localizedDescription)
+      }
+    }
+    // Apple requires apps to revoke their access when an account made with Sign in with Apple is deleted. Done
+    // first, so if it fails nothing is deleted and they can try again
+    if let appleAuthorizationCode {
+      do {
+        try await Auth.auth().revokeToken(withAuthorizationCode: appleAuthorizationCode)
+      } catch {
+        print(error)
+        return .failed("Couldn't disconnect Marquee from your Apple ID. Check your connection and try again.")
       }
     }
     let message = await withCheckedContinuation { continuation in
@@ -284,7 +320,7 @@ extension AuthenticationViewModel {
 
 enum AccountDeletionResult {
   case deleted
-  // They closed Google sign-in without confirming
+  // They closed Google or Apple sign-in without confirming
   case cancelled
   case failed(String)
 }
@@ -346,5 +382,133 @@ extension AuthenticationViewModel {
         self.errorMessage = error.localizedDescription
         return false
       }
+  }
+}
+
+// MARK: - Sign in with Apple
+
+extension AuthenticationViewModel {
+  /// A random nonce for Sign in with Apple. Apple gets its SHA-256 hash and Firebase gets it as is, which proves
+  /// the ID token was made for this sign-in
+  static func randomNonce(length: Int = 32) -> String {
+    let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+    var generator = SystemRandomNumberGenerator()
+    return String((0..<length).map { _ in charset.randomElement(using: &generator)! })
+  }
+
+  static func sha256(_ input: String) -> String {
+    SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// Sets up the request from SignInWithAppleButton: the name and email, and the hash of a new nonce kept for the
+  /// reply
+  func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+    let nonce = Self.randomNonce()
+    appleNonce = nonce
+    request.requestedScopes = [.fullName, .email]
+    request.nonce = Self.sha256(nonce)
+  }
+
+  /// A Firebase credential for an Apple sign-in. Apple only gives the name the first time, so it's passed on
+  private func appleCredential(from apple: ASAuthorizationAppleIDCredential, nonce: String) throws -> AuthCredential {
+    guard let tokenData = apple.identityToken, let idToken = String(data: tokenData, encoding: .utf8) else {
+      throw AuthenticationError.tokenError(message: "Apple didn't send an ID token. Try again.")
+    }
+    return OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: apple.fullName)
+  }
+
+  /// Finishes signing in with Apple from SignInWithAppleButton. Closing Apple's sheet isn't an error, so that
+  /// returns false and leaves errorMessage empty
+  func signInWithApple(_ result: Result<ASAuthorization, Error>) async -> Bool {
+    errorMessage = ""
+    let nonce = appleNonce
+    appleNonce = nil
+    do {
+      let authorization = try result.get()
+      guard let apple = authorization.credential as? ASAuthorizationAppleIDCredential, let nonce else {
+        throw AuthenticationError.tokenError(message: "Apple sign-in didn't finish. Try again.")
+      }
+      let credential = try appleCredential(from: apple, nonce: nonce)
+      let result = try await Auth.auth().signIn(with: credential)
+      let firebaseUser = result.user
+      // Apple shares the name only on the first sign-in; it becomes the name shown on Home, Profile and to friends
+      let fullName = apple.fullName
+        .map { PersonNameComponentsFormatter.localizedString(from: $0, style: .default) }?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      if !fullName.isEmpty, (firebaseUser.displayName ?? "").isEmpty {
+        let change = firebaseUser.createProfileChangeRequest()
+        change.displayName = fullName
+        try? await change.commitChanges()
+        self.user = Auth.auth().currentUser
+      }
+      // Signing in with Apple for the first time creates the account
+      if result.additionalUserInfo?.isNewUser == true {
+        AppAnalytics.log(.signUp(.apple))
+      }
+      let name = Auth.auth().currentUser?.displayName ?? ""
+      APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email",
+                                   name: name.isEmpty ? "no name" : name) { result in
+        if case .failure(let error) = result { print(error.localizedDescription) }
+        // New Apple accounts have no username yet, which the app asks for once this has loaded
+        SocialStore.shared.load()
+      }
+      PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.uid)
+      return true
+    }
+    catch {
+      if let error = error as? ASAuthorizationError, error.code == .canceled { return false }
+      print(error)
+      if case AuthenticationError.tokenError(let message) = error {
+        errorMessage = message
+      } else {
+        errorMessage = error.localizedDescription
+      }
+      return false
+    }
+  }
+}
+
+/// Runs Sign in with Apple without its button, to confirm it's them before deleting the account. Gives back
+/// Apple's credential and the nonce its token was made with
+final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+  private var continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>?
+  private var anchor = ASPresentationAnchor()
+
+  @MainActor
+  func signIn() async throws -> (credential: ASAuthorizationAppleIDCredential, nonce: String) {
+    // Apple's sheet goes over the key window, which Settings is presented in
+    let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+    if let window = scene?.windows.first(where: \.isKeyWindow) ?? scene?.windows.first { anchor = window }
+    let nonce = AuthenticationViewModel.randomNonce()
+    let request = ASAuthorizationAppleIDProvider().createRequest()
+    request.nonce = AuthenticationViewModel.sha256(nonce)
+    let controller = ASAuthorizationController(authorizationRequests: [request])
+    controller.delegate = self
+    controller.presentationContextProvider = self
+    // The controller only holds its delegate weakly; this object stays alive here until Apple replies
+    let credential = try await withCheckedThrowingContinuation { continuation in
+      self.continuation = continuation
+      controller.performRequests()
+    }
+    return (credential, nonce)
+  }
+
+  func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    anchor
+  }
+
+  func authorizationController(controller: ASAuthorizationController,
+                               didCompleteWithAuthorization authorization: ASAuthorization) {
+    if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+      continuation?.resume(returning: credential)
+    } else {
+      continuation?.resume(throwing: AuthenticationError.tokenError(message: "Apple sign-in didn't finish. Try again."))
+    }
+    continuation = nil
+  }
+
+  func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    continuation?.resume(throwing: error)
+    continuation = nil
   }
 }

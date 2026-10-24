@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import AuthenticationServices
 
 struct SignUpView: View {
     @State private var email: String = ""
@@ -20,7 +21,10 @@ struct SignUpView: View {
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
     @Environment(\.dismiss) var dismiss
     @State var invalidCredentials: Bool = false
-    
+    @State private var signingInWithApple = false
+    // Why Apple sign-in failed; nothing when they closed Apple's sheet
+    @State private var appleError: String? = nil
+
     private var cleanedHandle: String {
         handle.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: "@", with: "")
     }
@@ -70,6 +74,19 @@ struct SignUpView: View {
         }
     }
     
+    private func signUpWithApple(_ result: Result<ASAuthorization, Error>) {
+        signingInWithApple = true
+        appleError = nil
+        Task {
+            defer { signingInWithApple = false }
+            if await authenticationViewModel.signInWithApple(result) {
+                dismiss()
+            } else if !authenticationViewModel.errorMessage.isEmpty {
+                appleError = authenticationViewModel.errorMessage
+            }
+        }
+    }
+
     var body: some View {
         ZStack{
             AuthBackground()
@@ -125,6 +142,26 @@ struct SignUpView: View {
                     .padding(.top, 8)
                     .appearAnimation(delay: 0.25)
 
+                    HStack {
+                        Rectangle().fill(Theme.stroke).frame(height: 1)
+                        Text("or")
+                            .font(.footnote)
+                            .foregroundColor(Theme.textTertiary)
+                        Rectangle().fill(Theme.stroke).frame(height: 1)
+                    }
+                    .padding(.vertical, 6)
+
+                    if let appleError {
+                        Label(appleError, systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(Theme.accentSecondary)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    // Apple gives the name; the username is asked for once the account is made
+                    AppleSignInButton(label: .signUp, isWorking: signingInWithApple, onCompletion: signUpWithApple)
+                        .appearAnimation(delay: 0.26)
+
                     TermsNotice(confirmsAge: true)
                         .appearAnimation(delay: 0.27)
 
@@ -141,7 +178,10 @@ struct SignUpView: View {
                 }
                 .padding(24)
                 .padding(.top, 20)
+                // Nothing else can be tapped while Apple sign-in finishes
+                .disabled(signingInWithApple)
                 .animation(Theme.spring, value: invalidCredentials)
+                .animation(Theme.spring, value: appleError)
             }
         }
         .navigationBarBackButtonHidden(true)

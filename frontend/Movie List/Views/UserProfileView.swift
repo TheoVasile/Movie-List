@@ -123,7 +123,8 @@ struct UserProfileView: View {
                     Text(profile.handle.map { "@\($0)" } ?? viewModel.user?.displayName ?? "No Name")
                         .font(.title2.weight(.heavy))
                         .foregroundColor(Theme.textPrimary)
-                    Text(profile.handle == nil ? viewModel.user?.email ?? "" : viewModel.user?.displayName ?? "")
+                    // An Apple Hide My Email address isn't shown, since it means nothing to them
+                    Text(profile.handle == nil ? viewModel.shownEmail ?? "" : viewModel.user?.displayName ?? "")
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                     if profile.handle != nil {

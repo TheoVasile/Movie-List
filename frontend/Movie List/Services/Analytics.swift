@@ -24,7 +24,7 @@ enum AppAnalytics {
         Analytics.setAnalyticsCollectionEnabled(isEnabled)
     }
 
-    enum SignUpMethod: String { case email, google }
+    enum SignUpMethod: String { case email, google, apple }
     enum FilmSource: String {
         case search, discover, otherList = "other_list", friend, recommendation, collection
         case movieNight = "movie_night", checkIn = "check_in"
