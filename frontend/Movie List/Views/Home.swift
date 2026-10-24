@@ -25,8 +25,10 @@ struct Home: View {
     @State private var editingList: CDMovieList? = nil
     // The list whose contributors are being changed
     @State private var sharingList: CDMovieList? = nil
-    // The list waiting for the user to confirm deleting or leaving it
-    @State private var removingList: CDMovieList? = nil
+    // A list deleted or left from Edit List, taken off the phone once that sheet has closed
+    @State private var removedList: CDMovieList? = nil
+    // The list opened by Reorder in a card's menu, which starts out reordering
+    @State private var reorderingList: CDMovieList? = nil
     // A new list's visibility and the people (by @handle) who'll edit it with the user
     @State private var newListVisibility = ListVisibility.public
     @State private var newListRanked = true
@@ -263,65 +265,50 @@ private extension Home {
                 }
             }
         }
-        .confirmationDialog(
-            removingList.map { ListSharing.shared.isOwner($0.id) ? "Delete \($0.name ?? "List")?" : "Leave \($0.name ?? "List")?" } ?? "",
-            isPresented: Binding(get: { removingList != nil }, set: { if !$0 { removingList = nil } }),
-            titleVisibility: .visible,
-            presenting: removingList
-        ) { list in
-            if ListSharing.shared.isOwner(list.id) {
-                Button("Delete List", role: .destructive) { deleteList(list) }
-            } else {
-                Button("Leave List", role: .destructive) { leaveList(list) }
+        // Reorder in a card's menu opens the list ready to drag its films
+        .navigationDestination(isPresented: Binding(get: { reorderingList != nil }, set: { if !$0 { reorderingList = nil } })) {
+            if let reorderingList {
+                ListView(movieList: reorderingList, context: context, startsReordering: true)
+                    .environmentObject(NetworkService())
+                    .environmentObject(DatabaseService())
             }
-        } message: { list in
-            Text(ListSharing.shared.isOwner(list.id)
-                 ? "Its films and ranks are deleted too."
-                 : "You'll stop seeing this list. The films you added stay in it.")
         }
-        .sheet(item: $editingList) { movieList in
-            EditListSheet(movieList: movieList)
+        .sheet(item: $editingList, onDismiss: removeDeletedList) { movieList in
+            EditListSheet(movieList: movieList) { removedList = movieList }
         }
         .sheet(item: $sharingList) { movieList in
-            ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List")
-                .presentationDetents([.medium, .large])
+            ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List") {
+                removedList = movieList
+                removeDeletedList()
+            }
+            .presentationDetents([.medium, .large])
         }
     }
 
-    // A list card's actions, from its ••• or a long press. Someone else's list the user was invited to edit can only be left
-    @ViewBuilder
+    // A list card's actions, from its ••• or a long press: the same three as the ••• inside the list
     func listMenuItems(_ movieList: CDMovieList) -> some View {
-        if ListSharing.shared.isOwner(movieList.id) {
-            Button {
-                editingList = movieList
-            } label: {
-                Label("Edit List", systemImage: "pencil")
-            }
-            Button {
-                sharingList = movieList
-            } label: {
-                Label(ListSharing.shared.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
-            }
-            Divider()
-            Button(role: .destructive) {
-                removingList = movieList
-            } label: {
-                Label("Delete List", systemImage: "trash")
-            }
-        } else {
-            Button {
-                sharingList = movieList
-            } label: {
-                Label("Who Can Edit", systemImage: "person.2")
-            }
-            Divider()
-            Button(role: .destructive) {
-                removingList = movieList
-            } label: {
-                Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
-            }
+        ListMenuItems(
+            listID: movieList.id,
+            canReorder: movieList.movies.count > 1,
+            onEdit: { editingList = movieList },
+            onAddContributor: { sharingList = movieList },
+            onReorder: { reorderingList = movieList }
+        )
+    }
+
+    /// Takes a list that was just deleted or left off the phone
+    func removeDeletedList() {
+        guard let list = removedList else { return }
+        removedList = nil
+        withAnimation(Theme.spring) {
+            CDMovieList.delete(movieList: list)
+        }
+        // Everyone else's view of who's on it is now out of date
+        if ListSharing.shared.isShared(list.id) {
+            ListSharing.shared.refresh()
         }
     }
+
 
     func addNewList() {
         let name = listName.trimmingCharacters(in: .whitespaces)
@@ -385,33 +372,6 @@ private extension Home {
         }
     }
 
-    func leaveList(_ list: CDMovieList) {
-        APIService.shared.removeListEditor(listID: list.id) { ok in
-            guard ok else { return }
-            withAnimation(Theme.spring) {
-                CDMovieList.delete(movieList: list)
-            }
-            ListSharing.shared.refresh()
-        }
-    }
-
-    func deleteList(_ deleteItem: CDMovieList) {
-        APIService.shared.deleteList(listID: deleteItem.id) { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let serverList):
-                    print("List synced to backend:", serverList)
-                    withAnimation(Theme.spring) {
-                        CDMovieList.delete(movieList: deleteItem)
-                    }
-
-                case .failure(let error):
-                    print("Backend request failed", error.localizedDescription)
-                }
-            }
-        }
-    }
-    
     var newListSheet: some View {
         NavigationStack {
             Form {
@@ -475,7 +435,7 @@ private extension Home {
                 } header: {
                     Text("Contributors (Optional)")
                 } footer: {
-                    Text("Contributors can add, rank and remove films with you. You can add more later from the list's share menu.")
+                    Text("Contributors can add, rank and remove films with you. You can add more later from the list's ••• menu.")
                 }
                 .listRowBackground(Theme.surface)
             }
@@ -599,20 +559,29 @@ private struct ListCard: View {
 
 // MARK: - Edit list
 
-/// Renames a list and edits its description, saving to the server first so the two never disagree
+/// Renames a list and edits its description, saving to the server first so the two never disagree. Deleting the list
+/// is at the bottom. Someone else's list the user was invited to edit is read-only here, with a way to leave it
 struct EditListSheet: View {
     @ObservedObject var movieList: CDMovieList
+    // Called once the list has been deleted or left, as this sheet closes
+    var onRemoved: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @Environment(\.managedObjectContext) private var context
+    @ObservedObject private var sharing = ListSharing.shared
     @State private var name: String
     @State private var overview: String
     @State private var visibility: ListVisibility
     @State private var ranked: Bool
     @State private var isSaving = false
     @State private var saveFailed = false
+    // Deleting the list (the owner) or leaving it (a contributor): asking first, the request, and why it failed
+    @State private var confirmingRemove = false
+    @State private var isRemoving = false
+    @State private var removeFailed: String? = nil
 
-    init(movieList: CDMovieList) {
+    init(movieList: CDMovieList, onRemoved: @escaping () -> Void = {}) {
         self.movieList = movieList
+        self.onRemoved = onRemoved
         _name = State(initialValue: movieList.name ?? "")
         _overview = State(initialValue: movieList.overview ?? "")
         _visibility = State(initialValue: ListVisibility.of(movieList.id))
@@ -625,6 +594,11 @@ struct EditListSheet: View {
 
     private var isPrivateProfile: Bool { SocialStore.shared.profile?.is_private == true }
 
+    // Only the owner can rename a shared list, change who can see it or delete it
+    private var isOwner: Bool { sharing.isOwner(movieList.id) }
+
+    private var listTitle: String { movieList.name ?? "List" }
+
     private var hasChanges: Bool {
         trimmedName != (movieList.name ?? "") || overview != (movieList.overview ?? "") || visibility != ListVisibility.of(movieList.id)
             || ranked != ListRanking.isRanked(movieList.id)
@@ -633,57 +607,55 @@ struct EditListSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Name") {
-                    TextField("List name", text: $name)
-                        .disableAutocorrection(true)
+                if isOwner {
+                    ownerSections
+                } else {
+                    memberSections
                 }
-                .listRowBackground(Theme.surface)
                 Section {
-                    TextField("What's this list about?", text: $overview, axis: .vertical)
-                        .lineLimit(3...8)
-                } header: {
-                    Text("Description")
-                } footer: {
-                    Text("Optional. Shown at the top of the list.")
-                }
-                .listRowBackground(Theme.surface)
-                Section {
-                    Toggle("Ranked", isOn: $ranked)
-                        .tint(Theme.accent)
-                } footer: {
-                    Text(ranked
-                         ? "Films are ranked best first."
-                         : "Films are in no particular order. New ones go on the end, and the order isn't treated as a ranking.")
-                }
-                .listRowBackground(Theme.surface)
-                Section {
-                    Picker("Who Can See It", selection: $visibility) {
-                        ForEach(ListVisibility.options(isPrivate: isPrivateProfile)) { option in
-                            Label(option.title(isPrivate: isPrivateProfile), systemImage: option.icon).tag(option)
+                    Button(role: .destructive) {
+                        confirmingRemove = true
+                    } label: {
+                        HStack {
+                            Text(isOwner ? "Delete List" : "Leave List")
+                            Spacer()
+                            if isRemoving {
+                                ProgressView()
+                            }
                         }
                     }
-                } header: {
-                    Text("Visibility")
                 } footer: {
-                    Text(visibility.explanation(isPrivate: isPrivateProfile))
+                    Text(isOwner
+                         ? (sharing.isShared(movieList.id) ? "It's deleted for everyone on it, along with its films and ranks." : "Its films and ranks are deleted too.")
+                         : "You'll stop seeing this list. The films you added stay in it.")
                 }
                 .listRowBackground(Theme.surface)
             }
+            .disabled(isSaving || isRemoving)
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
-            .navigationTitle("Edit List")
+            .navigationTitle(isOwner ? "Edit List" : "List Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if isSaving {
-                        ProgressView()
-                    } else {
-                        Button("Save") { save() }
+                if isOwner {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .disabled(isRemoving)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Button("Save") { save() }
+                                .bold()
+                                .disabled(trimmedName.isEmpty || trimmedName.count > 100 || !hasChanges || isRemoving)
+                        }
+                    }
+                } else {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
                             .bold()
-                            .disabled(trimmedName.isEmpty || trimmedName.count > 100 || !hasChanges)
+                            .disabled(isRemoving)
                     }
                 }
             }
@@ -692,8 +664,82 @@ struct EditListSheet: View {
             } message: {
                 Text("Check your connection and try again.")
             }
+            .alert("Couldn't do that", isPresented: Binding(get: { removeFailed != nil }, set: { if !$0 { removeFailed = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removeFailed ?? "")
+            }
+            .confirmationDialog(isOwner ? "Delete \(listTitle)?" : "Leave \(listTitle)?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+                Button(isOwner ? "Delete List" : "Leave List", role: .destructive, action: remove)
+            } message: {
+                Text(isOwner
+                     ? (sharing.isShared(movieList.id) ? "It's deleted for everyone on it, along with its films and ranks." : "Its films and ranks are deleted too.")
+                     : "You'll stop seeing this list. The films you added stay in it.")
+            }
         }
         .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(isSaving || isRemoving)
+    }
+
+    @ViewBuilder
+    private var ownerSections: some View {
+        Section("Name") {
+            TextField("List name", text: $name)
+                .disableAutocorrection(true)
+        }
+        .listRowBackground(Theme.surface)
+        Section {
+            TextField("What's this list about?", text: $overview, axis: .vertical)
+                .lineLimit(3...8)
+        } header: {
+            Text("Description")
+        } footer: {
+            Text("Optional. Shown at the top of the list.")
+        }
+        .listRowBackground(Theme.surface)
+        Section {
+            Toggle("Ranked", isOn: $ranked)
+                .tint(Theme.accent)
+        } footer: {
+            Text(ranked
+                 ? "Films are ranked best first."
+                 : "Films are in no particular order. New ones go on the end, and the order isn't treated as a ranking.")
+        }
+        .listRowBackground(Theme.surface)
+        Section {
+            Picker("Who Can See It", selection: $visibility) {
+                ForEach(ListVisibility.options(isPrivate: isPrivateProfile)) { option in
+                    Label(option.title(isPrivate: isPrivateProfile), systemImage: option.icon).tag(option)
+                }
+            }
+        } header: {
+            Text("Visibility")
+        } footer: {
+            Text(visibility.explanation(isPrivate: isPrivateProfile))
+        }
+        .listRowBackground(Theme.surface)
+    }
+
+    // What a contributor sees: the list's details, which only the owner can change
+    @ViewBuilder
+    private var memberSections: some View {
+        Section {
+            LabeledContent("Name", value: listTitle)
+            if let owner = sharing.members(of: movieList.id).first(where: \.is_owner) {
+                LabeledContent("Owner", value: "@\(owner.handle)")
+            }
+            LabeledContent("Order", value: ranked ? "Ranked" : "Unranked")
+        } footer: {
+            Text("Only the owner can rename the list, change who can see it or delete it. You can add, rank and remove films.")
+        }
+        .listRowBackground(Theme.surface)
+        if let description = movieList.overview, !description.isEmpty {
+            Section("Description") {
+                Text(description)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .listRowBackground(Theme.surface)
+        }
     }
 
     private func save() {
@@ -712,6 +758,40 @@ struct EditListSheet: View {
             case .failure(let error):
                 print("Error updating list:", error)
                 saveFailed = true
+            }
+        }
+    }
+
+    // Deletes the list for everyone (the owner) or takes the user off it (a contributor). The caller removes it from
+    // the phone once this sheet has closed, so nothing is left showing a deleted list
+    private func remove() {
+        isRemoving = true
+        let finish = {
+            isRemoving = false
+            Haptics.success()
+            onRemoved()
+            dismiss()
+        }
+        if isOwner {
+            APIService.shared.deleteList(listID: movieList.id) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success: finish()
+                    case .failure(let error):
+                        print("Error deleting list:", error)
+                        isRemoving = false
+                        removeFailed = "Couldn't delete the list. Check your connection and try again."
+                    }
+                }
+            }
+        } else {
+            APIService.shared.removeListEditor(listID: movieList.id) { ok in
+                guard ok else {
+                    isRemoving = false
+                    removeFailed = "Couldn't leave the list. Check your connection and try again."
+                    return
+                }
+                finish()
             }
         }
     }
