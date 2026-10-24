@@ -24,6 +24,7 @@
 		A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */; };
 		77256AACB4B7F27835914928 /* AvatarCropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */; };
 		EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516C04920FFE5E41C8B08A86 /* DiaryView.swift */; };
+		452DFC6EB7B484DED94676A6 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2BEBC58C665885AF71C9F69 /* ReportSheet.swift */; };
 		4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */; };
 		3A059804AA2C274AF6146724 /* MovieNightPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */; };
 		D88FC96743C185FBA86CD30E /* GroupMovieNightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9119060590FAFCE00C356297 /* GroupMovieNightView.swift */; };
@@ -146,6 +147,7 @@
 		7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberField.swift; sourceTree = "<group>"; };
 		19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarCropView.swift; sourceTree = "<group>"; };
 		516C04920FFE5E41C8B08A86 /* DiaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryView.swift; sourceTree = "<group>"; };
+		A2BEBC58C665885AF71C9F69 /* ReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportSheet.swift; sourceTree = "<group>"; };
 		B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieNightView.swift; sourceTree = "<group>"; };
 		C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieNightPoll.swift; sourceTree = "<group>"; };
 		9119060590FAFCE00C356297 /* GroupMovieNightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupMovieNightView.swift; sourceTree = "<group>"; };
@@ -352,6 +354,7 @@
 				7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */,
 				19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */,
 				516C04920FFE5E41C8B08A86 /* DiaryView.swift */,
+				A2BEBC58C665885AF71C9F69 /* ReportSheet.swift */,
 				B8ECA6559AD343AD2066B9AB /* MovieNightView.swift */,
 				C2DEBB1B7B2C7F8287FDC3DC /* MovieNightPoll.swift */,
 				9119060590FAFCE00C356297 /* GroupMovieNightView.swift */,
@@ -542,6 +545,7 @@
 				A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */,
 				77256AACB4B7F27835914928 /* AvatarCropView.swift in Sources */,
 				EF8F02E893F1039AC99402F9 /* DiaryView.swift in Sources */,
+				452DFC6EB7B484DED94676A6 /* ReportSheet.swift in Sources */,
 				4E9E4F81483232B876D05F2C /* MovieNightView.swift in Sources */,
 				3A059804AA2C274AF6146724 /* MovieNightPoll.swift in Sources */,
 				D88FC96743C185FBA86CD30E /* GroupMovieNightView.swift in Sources */,

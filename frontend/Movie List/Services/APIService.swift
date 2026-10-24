@@ -962,6 +962,19 @@ class APIService {
         sendJSON("GET", "/users/me/blocked", completion: completion)
     }
 
+    private struct ReportResponse: Decodable { let received: Bool }
+
+    /// Reports someone, or something of theirs (contentType "list", "note", ...; "user" for the person), for us to
+    /// review. Calls back with whether it was sent
+    func report(_ handle: String, contentType: String, contentID: String?, reason: String, details: String?, completion: @escaping (Bool) -> Void) {
+        var body: [String: Any] = ["handle": handle, "content_type": contentType, "reason": reason]
+        if let contentID { body["content_id"] = contentID }
+        if let details { body["details"] = details }
+        sendJSON("POST", "/users/reports", body: body) { (result: Result<ReportResponse, Error>) in
+            completion((try? result.get())?.received == true)
+        }
+    }
+
     func fetchFriendLists(_ handle: String, completion: @escaping (Result<FriendLists, Error>) -> Void) {
         sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/lists", completion: completion)
     }

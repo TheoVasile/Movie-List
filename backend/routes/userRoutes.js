@@ -12,6 +12,7 @@ const { saveDeviceToken, removeDeviceToken, setNotificationPreferences, notifyUs
 const admin = require("../config/firebase");
 const pool = require("../config/db");
 const { TERMS_VERSION } = require("../config/terms");
+const { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, notifyOperator, fetchOpenReports } = require("../models/reportsModel");
 const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
@@ -30,8 +31,8 @@ router.get("/me", async (req, res) => {
     }
 });
 
-// Records that the user accepted the Terms of Service, e.g. { "version": "2026-10-23" }. Only the current
-// version can be accepted -> { "terms_version": "2026-10-23" }
+// Records that the user accepted the Terms of Service, e.g. { "version": "2026-10-24" }. Only the current
+// version can be accepted -> { "terms_version": "2026-10-24" }
 router.post("/terms/accept", async (req, res) => {
     if (req.body?.version !== TERMS_VERSION) {
         return res.status(400).json({ error: "Those aren't the current Terms of Service." });
@@ -767,6 +768,45 @@ router.delete("/me/recommendations/:id", async (req, res) => {
         res.json({ removed: true });
     } catch (error) {
         console.error("Error removing recommendation:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Reports another user, or something of theirs, e.g. { "handle": "sam", "content_type": "list", "content_id": "42",
+// "reason": "harassment", "details": "..." }. content_type is "user" for the person as a whole. Reporting the same
+// thing twice in a day only counts once
+router.post("/reports", async (req, res) => {
+    const body = req.body ?? {};
+    const text = (value, max) => (typeof value === "string" || typeof value === "number" ? String(value).trim().slice(0, max) : "");
+    const handle = text(body.handle, 40).replace(/^@/, "").toLowerCase();
+    const report = {
+        content_type: text(body.content_type, 20) || "user",
+        content_id: text(body.content_id, 64) || null,
+        reason: text(body.reason, 20),
+        details: text(body.details, MAX_DETAILS) || null,
+    };
+    if (!handle) return res.status(400).json({ error: "Say who you're reporting." });
+    if (!REPORT_CONTENT_TYPES.includes(report.content_type)) return res.status(400).json({ error: "That can't be reported." });
+    if (!REPORT_REASONS.includes(report.reason)) return res.status(400).json({ error: "Pick a reason for the report." });
+    try {
+        const saved = await createReport(req.user.uid, handle, report);
+        if (!saved) return res.status(404).json({ error: "User not found." });
+        if (!saved.duplicate) notifyOperator({ ...report, id: saved.id, handle });
+        res.status(201).json({ id: saved.id, received: true });
+    } catch (error) {
+        console.error("Error saving report:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// The open reports, for reviewing them. Only for the Firebase uids in ADMIN_UIDS (comma separated)
+router.get("/reports", async (req, res) => {
+    const admins = (process.env.ADMIN_UIDS ?? "").split(",").map((uid) => uid.trim()).filter(Boolean);
+    if (!admins.includes(req.user.uid)) return res.status(403).json({ error: "Forbidden" });
+    try {
+        res.json(await fetchOpenReports());
+    } catch (error) {
+        console.error("Error fetching reports:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

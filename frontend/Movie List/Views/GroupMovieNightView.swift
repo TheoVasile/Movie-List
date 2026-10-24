@@ -43,6 +43,7 @@ struct GroupMovieNightView: View {
     @State private var showMembers = false
     @State private var showFilters = false
     @State private var showSuggest = false
+    @State private var reporting: ReportTarget? = nil
 
     init(group: MovieGroup, canUseAI: Bool) {
         _group = State(initialValue: group)
@@ -125,6 +126,9 @@ struct GroupMovieNightView: View {
                     refresh()
                 }
                 .presentationDetents([.large])
+            }
+            .sheet(item: $reporting) { target in
+                ReportSheet(target: target)
             }
             .sheet(isPresented: $showSuggest) {
                 SuggestFilmSheet(alreadyIn: Set(picks.map(\.tmdb_id))) { movie in
@@ -361,6 +365,14 @@ struct GroupMovieNightView: View {
                     remove(pick)
                 } label: {
                     Label("Remove Suggestion", systemImage: "trash")
+                }
+            }
+            // Someone else's suggestion can be reported
+            if let by = pick.suggested_by, by != social.profile?.handle {
+                Button {
+                    reporting = ReportTarget(handle: by, kind: .group, contentID: "\(group.id)/\(pick.tmdb_id)")
+                } label: {
+                    Label("Report Suggestion", systemImage: "flag")
                 }
             }
         }
