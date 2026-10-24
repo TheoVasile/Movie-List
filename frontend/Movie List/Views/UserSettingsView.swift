@@ -42,6 +42,8 @@ struct UserSettingsView : View {
     @State private var notifyStreaming = true
     @State private var savedNotifyStreaming = true
     @State private var streamingServiceCount: Int? = nil
+    @State private var streamingLoaded = false
+    @State private var streamingFailed = false
     @AppStorage(AppAnalytics.enabledKey) private var shareAnalytics = true
     @AppStorage(Personalization.useAIKey) private var discoverUsesAI = false
     @AppStorage(Personalization.aiConsentAskedKey) private var aiConsentAsked = false
@@ -56,6 +58,17 @@ struct UserSettingsView : View {
         NavigationStack {
             Form {
                 Section("Profile") {
+                    if social.profileFailed {
+                        HStack {
+                            Label("Couldn't load your profile.", systemImage: "wifi.exclamationmark")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            Button("Retry") { social.retry() }
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(Theme.accent)
+                                .buttonStyle(.borderless)
+                        }
+                    }
                     Button {
                         showUsernameSetup = true
                     } label: {
@@ -63,10 +76,13 @@ struct UserSettingsView : View {
                             Text("Username")
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
-                            Text(social.profile?.handle.map { "@\($0)" } ?? "Choose one")
+                            // "Choose one" only once the profile has loaded and really has none
+                            Text(social.profile.map { $0.handle.map { "@\($0)" } ?? "Choose one" } ?? "@username")
                                 .foregroundColor(Theme.textSecondary)
+                                .loading(!social.hasLoaded)
                         }
                     }
+                    .disabled(!social.hasLoaded)
                     HStack {
                         Text("Name")
                         Spacer()
@@ -76,6 +92,7 @@ struct UserSettingsView : View {
                             .textContentType(.name)
                             .submitLabel(.done)
                             .onSubmit(saveName)
+                            .loading(!social.hasLoaded)
                         if nameChanged {
                             Button(savingName ? "Saving…" : "Save", action: saveName)
                                 .font(.body.weight(.semibold))
@@ -100,6 +117,7 @@ struct UserSettingsView : View {
                 // Optional: lets friends who have the number in their contacts find this account
                 Section {
                     PhoneNumberField()
+                        .loading(!social.hasLoaded)
                 } header: {
                     Text("Phone Number")
                 } footer: {
@@ -110,7 +128,8 @@ struct UserSettingsView : View {
                 Section {
                     Toggle("Private Profile", isOn: Binding(get: { isPrivate }, set: setPrivate))
                         .tint(Theme.accent)
-                        .disabled(savingPrivacy || social.profile == nil)
+                        .disabled(savingPrivacy)
+                        .loading(!social.hasLoaded)
                         .confirmationDialog("Make your profile public?", isPresented: $confirmPublic, titleVisibility: .visible) {
                             Button("Make Public") { savePrivacy(false) }
                         } message: {
@@ -199,6 +218,7 @@ struct UserSettingsView : View {
                             Label("Follow Requests", systemImage: "person.badge.plus")
                         }
                         .tint(Theme.accent)
+                        .loading(!social.hasLoaded)
                         .onChange(of: notifyRequests) { wanted in
                             guard wanted != (social.profile?.notify_requests ?? true) else { return }
                             APIService.shared.setNotificationPreferences(requests: wanted) { saved in
@@ -209,6 +229,7 @@ struct UserSettingsView : View {
                             Label("Friend Activity", systemImage: "person.2.fill")
                         }
                         .tint(Theme.accent)
+                        .loading(!social.hasLoaded)
                         .onChange(of: notifyActivity) { wanted in
                             guard wanted != (social.profile?.notify_activity ?? true) else { return }
                             APIService.shared.setNotificationPreferences(activity: wanted) { saved in
@@ -228,14 +249,26 @@ struct UserSettingsView : View {
                         if theatreCheckIns {
                             theatreLocationWarning
                         }
-                        Toggle(isOn: $notifyStreaming) {
-                            Label("Now Streaming", systemImage: "play.tv")
-                        }
-                        .tint(Theme.accent)
-                        .onChange(of: notifyStreaming) { wanted in
-                            guard wanted != savedNotifyStreaming else { return }
-                            APIService.shared.saveStreamingPreferences(notify: wanted) { result in
-                                if case .success(let saved) = result { savedNotifyStreaming = saved.notify } else { notifyStreaming = !wanted }
+                        if streamingFailed {
+                            HStack {
+                                Label("Now Streaming", systemImage: "play.tv")
+                                Spacer()
+                                Button("Retry", action: loadStreamingPreferences)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundColor(Theme.accent)
+                                    .buttonStyle(.borderless)
+                            }
+                        } else {
+                            Toggle(isOn: $notifyStreaming) {
+                                Label("Now Streaming", systemImage: "play.tv")
+                            }
+                            .tint(Theme.accent)
+                            .loading(!streamingLoaded)
+                            .onChange(of: notifyStreaming) { wanted in
+                                guard wanted != savedNotifyStreaming else { return }
+                                APIService.shared.saveStreamingPreferences(notify: wanted) { result in
+                                    if case .success(let saved) = result { savedNotifyStreaming = saved.notify } else { notifyStreaming = !wanted }
+                                }
                             }
                         }
                         NavigationLink {
@@ -412,14 +445,12 @@ struct UserSettingsView : View {
                 name = savedName
                 notifyRequests = social.profile?.notify_requests ?? true
                 notifyActivity = social.profile?.notify_activity ?? true
-                APIService.shared.fetchStreamingPreferences { result in
-                    guard case .success(let saved) = result else { return }
-                    savedNotifyStreaming = saved.notify
-                    notifyStreaming = saved.notify
-                    streamingServiceCount = saved.services.count
-                }
+                loadStreamingPreferences()
                 notifications.refreshAuthorization()
             }
+            // The profile can arrive after Settings opens; the switches show what it says once it does
+            .onChange(of: social.profile?.notify_requests) { saved in notifyRequests = saved ?? true }
+            .onChange(of: social.profile?.notify_activity) { saved in notifyActivity = saved ?? true }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -512,6 +543,20 @@ extension UserSettingsView {
                         .foregroundColor(Theme.accent)
                 }
             }
+        }
+    }
+
+    private func loadStreamingPreferences() {
+        streamingFailed = false
+        APIService.shared.fetchStreamingPreferences { result in
+            guard case .success(let saved) = result else {
+                streamingFailed = !streamingLoaded
+                return
+            }
+            savedNotifyStreaming = saved.notify
+            notifyStreaming = saved.notify
+            streamingServiceCount = saved.services.count
+            streamingLoaded = true
         }
     }
 
