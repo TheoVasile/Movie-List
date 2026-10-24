@@ -52,6 +52,7 @@ struct UserSettingsView : View {
     @AppStorage(Personalization.birthdayKey) private var birthday = ""
     // The birthday being picked, until it's saved; nil while not changing it
     @State private var birthdayDraft: Date? = nil
+    @State private var editingBirthday = false
     @State private var birthdayTooYoung = false
     @State private var savingBirthday = false
     @State private var birthdayMessage: String? = nil
@@ -579,52 +580,90 @@ extension UserSettingsView {
         Personalization.ageRange(birthday: birthday, legacy: ageRange) == Personalization.under18
     }
 
-    /// The user's birthday, always as a full date, saved with their account. Optional, and saved with Save, so
-    /// scrolling through years doesn't save each one on the way. An age range chosen in earlier builds isn't
-    /// shown: those users are asked for their birthday. Waits for the profile, which the birthday comes with
+    /// The user's birthday, always as a full date, saved with their account. Optional. Tapping the row opens a
+    /// wheel under it, and the date is saved when it closes, so scrolling through years doesn't save each one on
+    /// the way. An age range chosen in earlier builds isn't shown: those users are asked for their birthday.
+    /// Waits for the profile, which the birthday comes with
     @ViewBuilder private var birthdayRow: some View {
-        HStack {
-            Text("Birthday")
-            Spacer()
-            if let shown = birthdayDraft ?? Personalization.birthdayDate(birthday) {
-                DatePicker("Birthday", selection: Binding(get: { shown }, set: { birthdayDraft = $0 }),
-                           in: ...Date(), displayedComponents: .date)
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                if birthdayChanged {
-                    Button(savingBirthday ? "Saving…" : "Save", action: saveBirthday)
-                        .font(.body.weight(.semibold))
+        Button(action: toggleBirthdayPicker) {
+            HStack {
+                Text("Birthday")
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                if savingBirthday {
+                    ProgressView()
+                        .tint(Theme.accent)
+                        .accessibilityLabel("Saving")
+                } else if let shown = (editingBirthday ? birthdayDraft : nil) ?? Personalization.birthdayDate(birthday) {
+                    // In the accent colour while it's being changed, like the system's date rows
+                    Text(shown.formatted(date: .long, time: .omitted))
+                        .foregroundColor(editingBirthday ? Theme.accent : Theme.textSecondary)
+                        .loading(!social.hasLoaded)
+                } else {
+                    Text("Add")
                         .foregroundColor(Theme.accent)
-                        .buttonStyle(.borderless)
+                        .loading(!social.hasLoaded)
                 }
-            } else {
-                Button("Add your birthday") {
-                    birthdayMessage = nil
-                    birthdayDraft = Calendar.current.date(byAdding: .year, value: -18, to: Date())
-                }
-                .foregroundColor(Theme.textSecondary)
-                .buttonStyle(.borderless)
-            }
-            if birthdayDraft != nil || !birthday.isEmpty {
-                Button(action: removeBirthday) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(Theme.textSecondary)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Remove birthday")
             }
         }
-        .disabled(savingBirthday)
-        .loading(!social.hasLoaded)
+        .disabled(!social.hasLoaded || savingBirthday)
         .alert("You must be 13 or older", isPresented: $birthdayTooYoung) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("The minimum age for Marquee is 13, per the Terms of Service. Your birthday wasn't changed.")
         }
+        if editingBirthday {
+            VStack(spacing: 8) {
+                // Starts 18 years back when there's no birthday yet
+                DatePicker("Birthday", selection: Binding(get: { birthdayOnWheel }, set: { birthdayDraft = $0 }),
+                           in: ...Date(), displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.wheel)
+                    .tint(Theme.accent)
+                    .frame(maxWidth: .infinity)
+                HStack {
+                    if !birthday.isEmpty {
+                        Button("Remove Birthday", role: .destructive, action: removeBirthday)
+                            .font(.subheadline)
+                    }
+                    Spacer()
+                    // Saves the date on the wheel even if it wasn't turned; tapping the row instead closes it unsaved
+                    Button("Done") {
+                        birthdayDraft = birthdayOnWheel
+                        toggleBirthdayPicker()
+                    }
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(Theme.accent)
+                }
+                .buttonStyle(.borderless)
+            }
+            .disabled(savingBirthday)
+        }
         if let birthdayMessage {
             Text(birthdayMessage)
                 .font(.footnote)
                 .foregroundColor(Theme.accentSecondary)
+        }
+    }
+
+    /// The date the birthday wheel shows: the one being picked, the saved one, or 18 years back
+    private var birthdayOnWheel: Date {
+        birthdayDraft ?? Personalization.birthdayDate(birthday)
+            ?? Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
+    }
+
+    /// Opens the birthday wheel, or closes it and saves the date if it was changed
+    private func toggleBirthdayPicker() {
+        guard editingBirthday else {
+            birthdayMessage = nil
+            withAnimation(Theme.spring) { editingBirthday = true }
+            return
+        }
+        withAnimation(Theme.spring) { editingBirthday = false }
+        if birthdayChanged {
+            saveBirthday()
+        } else {
+            birthdayDraft = nil
         }
     }
 
@@ -658,13 +697,15 @@ extension UserSettingsView {
                     birthdayTooYoung = true
                 } else {
                     birthdayMessage = "Couldn't save your birthday. Check your connection and try again."
+                    // Back to the wheel with the date still picked, so Done tries again
+                    withAnimation(Theme.spring) { editingBirthday = true }
                 }
             }
         }
     }
 
-    /// Removes the birthday from the account and this iPhone, or stops adding one that isn't saved yet. An age
-    /// range from earlier builds stays, so anyone who said they were under 18 keeps AI switched off
+    /// Removes the birthday from the account and this iPhone, then closes the wheel. An age range from earlier
+    /// builds stays, so anyone who said they were under 18 keeps AI switched off
     private func removeBirthday() {
         Haptics.tap()
         birthdayMessage = nil
@@ -678,6 +719,7 @@ extension UserSettingsView {
             if case .success = result {
                 birthdayDraft = nil
                 birthday = ""
+                withAnimation(Theme.spring) { editingBirthday = false }
             } else {
                 birthdayMessage = "Couldn't remove your birthday. Check your connection and try again."
             }
