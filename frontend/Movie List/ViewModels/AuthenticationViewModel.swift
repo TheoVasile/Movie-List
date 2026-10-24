@@ -197,16 +197,91 @@ extension AuthenticationViewModel {
     }
   }
 
-  func deleteAccount() async -> Bool {
+  /// Whether the account has a password, so deleting it is confirmed with that rather than with Google
+  var signsInWithPassword: Bool {
+    user?.providerData.contains { $0.providerID == EmailAuthProviderID } ?? false
+  }
+
+  /// Permanently deletes the account. The user confirms it's them first, with their password or (when password is
+  /// nil) their Google account, since the server only deletes accounts signed in to in the last few minutes. The
+  /// server then deletes their data and their sign-in in one go, so neither is left without the other
+  func deleteAccount(password: String?) async -> AccountDeletionResult {
+    guard let current = Auth.auth().currentUser else { return .failed("You're not signed in.") }
     do {
-      try await user?.delete()
-      return true
+      let credential: AuthCredential
+      if let password {
+        credential = EmailAuthProvider.credential(withEmail: current.email ?? "", password: password)
+      } else {
+        credential = try await googleCredential()
+      }
+      _ = try await current.reauthenticate(with: credential)
     }
     catch {
-      errorMessage = error.localizedDescription
-      return false
+      if let error = error as? GIDSignInError, error.code == .canceled { return .cancelled }
+      switch AuthErrorCode(rawValue: (error as NSError).code) {
+      case .wrongPassword, .invalidCredential:
+        return .failed("That password isn't right.")
+      case .userMismatch:
+        return .failed("That's a different Google account. Choose the one you use for CineList.")
+      case .networkError:
+        return .failed("Couldn't reach the server. Check your connection and try again.")
+      case .tooManyRequests:
+        return .failed("Too many attempts. Wait a few minutes and try again.")
+      default:
+        return .failed(error.localizedDescription)
+      }
+    }
+    let message = await withCheckedContinuation { continuation in
+      APIService.shared.deleteAccount(firebase_id: current.uid) { continuation.resume(returning: $0) }
+    }
+    return message.map { .failed($0) } ?? .deleted
+  }
+
+  /// UserDefaults keys that belong to the signed-in account, removed when it's deleted. Add new account keys here.
+  /// Device settings (appearance.*) and whatever Firebase and Google Sign-In keep are left alone
+  static let accountDefaultsKeys = [
+    // Notifications and theatre check-ins
+    NotificationManager.suggestionsKey, TheatreCheckIns.enabledKey,
+    // AI and personalization
+    Personalization.aiAllowedKey, Personalization.useAIKey, Personalization.aiConsentAskedKey,
+    Personalization.ageRangeKey, Personalization.pronounsKey, "personalization.gender",
+    // Discover: taste profile, reactions, deck, filters and quick add
+    DiscoverViewModel.profileKey, DiscoverViewModel.likedKey, DiscoverViewModel.dislikedKey,
+    "discover.passedMovieIDs", "discover.genreFilter", "discover.filters", "discover.kind", "discover.savedDeck",
+    "discover.likedFilms", "discover.dislikedFilms",
+    "discoverQuickAdd", "discoverQuickAddListID", "discoverQuickAddUsesAI",
+    // Lists and their sharing, and cached film details
+    "unrankedLists", "listVisibility", "aiPlacedFilms", "listSharing",
+    "movieInfoCache", "genreCache", "imdbIDs", "filmographies",
+  ]
+  /// Prefixes of account keys made per list or per theatre: Tonight's Pick for each list, and the theatre the user
+  /// was last at and the ones found near them
+  static let accountDefaultsPrefixes = ["tonightsPick.", "theatreCheckIns."]
+
+  /// Once the account is deleted: signs out and removes what the app kept on this phone for it
+  func signOutDeletedAccount() {
+    // Also unregisters this phone from notifications, turns off theatre check-ins and clears Core Data
+    signOut()
+    GIDSignIn.sharedInstance.signOut()
+    let defaults = UserDefaults.standard
+    for key in Self.accountDefaultsKeys { defaults.removeObject(forKey: key) }
+    for key in defaults.dictionaryRepresentation().keys
+    where Self.accountDefaultsPrefixes.contains(where: key.hasPrefix) {
+      defaults.removeObject(forKey: key)
+    }
+    URLCache.shared.removeAllCachedResponses()
+    // Lists saved by older versions of the app
+    if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+      try? FileManager.default.removeItem(at: documents.appendingPathComponent("db.sqlite3"))
     }
   }
+}
+
+enum AccountDeletionResult {
+  case deleted
+  // They closed Google sign-in without confirming
+  case cancelled
+  case failed(String)
 }
 
 enum AuthenticationError: Error {
@@ -214,7 +289,8 @@ enum AuthenticationError: Error {
 }
 
 extension AuthenticationViewModel {
-  func signInWithGoogle() async -> Bool {
+  /// Shows Google sign-in and gives back a Firebase credential for the account picked
+  private func googleCredential() async throws -> AuthCredential {
     guard let clientID = FirebaseApp.app()?.options.clientID else {
       fatalError("No client ID found in Firebase configuration")
     }
@@ -224,19 +300,25 @@ extension AuthenticationViewModel {
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
           let window = windowScene.windows.first,
           let rootViewController = window.rootViewController else {
-      print("There is no root view controller!")
-      return false
+      throw AuthenticationError.tokenError(message: "There is no root view controller!")
     }
+    // Sheets (like Settings) present over the root, so Google's has to go over the top one
+    var presenter = rootViewController
+    while let presented = presenter.presentedViewController { presenter = presented }
 
+    let userAuthentication = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
+
+    let user = userAuthentication.user
+    guard let idToken = user.idToken else { throw AuthenticationError.tokenError(message: "ID token missing") }
+    let accessToken = user.accessToken
+
+    return GoogleAuthProvider.credential(withIDToken: idToken.tokenString,
+                                         accessToken: accessToken.tokenString)
+  }
+
+  func signInWithGoogle() async -> Bool {
       do {
-        let userAuthentication = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
-
-        let user = userAuthentication.user
-        guard let idToken = user.idToken else { throw AuthenticationError.tokenError(message: "ID token missing") }
-        let accessToken = user.accessToken
-
-        let credential = GoogleAuthProvider.credential(withIDToken: idToken.tokenString,
-                                                       accessToken: accessToken.tokenString)
+        let credential = try await googleCredential()
 
         let result = try await Auth.auth().signIn(with: credential)
         let firebaseUser = result.user

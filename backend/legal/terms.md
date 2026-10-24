@@ -204,7 +204,7 @@ If you send us ideas, suggestions or other feedback about the App, you agree tha
 
 ### Deleting your account
 
-You can stop using the App at any time. You can permanently delete your account from Settings using **Deactivate Account**. This deletes your account and your lists, and removes your profile, notes, watched history, social connections and other data associated with your account from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Content other people already received, such as recommendations you sent, may remain with them, and a list you were invited to edit will stay with its owner. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
+You can stop using the App at any time. You can permanently delete your account from Settings using **Delete Account**. This deletes your account and your sign-in, together with the data associated with your account, including your profile, lists and rankings, watched history and diary, notes, social connections, film recommendations, groups and votes, from our active systems, as described in our Privacy Policy. Deletion cannot be undone. Films you added to a list or group owned by someone else stay there without your name, and copies other people kept (for example, a list you shared through your iPhone's share sheet) are not affected. You can also ask us to delete your account by writing to {{CONTACT_EMAIL}}. Deleting the App from your iPhone does not delete your account.
 
 ### Suspension and termination by us
 
