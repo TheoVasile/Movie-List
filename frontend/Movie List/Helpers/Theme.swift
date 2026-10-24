@@ -463,4 +463,19 @@ extension View {
                     .stroke(Theme.stroke, lineWidth: 1)
             )
     }
+
+    /// For something the server hasn't answered yet: grey placeholder shapes instead of values that could pass
+    /// for real ones, a spinner over them, and nothing to tap or type into until it's there
+    func loading(_ isLoading: Bool, spinner alignment: Alignment = .trailing) -> some View {
+        self
+            .redacted(reason: isLoading ? .placeholder : [])
+            .disabled(isLoading)
+            .overlay(alignment: alignment) {
+                if isLoading {
+                    ProgressView()
+                        .tint(Theme.accent)
+                        .accessibilityLabel("Loading")
+                }
+            }
+    }
 }

@@ -19,17 +19,31 @@ final class SocialStore: ObservableObject {
     // People asking to follow the user, and the @usernames the user is waiting on
     @Published private(set) var requests: [UserSummary] = []
     @Published private(set) var requested: Set<String> = []
-    @Published private(set) var hasLoaded = false
+    // Whether the last try at loading the profile failed, with none loaded before it. Only a profile that loaded
+    // says anything about the account (e.g. that it has no @username yet): a request that failed, say because
+    // the server was still starting or the network wasn't up yet at launch, says nothing
+    @Published private(set) var profileFailed = false
+    @Published private(set) var hasLoadedFollowing = false
+    // Bumped by reset(), so answers and retries meant for the previous account are ignored
+    private var generation = 0
+    private var retryDelay: TimeInterval = 2
+    private var retryScheduled = false
+
+    /// Whether the profile has loaded at least once. Nothing about the account is shown or asked for before then
+    var hasLoaded: Bool { profile != nil }
 
     func load() {
-        APIService.shared.fetchMyProfile { result in
-            if case .success(let profile) = result { self.received(profile) }
-            self.hasLoaded = true
-        }
+        reloadProfile()
+        let generation = generation
         APIService.shared.fetchFollowing { result in
-            if case .success(let people) = result { self.following = people }
+            guard generation == self.generation else { return }
+            if case .success(let people) = result {
+                self.following = people
+                self.hasLoadedFollowing = true
+            }
         }
         APIService.shared.fetchFollowRequests { result in
+            guard generation == self.generation else { return }
             if case .success(let loaded) = result {
                 self.requests = loaded.incoming
                 self.requested = Set(loaded.outgoing)
@@ -37,11 +51,25 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    /// Reloads just the user's profile, e.g. after agreeing to new terms. Calls back once it has, whether or not it worked
+    /// Reloads just the user's profile, e.g. after agreeing to new terms. Calls back once it has, whether or not it
+    /// worked. Until one loads it keeps trying, waiting longer each time (up to 30 seconds)
     func reloadProfile(completion: (() -> Void)? = nil) {
+        let generation = generation
         APIService.shared.fetchMyProfile { result in
-            if case .success(let profile) = result { self.received(profile) }
-            self.hasLoaded = true
+            guard generation == self.generation else { return }
+            switch result {
+            case .success(let profile):
+                self.received(profile)
+                self.profileFailed = false
+                self.retryDelay = 2
+            case .failure(let error):
+                print("Couldn't load profile:", error)
+                // A profile that loaded before stays: it's still right, just not the latest
+                if self.profile == nil {
+                    self.profileFailed = true
+                    self.scheduleRetry()
+                }
+            }
             completion?()
         }
     }
@@ -50,6 +78,39 @@ final class SocialStore: ObservableObject {
     private func received(_ profile: UserProfile) {
         self.profile = profile
         Personalization.mirrorBirthday(from: profile)
+    }
+
+    private func scheduleRetry() {
+        guard !retryScheduled else { return }
+        retryScheduled = true
+        let generation = generation
+        let delay = retryDelay
+        retryDelay = min(delay * 2, 30)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard generation == self.generation else { return }
+            self.retryScheduled = false
+            if self.profile == nil { self.load() }
+        }
+    }
+
+    /// Tries loading again straight away, after it failed
+    func retry() {
+        profileFailed = false
+        retryDelay = 2
+        load()
+    }
+
+    /// Forgets the signed-in account's profile and friends, so the next account to sign in starts fresh
+    func reset() {
+        generation += 1
+        retryDelay = 2
+        retryScheduled = false
+        profile = nil
+        profileFailed = false
+        following = []
+        hasLoadedFollowing = false
+        requests = []
+        requested = []
     }
 
     /// Accepts or declines someone's request, taking it off the list straight away
@@ -283,6 +344,11 @@ struct FollowingSection: View {
             }
             if social.hasLoaded && social.profile?.handle == nil {
                 EmptyView()
+            } else if social.following.isEmpty && !social.hasLoadedFollowing {
+                // Not "follow friends" until it's known the user follows nobody
+                ProgressView()
+                    .tint(Theme.accent)
+                    .frame(maxWidth: .infinity)
             } else if social.following.isEmpty {
                 Text("Follow friends to see their lists, rankings and what they thought of each film.")
                     .font(.subheadline)

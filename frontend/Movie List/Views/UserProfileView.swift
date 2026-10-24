@@ -23,6 +23,7 @@ struct UserProfileView: View {
     @State private var uploadingPhoto = false
     @State private var photoError: String? = nil
     @ObservedObject private var social = SocialStore.shared
+    @ObservedObject private var sync = SyncStatus.shared
     var body: some View {
         NavigationStack {
             ZStack{
@@ -93,7 +94,8 @@ struct UserProfileView: View {
             }
             .buttonStyle(PressableButtonStyle(scale: 0.96))
             .accessibilityLabel("Change profile picture")
-            .disabled(uploadingPhoto)
+            // Whether there's a picture to remove isn't known until the profile loads
+            .disabled(uploadingPhoto || !social.hasLoaded)
             .appearAnimation()
             .confirmationDialog("Profile Picture", isPresented: $showPhotoOptions) {
                 Button("Choose a New Photo") { showPhotoPicker = true }
@@ -115,19 +117,31 @@ struct UserProfileView: View {
                     .font(.footnote)
                     .foregroundColor(Theme.accentSecondary)
             }
-            VStack(spacing: 4) {
-                // Known by their @username, with their name below
-                Text(social.profile?.handle.map { "@\($0)" } ?? viewModel.user?.displayName ?? "No Name")
-                    .font(.title2.weight(.heavy))
-                    .foregroundColor(Theme.textPrimary)
-                Text(social.profile?.handle == nil ? viewModel.user?.email ?? "" : viewModel.user?.displayName ?? "")
-                    .font(.subheadline)
-                    .foregroundColor(Theme.textSecondary)
-                if let profile = social.profile, profile.handle != nil {
-                    ConnectionCounts(handle: nil, followers: profile.followers, following: profile.following)
+            if let profile = social.profile {
+                VStack(spacing: 4) {
+                    // Known by their @username, with their name below
+                    Text(profile.handle.map { "@\($0)" } ?? viewModel.user?.displayName ?? "No Name")
+                        .font(.title2.weight(.heavy))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(profile.handle == nil ? viewModel.user?.email ?? "" : viewModel.user?.displayName ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                    if profile.handle != nil {
+                        ConnectionCounts(handle: nil, followers: profile.followers, following: profile.following)
+                    }
                 }
+                .appearAnimation(delay: 0.08)
+            } else {
+                // Placeholders the size of the @username and name, until the profile loads
+                VStack(spacing: 4) {
+                    Text("@username")
+                        .font(.title2.weight(.heavy))
+                    Text("Your Name")
+                        .font(.subheadline)
+                }
+                .foregroundColor(Theme.textSecondary)
+                .loading(true, spinner: .center)
             }
-            .appearAnimation(delay: 0.08)
         }
         .padding(.top, 24)
     }
@@ -138,6 +152,8 @@ struct UserProfileView: View {
             statTile(value: uniqueTitles.formatted(), label: hasShows ? "Films & Shows" : "Films", icon: "film")
             statTile(value: topLanguage, label: "Top Language", icon: "globe")
         }
+        // Not 0 lists and 0 films while the lists are still on their way
+        .redacted(reason: movieLists.isEmpty && sync.isFirstSync ? .placeholder : [])
         .appearAnimation(delay: 0.14)
     }
 
@@ -401,7 +417,13 @@ struct UserProfileView: View {
             Text("Your Lists")
                 .font(.headline)
                 .foregroundColor(Theme.textPrimary)
-            if movieLists.isEmpty {
+            if movieLists.isEmpty && sync.isFirstSync {
+                ProgressView()
+                    .tint(Theme.accent)
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
+                    .cardStyle()
+            } else if movieLists.isEmpty {
                 Text("No lists yet. Create one from the Lists tab.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)

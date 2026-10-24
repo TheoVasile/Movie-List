@@ -141,6 +141,7 @@ extension AuthenticationViewModel {
         TheatreCheckIns.shared.setEnabled(false)
         PersistenceController.shared.deleteAllCoreDataObjects()
         SyncStatus.shared.reset()
+        SocialStore.shared.reset()
         // The next person to sign in shouldn't see this account's films on the Home Screen
         WidgetSnapshot.remove()
         WidgetCenter.shared.reloadAllTimelines()
