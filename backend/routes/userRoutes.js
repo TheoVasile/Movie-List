@@ -3,6 +3,7 @@ const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGro
 const { fetchPicks, suggestPick, reactToPick, removePick, likedPicks } = require("../models/groupPicksModel");
 const { yearReview } = require("../models/yearReviewModel");
 const { fetchFriendActivity } = require("../services/digestService");
+const { watchedEpisodes, setEpisodesWatched } = require("../services/tvEpisodes");
 const { MAX_RECIPIENTS, sendRecommendation, fetchReceived, markSeen, removeReceived } = require("../models/recommendationsModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
@@ -637,6 +638,36 @@ router.get("/me/activity", async (req, res) => {
         })));
     } catch (error) {
         console.error("Error fetching friend activity:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Which episodes of a show the user has watched, e.g. /me/episodes/-1399 -> [{ season, episode }]
+router.get("/me/episodes/:showId", async (req, res) => {
+    const showId = Math.abs(parseInt(req.params.showId, 10));
+    if (!(showId > 0)) return res.status(400).json({ error: "A show id is required." });
+    try {
+        res.json(await watchedEpisodes(req.user.uid, showId));
+    } catch (error) {
+        console.error("Error fetching watched episodes:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Marks episodes of one season watched or not, e.g. { "season": 2, "episodes": [1, 2, 3], "watched": true }, and
+// replies with everything watched in the show
+router.put("/me/episodes/:showId", async (req, res) => {
+    const showId = Math.abs(parseInt(req.params.showId, 10));
+    const season = parseInt(req.body?.season, 10);
+    const episodes = (Array.isArray(req.body?.episodes) ? req.body.episodes : [])
+        .map((n) => parseInt(n, 10)).filter((n) => Number.isInteger(n) && n > 0 && n < 10000).slice(0, 500);
+    if (!(showId > 0) || !(season >= 0) || !episodes.length || typeof req.body?.watched !== "boolean") {
+        return res.status(400).json({ error: "A show, season, episodes and watched are required." });
+    }
+    try {
+        res.json(await setEpisodesWatched(req.user.uid, showId, season, episodes, req.body.watched));
+    } catch (error) {
+        console.error("Error saving watched episodes:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

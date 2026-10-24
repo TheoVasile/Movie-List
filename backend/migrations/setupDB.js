@@ -225,6 +225,24 @@ const createTables = async () => {
             );
             CREATE INDEX IF NOT EXISTS film_recommendations_recipient ON film_recommendations (recipient_id, created_at DESC);
 
+            -- TV episodes each person has watched, by the show's (positive) TMDb id
+            CREATE TABLE IF NOT EXISTS episode_watches (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                show_id INT NOT NULL,
+                season INT NOT NULL,
+                episode INT NOT NULL,
+                watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, show_id, season, episode)
+            );
+            -- New-season alerts already sent, so each season is announced once
+            CREATE TABLE IF NOT EXISTS season_alerts_sent (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                show_id INT NOT NULL,
+                season INT NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, show_id, season)
+            );
+
             CREATE TABLE IF NOT EXISTS movies (
                 id SERIAL PRIMARY KEY,
                 tmdb_id VARCHAR(20) UNIQUE,

@@ -412,6 +412,12 @@ struct MovieDetailView: View {
                     .transition(.opacity)
             }
 
+            // Shows get episode tracking: progress, what's next, and every episode
+            if movie.isTV && movie.tmdb_id != 0 {
+                EpisodesCard(showID: Int64(movie.tmdb_id))
+                    .appearAnimation(delay: 0.24)
+            }
+
             if hasActions {
                 actionTiles
                     .appearAnimation(delay: 0.26)

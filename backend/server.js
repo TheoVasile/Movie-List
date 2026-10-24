@@ -10,6 +10,7 @@ const cors = require("cors");
 const pool = require("./config/db");
 const { sendDailyDigests } = require("./services/digestService");
 const { sendStreamingAlerts } = require("./services/streamingAlerts");
+const { sendSeasonAlerts } = require("./services/tvEpisodes");
 
 const app = express();
 // Letterboxd imports can carry thousands of films in one request
@@ -45,6 +46,19 @@ app.post("/internal/streaming-alerts", async (req, res) => {
         res.json(await sendStreamingAlerts());
     } catch (error) {
         console.error("Error sending streaming alerts:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Tells people when a new season of a show in their lists starts. Same daily GitHub Action and secret
+app.post("/internal/season-alerts", async (req, res) => {
+    const secret = process.env.DIGEST_SECRET;
+    if (!secret) return res.status(503).json({ error: "Alerts aren't set up." });
+    if (req.get("x-digest-secret") !== secret) return res.status(401).json({ error: "Unauthorized" });
+    try {
+        res.json(await sendSeasonAlerts());
+    } catch (error) {
+        console.error("Error sending season alerts:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

@@ -1347,6 +1347,27 @@ class APIService {
         sendJSON("GET", "/movies/\(kind.rawValue)/\(id)", completion: completion)
     }
 
+    // MARK: TV episodes. showID is the app's (negative) TV id
+
+    func fetchShow(_ showID: Int64, completion: @escaping (Result<TVShow, Error>) -> Void) {
+        sendJSON("GET", "/movies/tv/\(showID)", completion: completion)
+    }
+
+    func fetchSeason(_ showID: Int64, season: Int, completion: @escaping (Result<TVSeasonDetail, Error>) -> Void) {
+        sendJSON("GET", "/movies/tv/\(showID)/season/\(season)", completion: completion)
+    }
+
+    func fetchWatchedEpisodes(_ showID: Int64, completion: @escaping (Result<[EpisodeKey], Error>) -> Void) {
+        sendJSON("GET", "/users/me/episodes/\(showID)", completion: completion)
+    }
+
+    /// Marks episodes of one season watched or not. Calls back with every watched episode of the show
+    func setEpisodesWatched(_ showID: Int64, season: Int, episodes: [Int], watched: Bool,
+                            completion: @escaping (Result<[EpisodeKey], Error>) -> Void) {
+        sendJSON("PUT", "/users/me/episodes/\(showID)", body: ["season": season, "episodes": episodes, "watched": watched],
+                 completion: completion)
+    }
+
     /// The film's IMDb id (e.g. "tt0099785"), or nil when TMDb doesn't have one
     func fetchIMDbID(tmdbID: Int64, completion: @escaping (Result<String?, Error>) -> Void) {
         struct IMDbResponse: Decodable {
