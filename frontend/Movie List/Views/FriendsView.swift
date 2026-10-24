@@ -1448,15 +1448,18 @@ struct FriendTakesSection: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
-                        }
-                        .contextMenu {
-                            Button {
-                                reporting = take.note == nil
-                                    ? ReportTarget(handle: take.handle)
-                                    : ReportTarget(handle: take.handle, kind: .note, contentID: tmdbID.map(String.init))
+                            Spacer(minLength: 0)
+                            Menu {
+                                reportButton(take)
                             } label: {
-                                Label(take.note == nil ? "Report @\(take.handle)" : "Report Note", systemImage: "flag")
+                                MoreActionsLabel()
                             }
+                            .padding(.top, -8)
+                            .accessibilityLabel("Options for @\(take.handle)'s take")
+                        }
+                        // A shortcut for the ⋮
+                        .contextMenu {
+                            reportButton(take)
                         }
                     }
                 }
@@ -1468,6 +1471,16 @@ struct FriendTakesSection: View {
         }
         .sheet(item: $reporting) { target in
             ReportSheet(target: target)
+        }
+    }
+
+    private func reportButton(_ take: FriendTake) -> some View {
+        Button {
+            reporting = take.note == nil
+                ? ReportTarget(handle: take.handle)
+                : ReportTarget(handle: take.handle, kind: .note, contentID: tmdbID.map(String.init))
+        } label: {
+            Label(take.note == nil ? "Report @\(take.handle)" : "Report Note", systemImage: "flag")
         }
     }
 }

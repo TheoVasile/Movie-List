@@ -126,18 +126,13 @@ struct DiscoverReactionsView: View {
                     ForEach(entries) { entry in
                         row(entry)
                             .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Haptics.tap()
-                                    withAnimation(Theme.spring) { reactions.forget(entry, liked: showingLiked) }
-                                } label: {
-                                    Label(showingLiked ? "Unlike" : "Remove", systemImage: showingLiked ? "heart.slash" : "arrow.uturn.backward")
-                                }
+                                forgetButton(entry)
                             }
                     }
                 } footer: {
                     Text(showingLiked
-                         ? "Discover recommends more films like these. Swipe left on one to unlike it."
-                         : "Discover shows fewer films like these. Swipe left on one to let it come back.")
+                         ? "Discover recommends more films like these. Use ⋮ or swipe left on one to unlike it."
+                         : "Discover shows fewer films like these. Use ⋮ or swipe left on one to let it come back.")
                         .font(.caption)
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -173,7 +168,29 @@ struct DiscoverReactionsView: View {
         }
     }
 
+    private func forgetButton(_ entry: DiscoverReactions.Entry) -> some View {
+        Button(role: .destructive) {
+            Haptics.tap()
+            withAnimation(Theme.spring) { reactions.forget(entry, liked: showingLiked) }
+        } label: {
+            Label(showingLiked ? "Unlike" : "Remove", systemImage: showingLiked ? "heart.slash" : "arrow.uturn.backward")
+        }
+    }
+
     private func row(_ entry: DiscoverReactions.Entry) -> some View {
+        HStack(spacing: 0) {
+            filmButton(entry)
+            Menu {
+                forgetButton(entry)
+            } label: {
+                MoreActionsLabel()
+            }
+            .accessibilityLabel("\(entry.movie.title) Options")
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private func filmButton(_ entry: DiscoverReactions.Entry) -> some View {
         Button {
             Haptics.tap()
             detailsMovie = entry.movie
@@ -205,7 +222,7 @@ struct DiscoverReactionsView: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
+        // Borderless, so tapping the ⋮ beside it doesn't also open the film
+        .buttonStyle(.borderless)
     }
 }

@@ -45,6 +45,9 @@ struct ListView: View {
     @ObservedObject private var streaming = StreamingNowStore.shared
     @State private var choosingServices = false
     @State private var showSharing = false
+    // Asking to confirm deleting the list (the owner) or leaving it (a contributor), and why that failed
+    @State private var confirmingRemoveList = false
+    @State private var removeListFailed: String? = nil
     // Whether the big title at the top of the list has scrolled away, so the bar shows a small one
     @State private var showBarTitle = false
     @Environment(\.dismiss) private var dismiss
@@ -191,6 +194,19 @@ struct ListView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .confirmationDialog(sharing.isOwner(movieList.id) ? "Delete \(listTitle)?" : "Leave \(listTitle)?",
+                            isPresented: $confirmingRemoveList, titleVisibility: .visible) {
+            Button(sharing.isOwner(movieList.id) ? "Delete List" : "Leave List", role: .destructive, action: removeList)
+        } message: {
+            Text(sharing.isOwner(movieList.id)
+                 ? (sharing.isShared(movieList.id) ? "It's deleted for everyone on it, along with its films and ranks." : "Its films and ranks are deleted too.")
+                 : "You'll stop seeing this list. The films you added stay in it.")
+        }
+        .alert("Couldn't do that", isPresented: Binding(get: { removeListFailed != nil }, set: { if !$0 { removeListFailed = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(removeListFailed ?? "")
+        }
         .confirmationDialog("Sort by TMDb rating?", isPresented: $confirmingRatingSort, titleVisibility: .visible) {
             Button("Sort, Highest Rated First") {
                 Haptics.success()
@@ -272,8 +288,9 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
                 }
-                if sharing.isShared(movieList.id), !editMode.isEditing {
-                    SharedListBanner(listID: movieList.id) { showSharing = true }
+                // Always shown to the owner, so inviting people isn't hidden in a menu
+                if sharing.isShared(movieList.id) || sharing.isOwner(movieList.id), !editMode.isEditing {
+                    ContributorsRow(listID: movieList.id) { showSharing = true }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -344,16 +361,17 @@ private extension ListView {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(filteredMovies, id: \.id) { movie in
-                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), ranked: viewModel.isRanked, streamingOn: viewModel.showStreamingOnly ? streaming.services(for: Int64(movie.tmdb_id)) ?? [] : [], onAddToLists: { addingToLists = movie }) {
-                        viewModel.setWatched(movie, !movie.watched)
-                    }
+                    MovieRow(movie: movie, showCompareMovieView: $viewModel.showCompareMovieView, selectedMovie: $viewModel.selectedMovie, showSetRank: $viewModel.showSetRank, info: viewModel.info(of: movie), aiPlaced: viewModel.isAIPlaced(movie), addedBy: sharing.addedBy(listID: movieList.id, movieID: movie.id), ranked: viewModel.isRanked, streamingOn: viewModel.showStreamingOnly ? streaming.services(for: Int64(movie.tmdb_id)) ?? [] : [], onAddToLists: { addingToLists = movie },
+                             onToggleWatched: { viewModel.setWatched(movie, !movie.watched) },
+                             onRemove: { delete(movie) })
                         .contentShape(Rectangle())
                         .onTapGesture { openDetail(movie) }
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                         .overlay { highlightRing(for: movie) }
-                        // Rows with custom swipe actions lose the built-in swipe to delete, so it's added back here
+                        // Shortcuts for the row's ⋮ menu. Rows with custom swipe actions lose the built-in swipe to delete,
+                        // so it's added back here
                         .swipeActions(edge: .leading) {
                             Button {
                                 Haptics.tap()
@@ -464,15 +482,17 @@ private extension ListView {
 
     var listTitle: String { movieList.name ?? "No Movie Name" }
 
-    // Edit Details (owner only) and Reorder Films, from the list's name
+    // Everything to do with the list itself, from the ••• by its name: editing, reordering, contributors, and
+    // deleting it (the owner) or leaving it (a contributor)
     @ViewBuilder
     var titleMenuItems: some View {
-        // Only the owner can rename a shared list
-        if sharing.isOwner(movieList.id) {
+        let isOwner = sharing.isOwner(movieList.id)
+        // Only the owner can rename a shared list or change who can see it
+        if isOwner {
             Button {
                 editingDetails = true
             } label: {
-                Label("Edit Details", systemImage: "pencil")
+                Label("Edit Name & Visibility", systemImage: "pencil")
             }
         }
         if viewModel.movies.count > 1 {
@@ -480,6 +500,30 @@ private extension ListView {
                 startReordering()
             } label: {
                 Label("Reorder Films", systemImage: "arrow.up.arrow.down")
+            }
+        }
+        Button {
+            showSharing = true
+        } label: {
+            if isOwner {
+                Label(sharing.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
+            } else {
+                Label("Who Can Edit", systemImage: "person.2")
+            }
+        }
+        Button {
+            exportZip()
+        } label: {
+            Label("Export List (ZIP)", systemImage: "doc.zipper")
+        }
+        Divider()
+        Button(role: .destructive) {
+            confirmingRemoveList = true
+        } label: {
+            if isOwner {
+                Label("Delete List", systemImage: "trash")
+            } else {
+                Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
             }
         }
     }
@@ -495,13 +539,13 @@ private extension ListView {
                     .foregroundColor(Theme.textPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                Image(systemName: "chevron.down.circle.fill")
+                // ••• rather than a chevron, so it reads as the list's actions and not just a title
+                Image(systemName: "ellipsis.circle.fill")
                     .font(.title3)
                     .foregroundStyle(Theme.textTertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .disabled(!sharing.isOwner(movieList.id) && viewModel.movies.count < 2)
         .accessibilityLabel("\(listTitle), list options")
         .accessibilityAddTraits(.isHeader)
     }
@@ -919,6 +963,41 @@ private extension ListView {
     func delete(_ movie: CDMovie) {
         guard let index = viewModel.movies.firstIndex(of: movie) else { return }
         viewModel.deleteMovie(at: IndexSet(integer: index))
+    }
+
+    // Deletes the list for everyone (the owner) or takes the user off it (a contributor), then closes it. Removed from
+    // the phone only once the screen has gone, so nothing on it is left showing a deleted list
+    func removeList() {
+        let list = movieList
+        let isOwner = sharing.isOwner(list.id)
+        let finish = {
+            Haptics.success()
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                withAnimation(Theme.spring) { CDMovieList.delete(movieList: list) }
+                if !isOwner { ListSharing.shared.refresh() }
+            }
+        }
+        if isOwner {
+            APIService.shared.deleteList(listID: list.id) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success: finish()
+                    case .failure(let error):
+                        print("Error deleting list:", error)
+                        removeListFailed = "Couldn't delete the list. Check your connection and try again."
+                    }
+                }
+            }
+        } else {
+            APIService.shared.removeListEditor(listID: list.id) { ok in
+                guard ok else {
+                    removeListFailed = "Couldn't leave the list. Check your connection and try again."
+                    return
+                }
+                finish()
+            }
+        }
     }
 
     var bulkWatchedTitle: String {

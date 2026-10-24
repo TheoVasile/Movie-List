@@ -25,6 +25,8 @@ struct Home: View {
     @State private var editingList: CDMovieList? = nil
     // The list whose contributors are being changed
     @State private var sharingList: CDMovieList? = nil
+    // The list waiting for the user to confirm deleting or leaving it
+    @State private var removingList: CDMovieList? = nil
     // A new list's visibility and the people (by @handle) who'll edit it with the user
     @State private var newListVisibility = ListVisibility.public
     @State private var newListRanked = true
@@ -239,36 +241,43 @@ private extension Home {
                             ListCard(movieList: movieList)
                         }
                         .buttonStyle(PressableButtonStyle())
-                        .contextMenu {
-                            // Someone else's list the user was invited to edit can only be left
-                            if ListSharing.shared.isOwner(movieList.id) {
-                                Button {
-                                    editingList = movieList
-                                } label: {
-                                    Label("Edit List", systemImage: "pencil")
-                                }
-                                Button {
-                                    sharingList = movieList
-                                } label: {
-                                    Label("Add Contributors…", systemImage: "person.badge.plus")
-                                }
-                                Button(role: .destructive) {
-                                    deleteList(movieList)
-                                } label: {
-                                    Label("Delete List", systemImage: "trash")
-                                }
-                            } else {
-                                Button(role: .destructive) {
-                                    leaveList(movieList)
-                                } label: {
-                                    Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
-                                }
+                        // Touch and hold is a shortcut for the ••• on the card
+                        .contextMenu { listMenuItems(movieList) }
+                        .overlay(alignment: .topTrailing) {
+                            Menu {
+                                listMenuItems(movieList)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundColor(Theme.textPrimary)
+                                    .frame(width: 30, height: 30)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                                    .padding(8)
+                                    .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("\(movieList.name ?? "List") Options")
                         }
                         .appearAnimation(delay: Double(min(index, 8)) * 0.06)
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            removingList.map { ListSharing.shared.isOwner($0.id) ? "Delete \($0.name ?? "List")?" : "Leave \($0.name ?? "List")?" } ?? "",
+            isPresented: Binding(get: { removingList != nil }, set: { if !$0 { removingList = nil } }),
+            titleVisibility: .visible,
+            presenting: removingList
+        ) { list in
+            if ListSharing.shared.isOwner(list.id) {
+                Button("Delete List", role: .destructive) { deleteList(list) }
+            } else {
+                Button("Leave List", role: .destructive) { leaveList(list) }
+            }
+        } message: { list in
+            Text(ListSharing.shared.isOwner(list.id)
+                 ? "Its films and ranks are deleted too."
+                 : "You'll stop seeing this list. The films you added stay in it.")
         }
         .sheet(item: $editingList) { movieList in
             EditListSheet(movieList: movieList)
@@ -276,6 +285,41 @@ private extension Home {
         .sheet(item: $sharingList) { movieList in
             ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List")
                 .presentationDetents([.medium, .large])
+        }
+    }
+
+    // A list card's actions, from its ••• or a long press. Someone else's list the user was invited to edit can only be left
+    @ViewBuilder
+    func listMenuItems(_ movieList: CDMovieList) -> some View {
+        if ListSharing.shared.isOwner(movieList.id) {
+            Button {
+                editingList = movieList
+            } label: {
+                Label("Edit List", systemImage: "pencil")
+            }
+            Button {
+                sharingList = movieList
+            } label: {
+                Label(ListSharing.shared.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
+            }
+            Divider()
+            Button(role: .destructive) {
+                removingList = movieList
+            } label: {
+                Label("Delete List", systemImage: "trash")
+            }
+        } else {
+            Button {
+                sharingList = movieList
+            } label: {
+                Label("Who Can Edit", systemImage: "person.2")
+            }
+            Divider()
+            Button(role: .destructive) {
+                removingList = movieList
+            } label: {
+                Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
+            }
         }
     }
 
@@ -475,6 +519,19 @@ private struct ListCard: View {
             posterFan
                 .frame(height: 150)
                 .frame(maxWidth: .infinity)
+                .overlay(alignment: .topLeading) {
+                    // Opposite the card's •••, so it's clear at a glance which lists have contributors
+                    if ListSharing.shared.isShared(movieList.id) {
+                        Label("Shared", systemImage: "person.2.fill")
+                            .font(.caption2.weight(.bold))
+                            .foregroundColor(Theme.textPrimary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                            .offset(x: -6, y: -6)
+                    }
+                }
             VStack(alignment: .leading, spacing: 3) {
                 Text(movieList.name ?? "No Name")
                     .font(.headline)
@@ -486,13 +543,9 @@ private struct ListCard: View {
                     if !ListRanking.isRanked(movieList.id) {
                         Text("· unranked")
                     }
-                    // Followers is the usual case, so only the other two get a quiet marker
+                    // Followers is the usual case, so only the other two get a quiet marker. Shared lists have a badge instead
                     let visibility = ListVisibility.of(movieList.id)
-                    if ListSharing.shared.isShared(movieList.id) {
-                        Image(systemName: "person.2.fill")
-                            .imageScale(.small)
-                            .accessibilityLabel("Shared")
-                    } else if visibility != .followers {
+                    if !ListSharing.shared.isShared(movieList.id) && visibility != .followers {
                         Image(systemName: visibility.icon)
                             .imageScale(.small)
                             .accessibilityLabel(visibility == .public ? "Public" : "Private")

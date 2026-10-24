@@ -24,6 +24,8 @@ struct MovieRow: View {
     var streamingOn: [StreamingService] = []
     var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
+    // Takes the film off this list; also on a swipe
+    var onRemove: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 14) {
@@ -127,14 +129,19 @@ struct MovieRow: View {
                               systemImage: movie.watched ? "eye.slash" : "eye")
                     }
                 }
+                if let onRemove {
+                    Divider()
+                    Button(role: .destructive) {
+                        Haptics.tap()
+                        onRemove()
+                    } label: {
+                        Label("Remove from List", systemImage: "trash")
+                    }
+                }
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.bold))
-                    .rotationEffect(.degrees(90)) // Makes it vertical like ⋮
-                    .foregroundColor(Theme.textSecondary)
-                    .frame(width: 36, height: 44)
-                    .contentShape(Rectangle())
+                MoreActionsLabel()
             }
+            .accessibilityLabel("\(movie.title ?? "Film") Options")
         }
         .padding(12)
         .background(
@@ -175,6 +182,18 @@ struct MovieRow: View {
         Haptics.tap()
         selectedMovie = movie
         withAnimation(Theme.spring, change)
+    }
+}
+
+/// The ⋮ at the end of a row that opens its actions, so none of them are hidden behind a swipe or a long press
+struct MoreActionsLabel: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.body.weight(.bold))
+            .rotationEffect(.degrees(90)) // Makes it vertical like ⋮
+            .foregroundColor(Theme.textSecondary)
+            .frame(width: 36, height: 44)
+            .contentShape(Rectangle())
     }
 }
 
