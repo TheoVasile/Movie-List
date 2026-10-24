@@ -114,7 +114,7 @@ struct WelcomeView: View {
             }
             .appearAnimation()
 
-            Text("CineList")
+            Text("Marquee")
                 .font(.system(size: 44, weight: .heavy, design: .rounded))
                 .foregroundColor(Theme.textPrimary)
                 .appearAnimation(delay: 0.1)

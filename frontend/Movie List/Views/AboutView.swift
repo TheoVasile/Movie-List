@@ -42,7 +42,7 @@ struct AboutView: View {
                 }
                 .appearAnimation(delay: 0.12)
 
-                Text("CineList is an independent app and isn't affiliated with, endorsed by or sponsored by any of these services. Film titles, posters and images belong to their respective owners.")
+                Text("Marquee is an independent app and isn't affiliated with, endorsed by or sponsored by any of these services. Film titles, posters and images belong to their respective owners.")
                     .font(.caption)
                     .foregroundColor(Theme.textTertiary)
                     .multilineTextAlignment(.center)
@@ -64,7 +64,7 @@ struct AboutView: View {
                 .background(Theme.accentGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: Theme.shadow.opacity(0.4), radius: 14, y: 8)
-            Text("CineList")
+            Text("Marquee")
                 .font(.system(size: 32, weight: .heavy, design: .rounded))
                 .foregroundColor(Theme.textPrimary)
             Text("Rank, track and share the films you love.")

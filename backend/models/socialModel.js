@@ -53,7 +53,7 @@ async function setPhone(user_id, phone) {
     await pool.query("UPDATE users SET phone = $2 WHERE firebase_uid = $1", [user_id, phone]);
 }
 
-// People on CineList whose email or phone hash is among the user's contacts', with whether the user follows
+// People on Marquee whose email or phone hash is among the user's contacts', with whether the user follows
 // them or has asked to. Only people with a @username, since that's how they're shown
 async function matchContacts(user_id, emailHashes, phoneHashes) {
     const result = await pool.query(

@@ -125,7 +125,7 @@ struct TopFilmsView: View {
                     .widgetBackground(poster: entry.posters[first.tmdbID])
             }
         } else {
-            EmptyWidgetView(message: "Open CineList to rank your films.")
+            EmptyWidgetView(message: "Open Marquee to rank your films.")
                 .widgetBackground()
         }
     }

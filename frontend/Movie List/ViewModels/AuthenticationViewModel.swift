@@ -223,7 +223,7 @@ extension AuthenticationViewModel {
       case .wrongPassword, .invalidCredential:
         return .failed("That password isn't right.")
       case .userMismatch:
-        return .failed("That's a different Google account. Choose the one you use for CineList.")
+        return .failed("That's a different Google account. Choose the one you use for Marquee.")
       case .networkError:
         return .failed("Couldn't reach the server. Check your connection and try again.")
       case .tooManyRequests:

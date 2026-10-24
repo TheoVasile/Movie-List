@@ -255,8 +255,8 @@ struct UserSettingsView : View {
                     Text("Notifications")
                 } footer: {
                     Text(notifications.authorization == .denied
-                         ? "Notifications for CineList are turned off in your iPhone's Settings."
-                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings. Now Streaming: when a film on your watchlist starts streaming on one of your services, or comes out. Theatre Check-ins: when you leave a movie theatre after a film, CineList asks what you saw so you can add it to a list. Works at any theatre; your location stays on this iPhone.")
+                         ? "Notifications for Marquee are turned off in your iPhone's Settings."
+                         : "Follow Requests: when someone asks to follow you, or accepts your request. Friend Activity: at most one summary a day of what the people you follow watched and ranked. Film Suggestions: an unwatched film from your watchlist on Tuesday, Friday and Sunday evenings. Now Streaming: when a film on your watchlist starts streaming on one of your services, or comes out. Theatre Check-ins: when you leave a movie theatre after a film, Marquee asks what you saw so you can add it to a list. Works at any theatre; your location stays on this iPhone.")
                 }
                 .listRowBackground(Theme.surface)
 
@@ -309,7 +309,7 @@ struct UserSettingsView : View {
                         .alert("You must be 13 or older", isPresented: $birthdayTooYoung) {
                             Button("OK", role: .cancel) {}
                         } message: {
-                            Text("The minimum age for CineList is 13, per the Terms of Service. Your birthday wasn't changed.")
+                            Text("The minimum age for Marquee is 13, per the Terms of Service. Your birthday wasn't changed.")
                         }
                     }
                 } header: {
@@ -441,7 +441,7 @@ struct UserSettingsView : View {
                     }
                 }
             } message: {
-                Text("This permanently deletes your CineList account and everything in it: your lists and rankings, diary and watched films, notes, followers and people you follow, film recommendations, and movie night groups. It can't be undone.")
+                Text("This permanently deletes your Marquee account and everything in it: your lists and rankings, diary and watched films, notes, followers and people you follow, film recommendations, and movie night groups. It can't be undone.")
             }
             .alert("Enter your password", isPresented: $askDeletePassword) {
                 SecureField("Password", text: $deletePassword)
@@ -499,8 +499,8 @@ extension UserSettingsView {
         if needsAlways || needsPrecise {
             VStack(alignment: .leading, spacing: 8) {
                 Text(needsAlways
-                     ? "Theatre check-ins need CineList's location access set to \"Always\"."
-                     : "Theatre check-ins need Precise Location turned on for CineList.")
+                     ? "Theatre check-ins need Marquee's location access set to \"Always\"."
+                     : "Theatre check-ins need Precise Location turned on for Marquee.")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
                 Button {

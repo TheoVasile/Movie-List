@@ -131,8 +131,8 @@ ${renderMarkdown(markdown).replace("</h1>", `</h1>
 </html>`;
 }
 
-const termsPage = () => documentPage("Terms of Service", loadTerms(), TERMS_UPDATED);
-const privacyPage = () => documentPage("Privacy Policy", loadPrivacy(), PRIVACY_UPDATED);
+const termsPage = () => documentPage("Marquee Terms of Service", loadTerms(), TERMS_UPDATED);
+const privacyPage = () => documentPage("Marquee Privacy Policy", loadPrivacy(), PRIVACY_UPDATED);
 
 module.exports = {
     TERMS_VERSION, TERMS_UPDATED, PRIVACY_VERSION, PRIVACY_UPDATED,

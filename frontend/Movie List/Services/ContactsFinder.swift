@@ -9,7 +9,7 @@ import Foundation
 import Contacts
 import CryptoKit
 
-/// Finds which of the user's contacts are on CineList. Each contact's emails and phone numbers are turned into
+/// Finds which of the user's contacts are on Marquee. Each contact's emails and phone numbers are turned into
 /// SHA-256 hashes on the phone and only the hashes are sent; the server compares them with its own and keeps
 /// nothing. Names and other contact details never leave the phone
 enum ContactsFinder {
@@ -18,7 +18,7 @@ enum ContactsFinder {
         case failed
     }
 
-    /// Whether the user has already let CineList read contacts, so it can check again without asking
+    /// Whether the user has already let Marquee read contacts, so it can check again without asking
     static var wasAllowed: Bool {
         CNContactStore.authorizationStatus(for: .contacts) == .authorized
     }

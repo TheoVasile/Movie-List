@@ -488,7 +488,7 @@ struct StatsShareCard: View {
             }
             HStack {
                 Spacer()
-                Label("Movie List", systemImage: "film.stack")
+                Label("Marquee", systemImage: "film.stack")
                     .font(.caption.weight(.bold))
                     .foregroundColor(Theme.textTertiary)
             }

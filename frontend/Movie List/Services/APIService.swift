@@ -360,7 +360,7 @@ struct UserProfile: Decodable {
     }
 }
 
-/// One of CineList's legal documents (the Terms of Service or Privacy Policy) as Markdown, with its version and
+/// One of Marquee's legal documents (the Terms of Service or Privacy Policy) as Markdown, with its version and
 /// when it last changed (e.g. "October 23, 2026")
 struct LegalDocumentText: Decodable {
     let version: String
@@ -842,7 +842,7 @@ class APIService {
         }
     }
 
-    /// Which contacts (as SHA-256 hashes of their emails and phone numbers) are on CineList
+    /// Which contacts (as SHA-256 hashes of their emails and phone numbers) are on Marquee
     func matchContacts(emails: [String], phones: [String], completion: @escaping (Result<[UserSummary], Error>) -> Void) {
         sendJSON("POST", "/users/contacts/match", body: ["emails": emails, "phones": phones], completion: completion)
     }

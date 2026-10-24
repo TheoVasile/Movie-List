@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseAnalytics
 
-/// Counts how CineList is used, with Firebase Analytics (the version without the advertising ID). Only the events
+/// Counts how Marquee is used, with Firebase Analytics (the version without the advertising ID). Only the events
 /// below are sent, each with a few fixed values: never titles, names, handles or anything the user typed. The
 /// user ID is never set, so events aren't tied to the account
 enum AppAnalytics {

@@ -236,7 +236,7 @@ struct YearSlideView: View {
                     .tracking(1.2)
                     .foregroundColor(Theme.textTertiary)
                 Spacer()
-                Label("CineList", systemImage: "film.stack")
+                Label("Marquee", systemImage: "film.stack")
                     .font(.caption.weight(.bold))
                     .foregroundColor(Theme.textTertiary)
             }

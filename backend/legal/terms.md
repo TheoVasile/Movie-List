@@ -1,6 +1,6 @@
-# CineList Terms of Service
+# Marquee Terms of Service
 
-Welcome to CineList. These Terms of Service (the "Terms") are a legal agreement between you and {{COMPANY_NAME}} ("we", "us" or "our"), the operator of the CineList mobile application, its Home Screen widgets and the online services that support them (together, the "App"). Please read them carefully. They include important information about your rights, the limits of our responsibility, and how disputes are resolved.
+Welcome to Marquee. These Terms of Service (the "Terms") are a legal agreement between you and {{COMPANY_NAME}} ("we", "us" or "our"), the operator of the Marquee mobile application, its Home Screen widgets and the online services that support them (together, the "App"). Please read them carefully. They include important information about your rights, the limits of our responsibility, and how disputes are resolved.
 
 ## 1. Accepting These Terms
 
@@ -22,7 +22,7 @@ If you are under the age of majority where you live (for example, 18 or 19 depen
 
 Some features are not available to users under 18. In particular, the App's AI features are turned off for anyone who indicates they are under 18 (see Section 9).
 
-You also confirm that you are not barred from using the App under the laws of any applicable jurisdiction, and that you have not previously had a CineList account removed by us for violating these Terms.
+You also confirm that you are not barred from using the App under the laws of any applicable jurisdiction, and that you have not previously had a Marquee account removed by us for violating these Terms.
 
 ## 4. Your Account
 
@@ -38,9 +38,9 @@ You agree to give accurate information when you create your account and to keep 
 
 Usernames are first come, first served. You may not choose a username that impersonates another person or organization, infringes someone else's rights, or is offensive or misleading. We may reclaim or require you to change a username that breaks these rules or that we reasonably believe is being held only to prevent others from using it.
 
-## 5. What CineList Does
+## 5. What Marquee Does
 
-CineList helps you keep track of the films and TV series you want to watch and have watched. Depending on the features you use, the App lets you:
+Marquee helps you keep track of the films and TV series you want to watch and have watched. Depending on the features you use, the App lets you:
 
 - Create ranked and unranked lists, a watchlist, and collections, and place films in your rankings
 - Mark films and TV episodes as watched, keep a viewing diary, and write notes on films that the people who follow you can see
@@ -109,7 +109,7 @@ We do not review all content before it appears, but we may (without being obliga
 
 ## 8. Community, Following, Blocking and Reporting
 
-CineList is social. When you follow someone, invite them to a list or a group, or send them a recommendation, they will usually be notified. Please be respectful.
+Marquee is social. When you follow someone, invite them to a list or a group, or send them a recommendation, they will usually be notified. Please be respectful.
 
 ### Blocking
 
@@ -135,7 +135,7 @@ When you invite friends to edit a list, they can add, remove and re-rank films i
 
 ### What they are
 
-CineList offers optional AI features powered by a third-party AI provider, Anthropic (the maker of the Claude models). These currently include AI Picks in Discover, AI suggestions when planning a Movie Night with friends, and Smart Placement, which suggests where a film belongs in a ranked list.
+Marquee offers optional AI features powered by a third-party AI provider, Anthropic (the maker of the Claude models). These currently include AI Picks in Discover, AI suggestions when planning a Movie Night with friends, and Smart Placement, which suggests where a film belongs in a ranked list.
 
 ### They are off unless you turn them on
 
@@ -163,15 +163,15 @@ If you turn on Theatre Check-ins, the App uses Apple's location services, includ
 
 ### Turning location off
 
-You can turn either feature off in CineList's Settings at any time, and you can change or withdraw location permission for CineList in your iPhone's Settings under Privacy and Security, Location Services. The rest of the App works without location access.
+You can turn either feature off in Marquee's Settings at any time, and you can change or withdraw location permission for Marquee in your iPhone's Settings under Privacy and Security, Location Services. The rest of the App works without location access.
 
 ## 11. Contacts
 
-If you choose to find friends from your contacts, the App asks for permission to read your iPhone's contacts. Email addresses and phone numbers are converted on your iPhone into one-way codes (hashes), and only those codes are sent to us to check which of your contacts are on CineList. We do not store them, and names and other contact details never leave your iPhone. You can withdraw contacts access at any time in your iPhone's Settings.
+If you choose to find friends from your contacts, the App asks for permission to read your iPhone's contacts. Email addresses and phone numbers are converted on your iPhone into one-way codes (hashes), and only those codes are sent to us to check which of your contacts are on Marquee. We do not store them, and names and other contact details never leave your iPhone. You can withdraw contacts access at any time in your iPhone's Settings.
 
 ## 12. Notifications
 
-With your permission, the App may send push and on-device notifications, for example when someone asks to follow you, accepts your request or follows you, invites you to a list or group, or recommends you a film; a daily summary of your friends' activity; suggestions from your watchlist; alerts when a film on your watchlist starts streaming on one of your services or is released, or a new season of a series you watch arrives; and theatre check-in reminders. You can choose which notifications you get in CineList's Settings and turn them all off in your iPhone's Settings. Some notices about your account or these Terms may be shown in the App regardless of these settings.
+With your permission, the App may send push and on-device notifications, for example when someone asks to follow you, accepts your request or follows you, invites you to a list or group, or recommends you a film; a daily summary of your friends' activity; suggestions from your watchlist; alerts when a film on your watchlist starts streaming on one of your services or is released, or a new season of a series you watch arrives; and theatre check-in reminders. You can choose which notifications you get in Marquee's Settings and turn them all off in your iPhone's Settings. Some notices about your account or these Terms may be shown in the App regardless of these settings.
 
 Streaming availability and release information comes from third parties, may be incomplete or out of date, and differs by country. We do not guarantee that an alert will be sent, or that a film will be available when you look for it.
 
@@ -186,15 +186,15 @@ The App relies on, links to and displays content from services we do not own or 
 - **Apple**, including Apple Maps (for theatre check-ins), location services, contacts, notifications and widgets on your device
 - **YouTube**, which hosts the trailers shown in the App. Trailers play in YouTube's player and are subject to YouTube's terms
 - **IMDb**, streaming services and other websites the App may link to
-- **Letterboxd**, whose export format the App can read and write. CineList is not affiliated with Letterboxd, and importing or exporting does not connect to your Letterboxd account
+- **Letterboxd**, whose export format the App can read and write. Marquee is not affiliated with Letterboxd, and importing or exporting does not connect to your Letterboxd account
 
-CineList is an independent app. It is not affiliated with, endorsed by or sponsored by TMDb, JustWatch, Anthropic, Google, YouTube, IMDb, Letterboxd, any streaming service, any film studio or distributor, or any movie theatre or theatre chain, including Cineplex and AMC. All film titles, posters, images, trademarks and other materials belonging to third parties are the property of their respective owners and are shown for identification and informational purposes.
+Marquee is an independent app. It is not affiliated with, endorsed by or sponsored by TMDb, JustWatch, Anthropic, Google, YouTube, IMDb, Letterboxd, any streaming service, any film studio or distributor, or any movie theatre or theatre chain, including Cineplex and AMC. All film titles, posters, images, trademarks and other materials belonging to third parties are the property of their respective owners and are shown for identification and informational purposes.
 
 Film information, ratings, release dates, availability and other third-party data may be inaccurate or change without notice. Please check with the relevant provider before relying on it.
 
 ## 14. Our Intellectual Property
 
-The App, including its software, design, look and feel, text, graphics, logos and the CineList name, is owned by {{COMPANY_NAME}} or our licensors and is protected by copyright, trademark and other laws. Other than Your Content and third-party content, all rights in the App are reserved.
+The App, including its software, design, look and feel, text, graphics, logos and the Marquee name, is owned by {{COMPANY_NAME}} or our licensors and is protected by copyright, trademark and other laws. Other than Your Content and third-party content, all rights in the App are reserved.
 
 Subject to these Terms, we grant you a personal, limited, non-exclusive, non-transferable, revocable licence to download and use the App on Apple devices you own or control, for your own personal, non-commercial use, as permitted by the App Store's Usage Rules. You may not use our name, logos or trademarks without our prior written permission.
 
