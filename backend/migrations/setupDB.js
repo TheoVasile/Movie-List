@@ -61,6 +61,9 @@ const createTables = async () => {
             -- the app asks again whenever it's older than the current one
             ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
+            -- When the user last confirmed they're 13 or older (and have a parent's or guardian's agreement if
+            -- they're under the age of majority), which they do each time they accept the Terms
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMP;
 
             -- Movie night groups, made by one user from people they follow
             CREATE TABLE IF NOT EXISTS watch_groups (
