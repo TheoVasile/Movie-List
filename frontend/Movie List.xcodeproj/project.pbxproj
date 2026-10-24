@@ -11,6 +11,7 @@
 		FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F0000000000000C /* DiscoverView.swift */; };
 		FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */; };
 		50D932EF1D418A6BC2B2ABB1 /* RecommendFilmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */; };
+		FF89BCFCD41C9BFC876BC376 /* FriendActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA05728CC1710E3CCE770DC9 /* FriendActivityView.swift */; };
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
@@ -51,6 +52,7 @@
 		FA2609A22D599679000A692D /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2609A12D599679000A692D /* APIService.swift */; };
 		8B7B1EB1DB20AAD8D2EB0AD6 /* ContactsFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02462785648178177F4101D5 /* ContactsFinder.swift */; };
 		6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58660986FCF41669AACB301E /* NotificationManager.swift */; };
+		BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
 		FA6F64C929F88B6E00B418DB /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6F64C829F88B6E00B418DB /* NetworkService.swift */; };
@@ -127,6 +129,7 @@
 		FA7E5A012F0000000000000C /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverReactionsView.swift; sourceTree = "<group>"; };
 		A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendFilmSheet.swift; sourceTree = "<group>"; };
+		EA05728CC1710E3CCE770DC9 /* FriendActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendActivityView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
@@ -166,6 +169,7 @@
 		FA2609A12D599679000A692D /* APIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
 		02462785648178177F4101D5 /* ContactsFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsFinder.swift; sourceTree = "<group>"; };
 		58660986FCF41669AACB301E /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingNowStore.swift; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
 		FA6F64C829F88B6E00B418DB /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
@@ -292,6 +296,7 @@
 				FA2609A12D599679000A692D /* APIService.swift */,
 				02462785648178177F4101D5 /* ContactsFinder.swift */,
 				58660986FCF41669AACB301E /* NotificationManager.swift */,
+				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 			);
 			path = Services;
@@ -321,6 +326,7 @@
 				FA7E5A012F0000000000000C /* DiscoverView.swift */,
 				D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */,
 				A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */,
+				EA05728CC1710E3CCE770DC9 /* FriendActivityView.swift */,
 				FAE949E82D547D0300592081 /* AccountView.swift */,
 				FAE949EA2D5480A200592081 /* SignUpView.swift */,
 				FAE949EC2D54828200592081 /* SignInView.swift */,
@@ -541,6 +547,7 @@
 				FA2609A22D599679000A692D /* APIService.swift in Sources */,
 				8B7B1EB1DB20AAD8D2EB0AD6 /* ContactsFinder.swift in Sources */,
 				6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */,
+				BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */,
 				FAE949E92D547D0300592081 /* AccountView.swift in Sources */,
 				FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */,
 				FAFF24F62BE687A000C4F78D /* MovieRow.swift in Sources */,
@@ -563,6 +570,7 @@
 				FA7E5A012F0000000000000D /* DiscoverView.swift in Sources */,
 				FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */,
 				50D932EF1D418A6BC2B2ABB1 /* RecommendFilmSheet.swift in Sources */,
+				FF89BCFCD41C9BFC876BC376 /* FriendActivityView.swift in Sources */,
 				FA01249F2BDEBDAB00A1C13C /* CDMovie+helper.swift in Sources */,
 				FA01249C2BDE150800A1C13C /* MovieListModel.xcdatamodeld in Sources */,
 				FAE62F3A2970E552000654E1 /* DatabaseService.swift in Sources */,

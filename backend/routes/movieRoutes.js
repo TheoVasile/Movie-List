@@ -11,7 +11,8 @@ const { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILi
 const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, pickHistory, saveRecommendations } = require("../models/groupPicksModel");
 const pool = require("../config/db");
-const { parseFilters, hasFilters, matchesFilters, availableServices } = require("../services/filmFilters");
+const { parseFilters, hasFilters, matchesFilters, availableServices, streamingServices } = require("../services/filmFilters");
+const { streamingPreferences } = require("../services/streamingAlerts");
 const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
 
 const router = express.Router();
@@ -460,6 +461,40 @@ router.post("/movie-night", async (req, res) => {
         }
         console.error("Error planning movie night:", error.message);
         res.status(502).json({ error: "Movie night recommendations failed." });
+    }
+});
+
+// "What can I watch tonight?": which of up to 200 films stream on the user's own services (Settings › My Streaming
+// Services), e.g. { "ids": [771, -1399], "region": "CA" } -> { region: "CA", services: [{ id, name, logo_path }],
+// films: { "771": [8] } }. films only has the ones on at least one of their services; services is empty when they
+// haven't picked any. The region falls back to their saved one, then US
+router.post("/streaming-now", async (req, res) => {
+    try {
+        const ids = parseMediaIds((Array.isArray(req.body?.ids) ? req.body.ids : []).join(","), 200);
+        const prefs = await streamingPreferences(req.user.uid);
+        const region = /^[A-Za-z]{2}$/.test(String(req.body?.region ?? "")) ? req.body.region.toUpperCase() : prefs?.region ?? "US";
+        const mine = new Set(prefs?.services ?? []);
+        if (!mine.size) return res.json({ region, services: [], films: {} });
+        const services = (await availableServices(region)).filter((service) => mine.has(service.id));
+
+        // Read the daily streaming check's results where they're fresh, but never write them: that table is how
+        // streaming alerts spot what's new, so updating it here would swallow alerts
+        const fresh = await pool.query(
+            `SELECT tmdb_id, providers FROM film_availability
+             WHERE region = $1 AND tmdb_id = ANY($2::int[]) AND checked_at > NOW() - INTERVAL '1 day'`,
+            [region, ids]
+        );
+        const known = new Map(fresh.rows.map((row) => [row.tmdb_id, row.providers]));
+        const films = {};
+        await mapWithConcurrency(ids, async (id) => {
+            const providers = known.get(id) ?? [...(await streamingServices(id, region))];
+            const onMine = providers.filter((provider) => mine.has(provider));
+            if (onMine.length) films[id] = onMine;
+        }, 8);
+        res.json({ region, services, films });
+    } catch (error) {
+        console.error("Error checking what's streaming:", error.message);
+        res.status(500).json({ error: "Internal server error" });
     }
 });
 

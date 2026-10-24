@@ -20,6 +20,8 @@ struct MovieRow: View {
     var addedBy: String? = nil
     // Unranked lists show no rank and offer no ranking actions
     var ranked = true
+    // The user's services streaming it, shown while the list is narrowed to what's streaming
+    var streamingOn: [StreamingService] = []
     var onAddToLists: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
     
@@ -71,6 +73,15 @@ struct MovieRow: View {
                 .lineLimit(1)
                 .font(.caption.weight(.medium))
                 .foregroundColor(Theme.textSecondary)
+                if !streamingOn.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(streamingOn.prefix(4)) { service in
+                            ProviderLogo(provider: WatchProvider(id: service.id, name: service.name, logo_path: service.logo_path), size: 20)
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Streaming on " + streamingOn.map(\.name).joined(separator: ", "))
+                }
                 if let addedBy {
                     HStack(spacing: 4) {
                         Image(systemName: "person.fill")

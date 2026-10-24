@@ -746,6 +746,12 @@ class APIService {
         sendJSON("PUT", "/users/me/streaming", body: body, completion: completion)
     }
 
+    /// Which of up to 200 films stream on the user's own services in their country
+    func fetchStreamingNow(tmdbIDs: [Int64], completion: @escaping (Result<StreamingNow, Error>) -> Void) {
+        sendJSON("POST", "/movies/streaming-now", body: ["ids": tmdbIDs, "region": Locale.current.region?.identifier ?? "US"],
+                 completion: completion)
+    }
+
     /// Streaming services in the user's country, most popular first
     func fetchStreamingServices(completion: @escaping (Result<[StreamingService], Error>) -> Void) {
         sendJSON("GET", "/movies/streaming-services", query: [URLQueryItem(name: "region", value: Locale.current.region?.identifier ?? "US")], completion: completion)
@@ -857,6 +863,11 @@ class APIService {
         sendJSON(following ? "POST" : "DELETE", path) { (result: Result<FollowResponse, Error>) in
             completion(result.map(\.following))
         }
+    }
+
+    /// What the people the user follows watched and ranked over the last two weeks, newest first
+    func fetchFriendActivity(completion: @escaping (Result<[FriendActivity], Error>) -> Void) {
+        sendJSON("GET", "/users/me/activity", query: [URLQueryItem(name: "days", value: "14")], completion: completion)
     }
 
     func fetchRecommendations(completion: @escaping (Result<[FilmRecommendation], Error>) -> Void) {
