@@ -30,9 +30,14 @@ struct ListView: View {
     // Set while asking to confirm marking the whole list watched (true) or unwatched (false)
     @State private var pendingBulkWatched: Bool? = nil
 
-    init(movieList: CDMovieList, context: NSManagedObjectContext) {
+    // Opened by Reorder in a list card's menu on Home, so it starts out reordering
+    private let startsReordering: Bool
+    @State private var didStartReordering = false
+
+    init(movieList: CDMovieList, context: NSManagedObjectContext, startsReordering: Bool = false) {
         _viewModel = StateObject(wrappedValue: ListViewModel(movieList: movieList, context: context))
         self.movieList = movieList
+        self.startsReordering = startsReordering
     }
     // Observed so the title and description update right after the list is edited
     @ObservedObject private var movieList: CDMovieList
@@ -45,9 +50,8 @@ struct ListView: View {
     @ObservedObject private var streaming = StreamingNowStore.shared
     @State private var choosingServices = false
     @State private var showSharing = false
-    // Asking to confirm deleting the list (the owner) or leaving it (a contributor), and why that failed
-    @State private var confirmingRemoveList = false
-    @State private var removeListFailed: String? = nil
+    // Set once the list is deleted or left from Edit List, so it closes when that sheet does
+    @State private var listRemoved = false
     // Whether the big title at the top of the list has scrolled away, so the bar shows a small one
     @State private var showBarTitle = false
     @Environment(\.dismiss) private var dismiss
@@ -129,7 +133,16 @@ struct ListView: View {
                 addToOtherLists(movie, lists)
             }
         }
-        .onAppear { viewModel.loadInfo() }
+        .onAppear {
+            viewModel.loadInfo()
+            if startsReordering && !didStartReordering {
+                didStartReordering = true
+                // Once the push has finished, so the rows' drag handles slide in where they can be seen
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    if viewModel.movies.count > 1 { startReordering() }
+                }
+            }
+        }
         // The list's name is shown by the view itself rather than by the bar, so a long name wraps onto more lines
         // instead of being cut short or squeezing Recommend, Export and Add
         .navigationBarTitleDisplayMode(.inline)
@@ -185,27 +198,14 @@ struct ListView: View {
                 }
             }
         }
-        .sheet(isPresented: $editingDetails) {
-            EditListSheet(movieList: movieList)
+        .sheet(isPresented: $editingDetails, onDismiss: closeIfRemoved) {
+            EditListSheet(movieList: movieList) { listRemoved = true }
         }
         .sheet(isPresented: $showSharing) {
             ShareListSheet(listID: movieList.id, listName: movieList.name ?? "List") {
                 dismiss()
             }
             .presentationDetents([.medium, .large])
-        }
-        .confirmationDialog(sharing.isOwner(movieList.id) ? "Delete \(listTitle)?" : "Leave \(listTitle)?",
-                            isPresented: $confirmingRemoveList, titleVisibility: .visible) {
-            Button(sharing.isOwner(movieList.id) ? "Delete List" : "Leave List", role: .destructive, action: removeList)
-        } message: {
-            Text(sharing.isOwner(movieList.id)
-                 ? (sharing.isShared(movieList.id) ? "It's deleted for everyone on it, along with its films and ranks." : "Its films and ranks are deleted too.")
-                 : "You'll stop seeing this list. The films you added stay in it.")
-        }
-        .alert("Couldn't do that", isPresented: Binding(get: { removeListFailed != nil }, set: { if !$0 { removeListFailed = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(removeListFailed ?? "")
         }
         .confirmationDialog("Sort by TMDb rating?", isPresented: $confirmingRatingSort, titleVisibility: .visible) {
             Button("Sort, Highest Rated First") {
@@ -266,6 +266,13 @@ private extension ListView {
     var MovieListSection: some View {
         ScrollViewReader { proxy in
             List {
+                // Who's on a shared list, above everything else. Nothing at all on a list only the user is on
+                if sharing.members(of: movieList.id).count > 1, !editMode.isEditing {
+                    ContributorAvatars(listID: movieList.id) { showSharing = true }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 0, trailing: 20))
+                }
                 titleHeader
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -287,13 +294,6 @@ private extension ListView {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
-                }
-                // Always shown to the owner, so inviting people isn't hidden in a menu
-                if sharing.isShared(movieList.id) || sharing.isOwner(movieList.id), !editMode.isEditing {
-                    ContributorsRow(listID: movieList.id) { showSharing = true }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 }
                 if viewModel.movies.isEmpty {
                     EmptyStateView(
@@ -482,56 +482,17 @@ private extension ListView {
 
     var listTitle: String { movieList.name ?? "No Movie Name" }
 
-    // Everything to do with the list itself, from the ••• by its name: editing, reordering, contributors, and
-    // deleting it (the owner) or leaving it (a contributor)
-    @ViewBuilder
-    var titleMenuItems: some View {
-        let isOwner = sharing.isOwner(movieList.id)
-        // Only the owner can rename a shared list or change who can see it
-        if isOwner {
-            Button {
-                editingDetails = true
-            } label: {
-                Label("Edit Name & Visibility", systemImage: "pencil")
-            }
-        }
-        if viewModel.movies.count > 1 {
-            Button {
-                startReordering()
-            } label: {
-                Label("Reorder Films", systemImage: "arrow.up.arrow.down")
-            }
-        }
-        Button {
-            showSharing = true
-        } label: {
-            if isOwner {
-                Label(sharing.isShared(movieList.id) ? "Contributors…" : "Add Contributors…", systemImage: "person.badge.plus")
-            } else {
-                Label("Who Can Edit", systemImage: "person.2")
-            }
-        }
-        Button {
-            exportZip()
-        } label: {
-            Label("Export List (ZIP)", systemImage: "doc.zipper")
-        }
-        Divider()
-        Button(role: .destructive) {
-            confirmingRemoveList = true
-        } label: {
-            if isOwner {
-                Label("Delete List", systemImage: "trash")
-            } else {
-                Label("Leave Shared List", systemImage: "rectangle.portrait.and.arrow.right")
-            }
-        }
-    }
-
-    // The list's name at the top, large, wrapping onto as many lines as it needs
+    // The list's name at the top, large, wrapping onto as many lines as it needs. Its ••• has the same three actions
+    // as the list's card on Home
     var titleHeader: some View {
         Menu {
-            titleMenuItems
+            ListMenuItems(
+                listID: movieList.id,
+                canReorder: viewModel.movies.count > 1,
+                onEdit: { editingDetails = true },
+                onAddContributor: { showSharing = true },
+                onReorder: startReordering
+            )
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(listTitle)
@@ -863,8 +824,11 @@ private extension ListView {
     // Shows every film so each one can be dragged to its new rank
     func startReordering() {
         Haptics.tap()
+        // Positions in a filtered list wouldn't be ranks, so every film is shown
         viewModel.searchText = ""
         viewModel.selectedGenres = []
+        viewModel.showAIPlacedOnly = false
+        viewModel.showStreamingOnly = false
         withAnimation(Theme.spring) { editMode = .active }
     }
 
@@ -965,38 +929,16 @@ private extension ListView {
         viewModel.deleteMovie(at: IndexSet(integer: index))
     }
 
-    // Deletes the list for everyone (the owner) or takes the user off it (a contributor), then closes it. Removed from
-    // the phone only once the screen has gone, so nothing on it is left showing a deleted list
-    func removeList() {
+    // After the list was deleted or left from Edit List: closes it, then takes it off the phone once the screen has
+    // gone, so nothing on it is left showing a deleted list
+    func closeIfRemoved() {
+        guard listRemoved else { return }
         let list = movieList
-        let isOwner = sharing.isOwner(list.id)
-        let finish = {
-            Haptics.success()
-            dismiss()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                withAnimation(Theme.spring) { CDMovieList.delete(movieList: list) }
-                if !isOwner { ListSharing.shared.refresh() }
-            }
-        }
-        if isOwner {
-            APIService.shared.deleteList(listID: list.id) { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success: finish()
-                    case .failure(let error):
-                        print("Error deleting list:", error)
-                        removeListFailed = "Couldn't delete the list. Check your connection and try again."
-                    }
-                }
-            }
-        } else {
-            APIService.shared.removeListEditor(listID: list.id) { ok in
-                guard ok else {
-                    removeListFailed = "Couldn't leave the list. Check your connection and try again."
-                    return
-                }
-                finish()
-            }
+        let wasShared = sharing.isShared(list.id)
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            withAnimation(Theme.spring) { CDMovieList.delete(movieList: list) }
+            if wasShared { ListSharing.shared.refresh() }
         }
     }
 

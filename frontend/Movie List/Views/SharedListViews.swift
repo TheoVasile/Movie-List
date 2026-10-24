@@ -8,26 +8,18 @@
 import Foundation
 import SwiftUI
 
-/// Who can edit a list, above its films: "Shared with Edie" / "Owen's list, shared with you" with everyone's faces,
-/// or, on a list that isn't shared yet, an invitation to share it. Tapping it shows the contributors, where the owner adds people
-struct ContributorsRow: View {
+/// Everyone on a shared list as a row of overlapping faces, at the very top of the list. Tapping it shows the
+/// contributors, where the owner adds and removes people. Shows nothing on a list only the user is on
+struct ContributorAvatars: View {
     let listID: Int64
     let action: () -> Void
     @ObservedObject private var sharing = ListSharing.shared
 
-    private var isShared: Bool { sharing.isShared(listID) }
-    private var isOwner: Bool { sharing.isOwner(listID) }
+    // Faces shown before the rest fold into a "+N"
+    private static let maxShown = 5
+    private static let size: CGFloat = 30
 
-    private var text: String {
-        guard isShared else { return "Just you. Invite friends to add and rank films with you." }
-        let others = sharing.others(on: listID)
-        if !isOwner, let owner = others.first(where: \.is_owner) {
-            let rest = others.filter { !$0.is_owner }.map { "@\($0.handle)" }
-            return rest.isEmpty ? "@\(owner.handle)'s list, shared with you"
-                : "@\(owner.handle)'s list, shared with you and \(Self.names(rest))"
-        }
-        return "Shared with \(Self.names(others.map { "@\($0.handle)" }))"
-    }
+    private var members: [ListMember] { sharing.members(of: listID) }
 
     // "Sam", "Sam and Ana", "Sam, Ana and Lee"
     static func names(_ all: [String]) -> String {
@@ -36,52 +28,76 @@ struct ContributorsRow: View {
     }
 
     var body: some View {
-        Button {
-            Haptics.tap()
-            action()
-        } label: {
-            HStack(spacing: 10) {
-                if isShared {
-                    HStack(spacing: -10) {
-                        ForEach(sharing.others(on: listID).prefix(4)) { person in
-                            Avatar(name: person.display_name, size: 28, handle: person.handle, version: person.avatar_version)
-                                .overlay(Circle().stroke(Theme.background, lineWidth: 2))
-                        }
+        if sharing.isShared(listID) && members.count > 1 {
+            Button {
+                Haptics.tap()
+                action()
+            } label: {
+                HStack(spacing: -8) {
+                    ForEach(members.prefix(Self.maxShown)) { person in
+                        Avatar(name: person.display_name, size: Self.size, handle: person.is_me ? nil : person.handle, version: person.avatar_version)
+                            .overlay(Circle().stroke(Theme.background, lineWidth: 2))
                     }
-                } else {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
-                        .frame(width: 28, height: 28)
-                        .background(Theme.surfaceRaised, in: Circle())
+                    if members.count > Self.maxShown {
+                        Text("+\(members.count - Self.maxShown)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundColor(Theme.textPrimary)
+                            .frame(width: Self.size, height: Self.size)
+                            .background(Theme.surfaceRaised, in: Circle())
+                            .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+                    }
                 }
-                Text(text)
-                    .font(isShared ? .subheadline.weight(.semibold) : .subheadline)
-                    .foregroundColor(isShared ? Theme.textPrimary : Theme.textSecondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-                // Spelled out, so it's clear this is where people are added
-                if isOwner {
-                    Label("Invite", systemImage: "person.badge.plus")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(Theme.onAccent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Theme.accentGradient, in: Capsule())
-                        .fixedSize()
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                .contentShape(Rectangle())
             }
-            .padding(12)
-            .cardStyle(cornerRadius: 16)
+            .buttonStyle(PressableButtonStyle(scale: 0.96))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Contributors: \(Self.names(members.map { $0.is_me ? "you" : "@\($0.handle)" }))")
+            .accessibilityHint("Shows who can edit this list")
         }
-        .buttonStyle(PressableButtonStyle(scale: 0.98))
-        .accessibilityLabel(isOwner ? "Contributors. \(text)" : text)
-        .accessibilityHint(isOwner ? "Shows who can edit this list and invites people" : "Shows who can edit this list")
+    }
+}
+
+/// A list's actions, the same three everywhere: the ••• by the list's name, the ••• on its card on Home and a long
+/// press on that card. Deleting and leaving the list are in Edit List, and exporting is in the Share menu
+struct ListMenuItems: View {
+    let listID: Int64
+    // Reordering needs at least two films
+    var canReorder = true
+    let onEdit: () -> Void
+    let onAddContributor: () -> Void
+    let onReorder: () -> Void
+    @ObservedObject private var sharing = ListSharing.shared
+    @ObservedObject private var sync = SyncStatus.shared
+
+    var body: some View {
+        // Who owns the list isn't known until the lists first load
+        let loading = sync.isFirstSync
+        let isOwner = sharing.isOwner(listID)
+        Button {
+            onEdit()
+        } label: {
+            Label("Edit List", systemImage: "pencil")
+        }
+        .disabled(loading)
+        // Shown to everyone so the menu is always the same three items, but only the owner can invite people
+        Button {
+            onAddContributor()
+        } label: {
+            Label("Add Contributor", systemImage: "person.badge.plus")
+            if !isOwner {
+                Text("Only the owner can add people")
+            }
+        }
+        .disabled(loading || !isOwner)
+        Button {
+            onReorder()
+        } label: {
+            Label("Reorder", systemImage: "arrow.up.arrow.down")
+            if !canReorder {
+                Text("Needs at least two films")
+            }
+        }
+        .disabled(!canReorder)
     }
 }
 
