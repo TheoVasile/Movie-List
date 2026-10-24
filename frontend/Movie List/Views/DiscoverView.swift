@@ -175,6 +175,7 @@ struct DiscoverView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityLabel("Discover Options")
                 }
             }
         }
@@ -295,6 +296,7 @@ private extension DiscoverView {
             Image(systemName: "brain")
                 .font(.system(size: 40))
                 .foregroundStyle(Theme.accentGradient)
+                .accessibilityHidden(true)
             Text("Allow AI Features?")
                 .font(.title2.bold())
                 .foregroundColor(Theme.textPrimary)

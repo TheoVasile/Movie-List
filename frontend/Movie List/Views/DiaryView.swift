@@ -206,6 +206,7 @@ struct WatchHistoryCard: View {
         HStack(spacing: 12) {
             Image(systemName: "book.closed.fill")
                 .foregroundStyle(Theme.accentGradient)
+                .accessibilityHidden(true)
             Text(summary)
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(Theme.textPrimary)

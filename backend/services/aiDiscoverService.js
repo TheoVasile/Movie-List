@@ -1,9 +1,13 @@
 const Anthropic = require("@anthropic-ai/sdk");
+const pool = require("../config/db");
 
 const MODEL = "claude-haiku-5-5";
 // Plenty for anyone's lists, while keeping each request to a fraction of a cent
 const MAX_LIST_FILMS = 4000;
 const DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 40;
+// AI requests a day from everyone together, a cap on the daily AI bill. At a fraction of a cent each, the default
+// keeps a day under about $25
+const GLOBAL_DAILY_LIMIT = Number(process.env.AI_GLOBAL_DAILY_LIMIT) || 5000;
 
 const SYSTEM_PROMPT = `You recommend films for the Discover tab of a film-ranking app. The user swipes through your picks one at a time and adds the ones they like to their lists.
 
@@ -46,16 +50,39 @@ function getClient() {
     return client;
 }
 
-// Requests per user per day. Kept in memory, so it resets when the server restarts
-const usage = new Map();
-function takeDailyRequest(user_id) {
+// Requests per user per day, counted in the database (ai_usage) so restarts and extra servers don't reset them.
+// The increment only happens while under the limit, in one statement, so two requests at once can't both slip in
+let lastCleanup = "";
+async function takeDailyRequest(user_id) {
+    // Days are UTC, like the database
     const today = new Date().toISOString().slice(0, 10);
-    const entry = usage.get(user_id);
-    const count = entry?.day === today ? entry.count : 0;
-    if (count >= DAILY_LIMIT) {
+    // Old counts are only needed for today, so the first request of each day on this server deletes them
+    if (lastCleanup !== today) {
+        lastCleanup = today;
+        pool.query("DELETE FROM ai_usage WHERE day < $1::date - 2", [today])
+            .catch((error) => console.error("Couldn't delete old AI usage:", error.message));
+    }
+    const mine = await pool.query(
+        `INSERT INTO ai_usage (user_id, day, count) VALUES ($1, $2, 1)
+         ON CONFLICT (user_id, day) DO UPDATE SET count = ai_usage.count + 1 WHERE ai_usage.count < $3
+         RETURNING count`,
+        [user_id, today, DAILY_LIMIT]
+    );
+    if (!mine.rowCount) {
         throw new AILimitError(`Daily limit of ${DAILY_LIMIT} AI requests reached`);
     }
-    usage.set(user_id, { day: today, count: count + 1 });
+    // Everyone's requests together, so a launch spike can't run up the AI bill
+    const everyone = await pool.query(
+        `INSERT INTO ai_usage_total (day, count) VALUES ($1, 1)
+         ON CONFLICT (day) DO UPDATE SET count = ai_usage_total.count + 1 WHERE ai_usage_total.count < $2
+         RETURNING count`,
+        [today, GLOBAL_DAILY_LIMIT]
+    );
+    if (!everyone.rowCount) {
+        // The user didn't get to use this one
+        await pool.query("UPDATE ai_usage SET count = count - 1 WHERE user_id = $1 AND day = $2", [user_id, today]);
+        throw new AILimitError("AI picks are taking a break for today. Try again tomorrow.");
+    }
 }
 
 // Shows in the user's lists are marked so the AI doesn't take them for films
@@ -176,7 +203,7 @@ function createPickParser(onPick) {
 /// Fails before any pick arrives if AI isn't set up, the daily limit is reached, or the request fails
 async function recommendFilms(user_id, lists, signals, count, onPick = () => {}) {
     const anthropic = getClient();
-    takeDailyRequest(user_id);
+    await takeDailyRequest(user_id);
 
     const picks = [];
     const parse = createPickParser((pick) => {
@@ -229,7 +256,7 @@ const MOVIE_NIGHT_TOTAL_FILMS = 4000;
 /// services. Returns [{ title, year, reason }]. Counts against the user's daily limit
 async function recommendForGroup(user_id, people, count, constraints = {}) {
     const anthropic = getClient();
-    takeDailyRequest(user_id);
+    await takeDailyRequest(user_id);
 
     const each = Math.floor(MOVIE_NIGHT_TOTAL_FILMS / people.length);
     const limits = [];
@@ -297,7 +324,7 @@ const PLACEMENT_SCHEMA = {
 /// the new film), as { title, year }. Returns { rank, reason } with rank clamped to 1...films.length + 1
 async function placeInList(user_id, listName, films, newFilm) {
     const anthropic = getClient();
-    takeDailyRequest(user_id);
+    await takeDailyRequest(user_id);
 
     const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}`).join("\n");
     const response = await anthropic.messages.create({

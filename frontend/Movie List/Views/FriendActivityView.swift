@@ -175,6 +175,7 @@ struct FriendActivityView: View {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Image(systemName: item.icon)
                                 .foregroundStyle(Theme.accentGradient)
+                                .accessibilityHidden(true)
                             Text(Theme.year(from: item.release_date).isEmpty ? item.title : "\(item.title) (\(Theme.year(from: item.release_date)))")
                                 .fontWeight(.semibold)
                                 .foregroundColor(Theme.textPrimary)

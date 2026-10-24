@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const { notifyUser } = require("./pushService");
 const { visibleTo } = require("../models/listModel");
+const { mapWithConcurrency } = require("./letterboxdService");
 
 // Watches or list additions saved more than this many to the second were done in bulk (an import, or
 // marking a whole list watched), not one by one, so they aren't news
@@ -136,29 +137,45 @@ async function buildDigest(user_id) {
     };
 }
 
+// People whose digests are built at once, and how many are done before their last_digest_at is saved in one go
+const CONCURRENCY = 5;
+const CHUNK_SIZE = 100;
+
 /// Sends the daily digest to everyone who wants it, has a device and hasn't had one in the last 20 hours.
 /// Returns how many people were sent one
 async function sendDailyDigests() {
+    // Only people someone they follow (or a list they follow) did something for in the last day, found in one
+    // query, so the daily run doesn't build a digest for everyone just to find most are empty
     const people = await pool.query(
         `SELECT DISTINCT u.firebase_uid FROM users u JOIN device_tokens t ON t.user_id = u.firebase_uid
          WHERE u.notify_activity AND (u.last_digest_at IS NULL OR u.last_digest_at < NOW() - INTERVAL '20 hours')
-           AND (EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted)
-                OR EXISTS (SELECT 1 FROM list_follows lf WHERE lf.user_id = u.firebase_uid))`
+           AND (EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = u.firebase_uid AND f.accepted
+                        AND (EXISTS (SELECT 1 FROM watched_movies w WHERE w.user_id = f.followee_id AND w.watched_at > NOW() - INTERVAL '24 hours')
+                             OR EXISTS (SELECT 1 FROM watch_log wl WHERE wl.user_id = f.followee_id AND wl.created_at > NOW() - INTERVAL '24 hours')
+                             OR EXISTS (SELECT 1 FROM lists l JOIN list_movies lm ON lm.list_id = l.id
+                                        WHERE l.user_id = f.followee_id AND lm.added_at > NOW() - INTERVAL '24 hours')))
+                OR EXISTS (SELECT 1 FROM list_follows lf JOIN list_movies lm ON lm.list_id = lf.list_id
+                           WHERE lf.user_id = u.firebase_uid AND lm.added_at > NOW() - INTERVAL '24 hours'))`
     );
+    const uids = people.rows.map((row) => row.firebase_uid);
     let sent = 0;
-    for (const { firebase_uid } of people.rows) {
-        try {
-            const digest = await buildDigest(firebase_uid);
-            if (!digest) continue;
-            if (await notifyUser(firebase_uid, "activity", digest)) {
-                sent++;
-                await pool.query("UPDATE users SET last_digest_at = NOW() WHERE firebase_uid = $1", [firebase_uid]);
+    for (let i = 0; i < uids.length; i += CHUNK_SIZE) {
+        const done = await mapWithConcurrency(uids.slice(i, i + CHUNK_SIZE), async (firebase_uid) => {
+            try {
+                const digest = await buildDigest(firebase_uid);
+                return digest && (await notifyUser(firebase_uid, "activity", digest)) > 0 ? firebase_uid : null;
+            } catch (error) {
+                console.error("Couldn't build a digest:", error.message);
+                return null;
             }
-        } catch (error) {
-            console.error("Couldn't build a digest:", error.message);
+        }, CONCURRENCY);
+        const notified = done.filter(Boolean);
+        if (notified.length) {
+            await pool.query("UPDATE users SET last_digest_at = NOW() WHERE firebase_uid = ANY($1::text[])", [notified]);
         }
+        sent += notified.length;
     }
-    return { candidates: people.rows.length, sent };
+    return { candidates: uids.length, sent };
 }
 
 module.exports = { sendDailyDigests, buildDigest, fetchFriendActivity, fetchFollowedListUpdates, describe };

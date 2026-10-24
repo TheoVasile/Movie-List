@@ -64,6 +64,7 @@ struct AboutView: View {
                 .background(Theme.accentGradient)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .shadow(color: Theme.shadow.opacity(0.4), radius: 14, y: 8)
+                .accessibilityHidden(true)
             Text("Marquee")
                 .font(.system(size: 32, weight: .heavy, design: .rounded))
                 .foregroundColor(Theme.textPrimary)

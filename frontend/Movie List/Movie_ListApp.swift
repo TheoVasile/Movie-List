@@ -13,6 +13,7 @@ import GoogleSignInSwift
 import FirebaseAppCheck
 import FirebaseMessaging
 import FirebaseAuth
+import FirebaseCrashlytics
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
@@ -23,8 +24,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
     #endif
     FirebaseApp.configure()
-    // Usage analytics are on unless turned off in Settings
+    // Usage analytics and crash reports are on unless turned off in Settings (one toggle for both). No user ID
+    // or other personal information is ever set in Crashlytics
     AppAnalytics.applySetting()
+    Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(AppAnalytics.isEnabled)
     Personalization.migrateGenderToPronouns()
     Personalization.migrateAIConsent()
 
