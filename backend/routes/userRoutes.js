@@ -2,6 +2,7 @@ const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, suggestPick, reactToPick, removePick, likedPicks } = require("../models/groupPicksModel");
 const { yearReview } = require("../models/yearReviewModel");
+const { fetchFriendActivity } = require("../services/digestService");
 const { MAX_RECIPIENTS, sendRecommendation, fetchReceived, markSeen, removeReceived } = require("../models/recommendationsModel");
 const { setStreamingPreferences, streamingPreferences } = require("../services/streamingAlerts");
 const { availableServices } = require("../services/filmFilters");
@@ -608,6 +609,34 @@ router.get("/search", async (req, res) => {
         res.json(await searchUsers(req.user.uid, query.slice(0, 20)));
     } catch (error) {
         console.error("Error searching users:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// What the people the user follows watched, rewatched and added to their lists lately, newest first, e.g.
+// ?days=14 (1 to 30). Each entry has the friend, the film (with what the app needs to open it) and when
+router.get("/me/activity", async (req, res) => {
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 30);
+    try {
+        const rows = await fetchFriendActivity(req.user.uid, { days, limit: 200 });
+        res.json(rows.filter((row) => row.handle).map((row) => ({
+            kind: row.kind,
+            rank: row.rank,
+            list_name: row.list_name,
+            at: new Date(row.at).toISOString(),
+            handle: row.handle,
+            avatar_version: row.avatar_version,
+            tmdb_id: Number(row.tmdb_id),
+            title: row.title,
+            release_date: row.release_date ?? "",
+            poster_path: row.poster_path,
+            overview: row.overview ?? "",
+            original_language: row.original_language ?? "",
+            popularity: row.popularity ?? 0,
+            my_list: row.my_list,
+        })));
+    } catch (error) {
+        console.error("Error fetching friend activity:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });
