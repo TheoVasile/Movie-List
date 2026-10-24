@@ -144,6 +144,9 @@ extension AuthenticationViewModel {
         // The next person to sign in shouldn't see this account's films on the Home Screen
         WidgetSnapshot.remove()
         WidgetCenter.shared.reloadAllTimelines()
+        // The birthday is saved with the account and comes back when it signs in again; the next person to
+        // sign in shouldn't get it
+        UserDefaults.standard.removeObject(forKey: Personalization.birthdayKey)
       try Auth.auth().signOut()
     }
     catch {

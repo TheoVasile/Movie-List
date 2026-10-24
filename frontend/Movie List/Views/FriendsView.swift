@@ -23,7 +23,7 @@ final class SocialStore: ObservableObject {
 
     func load() {
         APIService.shared.fetchMyProfile { result in
-            if case .success(let profile) = result { self.profile = profile }
+            if case .success(let profile) = result { self.received(profile) }
             self.hasLoaded = true
         }
         APIService.shared.fetchFollowing { result in
@@ -40,10 +40,16 @@ final class SocialStore: ObservableObject {
     /// Reloads just the user's profile, e.g. after agreeing to new terms. Calls back once it has, whether or not it worked
     func reloadProfile(completion: (() -> Void)? = nil) {
         APIService.shared.fetchMyProfile { result in
-            if case .success(let profile) = result { self.profile = profile }
+            if case .success(let profile) = result { self.received(profile) }
             self.hasLoaded = true
             completion?()
         }
+    }
+
+    /// Keeps the profile, and copies the birthday saved with the account onto this iPhone
+    private func received(_ profile: UserProfile) {
+        self.profile = profile
+        Personalization.mirrorBirthday(from: profile)
     }
 
     /// Accepts or declines someone's request, taking it off the list straight away

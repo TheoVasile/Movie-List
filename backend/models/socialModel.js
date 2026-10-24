@@ -14,11 +14,13 @@ function isValidHandle(handle) {
     return typeof handle === "string" && HANDLE_PATTERN.test(handle);
 }
 
-// The signed-in user's @username (null until they pick one), display name and follow counts
+// The signed-in user's @username (null until they pick one), display name and follow counts. Only ever for the
+// user themselves: it includes their birthday and phone number
 async function getProfile(user_id) {
     const result = await pool.query(
         `SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version, u.ai_allowed, u.notify_requests, u.notify_activity,
                 u.phone IS NOT NULL AS has_phone, u.phone, u.is_private, u.terms_version,
+                TO_CHAR(u.birthday, 'YYYY-MM-DD') AS birthday,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND accepted)::int AS followers,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.firebase_uid AND accepted)::int AS following,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.firebase_uid AND NOT accepted)::int AS requests,
@@ -88,6 +90,15 @@ async function fetchAvatar({ user_id, handle }) {
 
 async function setAIAllowed(user_id, allowed) {
     await pool.query("UPDATE users SET ai_allowed = $2 WHERE firebase_uid = $1", [user_id, allowed]);
+}
+
+// Saves the user's birthday as "yyyy-MM-dd", or removes it with null
+async function setBirthday(user_id, birthday) {
+    const result = await pool.query(
+        "UPDATE users SET birthday = $2 WHERE firebase_uid = $1 RETURNING TO_CHAR(birthday, 'YYYY-MM-DD') AS birthday",
+        [user_id, birthday]
+    );
+    return result.rowCount ? { birthday: result.rows[0].birthday } : null;
 }
 
 async function setHandle(user_id, handle) {
@@ -393,4 +404,4 @@ async function fetchBlocked(user_id) {
     return result.rows;
 }
 
-module.exports = { notBlocked, blockUser, unblockUser, fetchBlocked, setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { notBlocked, blockUser, unblockUser, fetchBlocked, setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };

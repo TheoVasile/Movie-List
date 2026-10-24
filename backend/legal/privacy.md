@@ -7,7 +7,7 @@ This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects
 ## 1. The Short Version
 
 - We collect what we need to run Marquee: your account details, your profile, the films and lists you add, and the people you connect with.
-- A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your birthday and pronouns are kept on your device, and are only sent anywhere in the limited ways described below.
+- A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your pronouns are kept on your device, and are only sent anywhere in the limited ways described below. If you add your birthday, we store it with your account, and only you can see it.
 - AI features are off unless you turn them on. When you use them, we send your film lists and preferences to our AI provider, Anthropic, but not your name, email address, phone number or contacts.
 - We do not sell your personal information, we do not show ads, and we do not track you across other companies' apps or websites.
 - We use Google Analytics for Firebase to count which features are used, without your advertising identifier or your name, email address or content. You can turn it off in Settings.
@@ -26,6 +26,10 @@ We collect the **display name** and **@username** you choose, and, if you add on
 ### Your phone number (optional)
 
 If you add a phone number so friends can find you from their contacts, Google Firebase verifies it by sending a code by text message. Once it is verified, we store the number on our servers and in your Firebase account. You can remove it at any time in Settings, which removes it from both.
+
+### Your birthday (optional)
+
+If you add your birthday in Settings, we store your **date of birth** on our servers, linked to your account, so that it is kept when you reinstall the App or sign in on another iPhone. We use it only to check that you are old enough to use Marquee (the App does not accept a birthday that makes you younger than 13) and its AI features, and to work out the age range (such as 25–34) sent with AI Discover requests. Only you can see your birthday: it is never shown to other users, and it is never sent to our AI provider or anyone else. You can change or remove it at any time in Settings, which removes it from our servers.
 
 ### What you add to Marquee
 
@@ -77,7 +81,7 @@ Analytics are on unless you turn them off. You can turn them off at any time wit
 Some features work only on your device. This information is not sent to us, except as described here:
 
 - **Discover.** The films you like, skip or mark "not for me" in Discover, your Discover filters, and the taste profile built from them are stored on your iPhone. They are sent to our servers only when you use AI Picks, so that the AI can make suggestions (see Section 7).
-- **Birthday and pronouns.** If you choose to add your birthday or pronouns for better recommendations, they are stored on your iPhone. Your birthday itself is never sent to us or to our AI provider: the App works out your age range from it (such as 25–34), and only that age range, and your pronouns, are sent with AI Discover requests, and only while AI features are on. If you chose an age range in an earlier version of the App instead, that age range is used in the same way until you add a birthday. If your birthday or age range shows you are under 18, the App turns AI features off for you.
+- **Pronouns and age range.** If you choose your pronouns for better recommendations, they are stored on your iPhone. Your birthday is stored with your account (see Section 2), and the App also keeps a copy of it on your iPhone, where it works out your age range (such as 25–34). Only that age range, and your pronouns, are sent with AI Discover requests, and only while AI features are on; your birthday itself is never sent to our AI provider. If you chose an age range in an earlier version of the App and have not added a birthday, that age range stays on your iPhone and is used in the same way. If your birthday or age range shows you are under 18, the App turns AI features off for you.
 - **Daylight appearance.** If you choose the Daylight appearance, the App uses your approximate location, rounded to about 10 kilometres, to work out sunrise and sunset. It is stored on your iPhone and is not sent to us.
 - **Theatre check-ins.** If you turn on Theatre Check-ins, the App uses your iPhone's location, including in the background and with precise location, to notice when you spend about a film's length at a movie theatre and then leave. The theatres near you, when you arrived and where you are stay on your iPhone. To find nearby theatres, the App asks Apple Maps, which means Apple receives your approximate location under Apple's own privacy policy. If you then choose what you saw, we receive only the film and the date, like any other diary entry, and not the theatre or your location.
 - **Widgets.** To show your top films and tonight's suggestions on your Home Screen, the App saves a small copy of that information in a space on your iPhone shared with its widgets. It is removed when you sign out.
@@ -124,6 +128,7 @@ We use personal information to:
 - Run the social features you use, such as following, private accounts, blocking, shared lists, recommendations, activity and movie night groups
 - Find streaming availability and send the notifications and alerts you have chosen, including the daily friends summary
 - Provide the optional AI features you have turned on
+- Check that you are old enough to use the App and its AI features, and work out the age range used for AI Discover, from your birthday if you have added one
 - Keep the App safe, prevent abuse and fraud, enforce our Terms of Service and respond to reports
 - Understand how the App is used, fix problems and improve it
 - Respond to your messages and requests, and tell you about changes to the App, our Terms or this Policy
@@ -136,7 +141,7 @@ We do not use your information to show you advertising, and we do not make decis
 If data protection laws such as the GDPR or UK GDPR apply to you, we rely on these legal bases:
 
 - **Contract:** to provide the App and the features you ask for under our Terms of Service
-- **Consent:** for optional features you turn on, such as AI features, adding a phone number, contacts matching, location features and notifications. You can withdraw consent at any time, without affecting what happened before
+- **Consent:** for optional features you turn on, such as AI features, adding your birthday or a phone number, contacts matching, location features and notifications. You can withdraw consent at any time, without affecting what happened before
 - **Legitimate interests:** to keep the App secure, prevent abuse, understand and improve the App (including usage analytics, which you can turn off in Settings), and communicate with you about it, where these interests are not overridden by your rights
 - **Legal obligation:** where we must keep or disclose information to comply with the law
 
@@ -150,6 +155,7 @@ Marquee is a social app, so some of your information is visible to other users:
 - People you send recommendations to see the film and any message you add, and the people in your movie night groups and shared lists see your suggestions, reactions, votes and edits
 - Notifications to your friends may include your name or @username and the film involved
 - If you report someone, we do not tell them who reported them
+- Your birthday, if you add one, is only ever visible to you
 
 Blocking someone stops them from following you and seeing your profile and lists. Remember that anything you share with others can be copied or passed on by them.
 
@@ -203,6 +209,7 @@ We keep your information for as long as your account exists, because we need it 
 
 - Your account, profile and content are kept until you delete them or delete your account
 - Your phone number is kept until you remove it or delete your account
+- Your birthday is kept until you remove it or delete your account
 - Notification tokens are removed when you sign out, when your account is deleted, or when they stop working
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
 - Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
@@ -217,7 +224,7 @@ When you delete your account, we delete your information as described in Section
 
 You can permanently delete your account at any time in Settings by tapping **Delete Account**. For your security, you first confirm it is you by entering your password or signing in with Google again, and our servers only accept a deletion request made shortly after that. Your account is then deleted in a single step on our servers:
 
-- Your account, profile, photo, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
+- Your account, profile, photo, birthday, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
 - Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to, along with your votes and reactions in them
 - Your sign-in account with Google Firebase is deleted at the same time. If that fails, nothing is deleted and you can try again
 - Films you added to someone else's shared list, and films you suggested in a group you did not own, stay there without your name
@@ -229,7 +236,7 @@ Usage analytics are not linked to your account, so they are not deleted with it;
 
 ### Choices in the App
 
-- Change your display name, @username, photo, phone number, notification settings, streaming services and AI setting in Settings
+- Change or remove your display name, @username, photo, birthday, phone number, notification settings, streaming services and AI setting in Settings
 - Make your account private, approve or decline follow requests, choose each list's visibility, and block people
 - Edit or delete your lists, notes, diary entries and recommendations
 - Turn off AI features, location features, contacts access, notifications and usage analytics
@@ -260,7 +267,7 @@ If the GDPR, the UK GDPR or Swiss data protection law applies to you, you have t
 
 If you are a California resident, the California Consumer Privacy Act, as amended by the California Privacy Rights Act, gives you the right to know what personal information we collect, use and disclose, to access, correct and delete it, and not to be discriminated against for exercising these rights. Residents of some other US states have similar rights.
 
-In the past 12 months, we have collected these categories of personal information, from you, your device and the service providers described in this Policy, for the purposes described in Section 8: identifiers (such as your name, email address, @username, phone number, account ID, IP address, device tokens and the analytics app instance identifier); customer records (such as your email address and phone number); internet or other electronic network activity (such as your lists, ratings, activity in the App and usage analytics); approximate location derived from your IP address (for usage analytics); and inferences drawn from them (such as film recommendations). We disclose these categories for business purposes to the service providers listed in Section 10. Your sign-in details are sensitive personal information, which we use only to provide and secure your account.
+In the past 12 months, we have collected these categories of personal information, from you, your device and the service providers described in this Policy, for the purposes described in Section 8: identifiers (such as your name, email address, @username, phone number, account ID, IP address, device tokens and the analytics app instance identifier); customer records (such as your email address and phone number); characteristics of protected classifications (your date of birth, if you add it); internet or other electronic network activity (such as your lists, ratings, activity in the App and usage analytics); approximate location derived from your IP address (for usage analytics); and inferences drawn from them (such as film recommendations). We disclose these categories for business purposes to the service providers listed in Section 10. Your sign-in details are sensitive personal information, which we use only to provide and secure your account.
 
 We do not sell personal information or share it for cross-context behavioural advertising, and we have not done so in the past 12 months. We have no actual knowledge of selling or sharing the personal information of anyone under 16. Because we do not track you across other services, we do not respond differently to Do Not Track or Global Privacy Control signals.
 
@@ -274,7 +281,7 @@ If we decline your request, we will explain why. Where the law allows, you can a
 
 Marquee is not intended for children under 13, and you must be at least 13 to create an account. When you sign up, and whenever you accept the Terms of Service, you confirm that you are at least 13. We do not knowingly collect personal information from children under 13. If we learn that a child under 13 has created an account, we will delete it and its information. If you believe a child under 13 has given us personal information, please contact us at {{CONTACT_EMAIL}}.
 
-If you are under the age at which you can consent to the processing of your personal information where you live, you may only use the App with the consent of a parent or guardian. AI features are not available to users who tell us they are under 18.
+If you are under the age at which you can consent to the processing of your personal information where you live, you may only use the App with the consent of a parent or guardian. AI features are not available to users who tell us they are under 18, by the birthday they add or an age range they chose in an earlier version of the App.
 
 ## 16. Security
 
