@@ -237,14 +237,37 @@ extension AuthenticationViewModel {
     return message.map { .failed($0) } ?? .deleted
   }
 
+  /// UserDefaults keys that belong to the signed-in account, removed when it's deleted. Add new account keys here.
+  /// Device settings (appearance.*) and whatever Firebase and Google Sign-In keep are left alone
+  static let accountDefaultsKeys = [
+    // Notifications and theatre check-ins
+    NotificationManager.suggestionsKey, TheatreCheckIns.enabledKey,
+    // AI and personalization
+    Personalization.aiAllowedKey, Personalization.useAIKey, Personalization.aiConsentAskedKey,
+    Personalization.ageRangeKey, Personalization.pronounsKey, "personalization.gender",
+    // Discover: taste profile, reactions, deck, filters and quick add
+    DiscoverViewModel.profileKey, DiscoverViewModel.likedKey, DiscoverViewModel.dislikedKey,
+    "discover.passedMovieIDs", "discover.genreFilter", "discover.filters", "discover.kind", "discover.savedDeck",
+    "discover.likedFilms", "discover.dislikedFilms",
+    "discoverQuickAdd", "discoverQuickAddListID", "discoverQuickAddUsesAI",
+    // Lists and their sharing, and cached film details
+    "unrankedLists", "listVisibility", "aiPlacedFilms", "listSharing",
+    "movieInfoCache", "genreCache", "imdbIDs", "filmographies",
+  ]
+  /// Prefixes of account keys made per list or per theatre: Tonight's Pick for each list, and the theatre the user
+  /// was last at and the ones found near them
+  static let accountDefaultsPrefixes = ["tonightsPick.", "theatreCheckIns."]
+
   /// Once the account is deleted: signs out and removes what the app kept on this phone for it
   func signOutDeletedAccount() {
     // Also unregisters this phone from notifications, turns off theatre check-ins and clears Core Data
     signOut()
     GIDSignIn.sharedInstance.signOut()
-    // Settings, Discover's taste profile and cached film details
-    if let domain = Bundle.main.bundleIdentifier {
-      UserDefaults.standard.removePersistentDomain(forName: domain)
+    let defaults = UserDefaults.standard
+    for key in Self.accountDefaultsKeys { defaults.removeObject(forKey: key) }
+    for key in defaults.dictionaryRepresentation().keys
+    where Self.accountDefaultsPrefixes.contains(where: key.hasPrefix) {
+      defaults.removeObject(forKey: key)
     }
     URLCache.shared.removeAllCachedResponses()
     // Lists saved by older versions of the app
