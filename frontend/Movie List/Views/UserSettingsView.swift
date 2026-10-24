@@ -291,6 +291,17 @@ struct UserSettingsView : View {
                                 .foregroundStyle(Theme.accentGradient)
                         }
                     }
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label {
+                            Text("About & Credits")
+                                .foregroundColor(Theme.textPrimary)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(Theme.accentGradient)
+                        }
+                    }
                 }
                 .listRowBackground(Theme.surface)
 
