@@ -515,6 +515,7 @@ struct GroupMembersSheet: View {
     let onChange: (MovieGroup) -> Void
     @State private var busy: Set<String> = []
     @State private var failed = false
+    @State private var reporting: ReportTarget? = nil
 
     private static let maxMembers = 7
 
@@ -536,6 +537,13 @@ struct GroupMembersSheet: View {
                             .swipeActions {
                                 if group.is_owner {
                                     Button("Remove", role: .destructive) { remove(person) }
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    reporting = ReportTarget(handle: person.handle, kind: .group, contentID: String(group.id))
+                                } label: {
+                                    Label("Report @\(person.handle)", systemImage: "flag")
                                 }
                             }
                     }
@@ -602,6 +610,9 @@ struct GroupMembersSheet: View {
                     Button("Done") { dismiss() }
                         .bold()
                 }
+            }
+            .sheet(item: $reporting) { target in
+                ReportSheet(target: target)
             }
             .alert("Couldn't change the group", isPresented: $failed) {
                 Button("OK", role: .cancel) {}

@@ -113,11 +113,19 @@ CineList is social. When you follow someone, invite them to a list or a group, o
 
 ### Blocking
 
-You can block another user at any time from their profile. Blocking stops them from finding or following you, removes any follow between you in either direction, and removes them from lists you share with each other. You can see and undo your blocks in the App.
+You can block another user at any time from their profile, or right after reporting them. Blocking stops them from finding or following you, removes any follow between you in either direction, removes them from lists and groups you share with each other, and stops them sending you films. You can see and undo your blocks in the App.
 
 ### Reporting
 
-If someone is breaking these Terms, or you see content that is abusive, unsafe or illegal, please report it to us at {{CONTACT_EMAIL}} with the @username involved and a short description. We will review reports and may take action, including removing content or suspending or terminating accounts. In an emergency, contact your local emergency services.
+If someone is breaking these Terms, or you see content that is abusive, unsafe or illegal, you can report it in the App. Use **Report** on a user's profile, or on the list, note, recommendation, activity or group member you are concerned about, pick a reason and, if you like, add a few details. You can also block the user at the same time.
+
+We do not tolerate objectionable content or abusive users. When you report something:
+
+- We review reports **within 24 hours**
+- If we find that content or an account breaks these Terms, we may remove the content, and suspend or terminate the account that posted it
+- We do not tell the person you reported who reported them
+
+Please only report things in good faith; misusing reporting is itself a breach of these Terms. In an emergency, contact your local emergency services.
 
 ### Shared lists and groups
 
@@ -273,4 +281,4 @@ If you downloaded the App from Apple's App Store, the following also applies, an
 
 ## 25. Contact Us
 
-If you have questions about these Terms, want to report a user or content, or need help with your account, please contact {{COMPANY_NAME}} at {{CONTACT_EMAIL}}.
+If you have questions about these Terms or need help with your account, please contact {{COMPANY_NAME}} at {{CONTACT_EMAIL}}. To report a user or content, please use **Report** in the App (see Section 8).

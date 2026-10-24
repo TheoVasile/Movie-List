@@ -213,6 +213,22 @@ const createTables = async () => {
             );
             CREATE INDEX IF NOT EXISTS blocks_blocked ON blocks (blocked_id);
 
+            -- Users and content people reported as objectionable, for us to review. content_type says what was
+            -- reported ('user', 'list', 'note', ...) and content_id which one, if it isn't the user as a whole
+            CREATE TABLE IF NOT EXISTS reports (
+                id SERIAL PRIMARY KEY,
+                reporter_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                reported_user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                content_type VARCHAR(20) NOT NULL,
+                content_id VARCHAR(64),
+                reason VARCHAR(20) NOT NULL,
+                details VARCHAR(500),
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CHECK (reporter_id <> reported_user_id)
+            );
+            CREATE INDEX IF NOT EXISTS reports_open ON reports (status, created_at);
+
             -- Films people send each other to watch, with an optional note. seen turns true once the recipient opens them
             CREATE TABLE IF NOT EXISTS film_recommendations (
                 id SERIAL PRIMARY KEY,

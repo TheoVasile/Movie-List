@@ -200,6 +200,7 @@ struct RecommendationsView: View {
     @State private var details: CDMovie? = nil
     @State private var detailsMovie: Movie? = nil
     @State private var adding: Movie? = nil
+    @State private var reporting: ReportTarget? = nil
 
     var body: some View {
         List {
@@ -223,6 +224,14 @@ struct RecommendationsView: View {
                             Label("Remove", systemImage: "trash")
                         }
                     }
+                    .contextMenu {
+                        Button {
+                            reporting = ReportTarget(handle: recommendation.sender_handle, kind: .recommendation,
+                                                     contentID: String(recommendation.id))
+                        } label: {
+                            Label("Report @\(recommendation.sender_handle)", systemImage: "flag")
+                        }
+                    }
             }
         }
         .listStyle(.plain)
@@ -233,6 +242,9 @@ struct RecommendationsView: View {
         .refreshable { store.load() }
         // Everything here counts as seen once it has loaded
         .onAppear { store.load(thenMarkSeen: true) }
+        .sheet(item: $reporting) { target in
+            ReportSheet(target: target)
+        }
         .sheet(item: $details) { preview in
             // Add to Lists closes the info screen and asks which lists
             MovieDetailView(movie: preview, onAddToLists: {

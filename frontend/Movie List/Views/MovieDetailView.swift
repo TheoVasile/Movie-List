@@ -435,7 +435,7 @@ struct MovieDetailView: View {
             }
 
             if !friendTakes.isEmpty {
-                FriendTakesSection(takes: friendTakes)
+                FriendTakesSection(takes: friendTakes, tmdbID: Int64(movie.tmdb_id))
             }
 
             if let providers {
