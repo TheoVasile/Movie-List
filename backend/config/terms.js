@@ -7,8 +7,8 @@ const TERMS_VERSION = "2026-10-24";
 const TERMS_UPDATED = "October 24, 2026";
 
 // The Privacy Policy. Nobody accepts it, so its version is only for reference
-const PRIVACY_VERSION = "2026-10-25";
-const PRIVACY_UPDATED = "October 25, 2026";
+const PRIVACY_VERSION = "2026-10-24.2";
+const PRIVACY_UPDATED = "October 24, 2026";
 
 // Filled into the Terms and Privacy Policy text; TERMS_COMPANY_NAME and TERMS_CONTACT_EMAIL override them
 const COMPANY_NAME = "Blended Bits";
