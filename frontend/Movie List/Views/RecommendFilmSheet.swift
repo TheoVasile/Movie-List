@@ -183,6 +183,7 @@ struct RecommendFilmSheet: View {
             switch result {
             case .success(let sentTo) where !sentTo.isEmpty:
                 Haptics.success()
+                AppAnalytics.log(.recommendationSent(recipients: sentTo.count))
                 dismiss()
             default:
                 failure = "Couldn't send it. Check your connection and try again."
@@ -258,7 +259,10 @@ struct RecommendationsView: View {
                 for chosen in lists {
                     chosen.addMovie(movie, context: context) { _ in }
                 }
-                if !lists.isEmpty { Haptics.success() }
+                if !lists.isEmpty {
+                    Haptics.success()
+                    AppAnalytics.log(.filmAdded(.recommendation))
+                }
             }
             .environmentObject(authViewModel)
             .environment(\.managedObjectContext, context)

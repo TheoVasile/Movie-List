@@ -161,7 +161,10 @@ struct DiscoverReactionsView: View {
                 for chosen in lists {
                     chosen.addMovie(movie, context: context) { _ in }
                 }
-                if !lists.isEmpty { Haptics.success() }
+                if !lists.isEmpty {
+                    Haptics.success()
+                    AppAnalytics.log(.filmAdded(.discover))
+                }
             }
             .environmentObject(authViewModel)
             .environment(\.managedObjectContext, context)

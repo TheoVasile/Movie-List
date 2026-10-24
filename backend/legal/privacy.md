@@ -10,6 +10,7 @@ This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects
 - A lot stays on your iPhone. Your location, your contacts, your Discover swipes and your birthday and pronouns are kept on your device, and are only sent anywhere in the limited ways described below.
 - AI features are off unless you turn them on. When you use them, we send your film lists and preferences to our AI provider, Anthropic, but not your name, email address, phone number or contacts.
 - We do not sell your personal information, we do not show ads, and we do not track you across other companies' apps or websites.
+- We use Google Analytics for Firebase to count which features are used, without your advertising identifier or your name, email address or content. You can turn it off in Settings.
 - You can see, change, download and delete your information, and you can delete your account from Settings at any time.
 
 ## 2. Information You Give Us
@@ -52,10 +53,24 @@ If you email us, we collect your email address and whatever you include in your 
 
 - **Notification tokens.** If you allow notifications, Apple and Google Firebase Cloud Messaging give the App a token for your device, which we store with your account so we can send you notifications. When you sign out, we remove it.
 - **Technical information.** Like any online service, our servers and hosting providers receive technical information when the App connects to them, such as your IP address, the time of the request and the type of request. Our hosting providers keep server logs for a limited time for security, troubleshooting and abuse prevention. We use IP addresses briefly to limit how often someone can check whether a @username is taken.
-- **Usage and diagnostic information.** The App is built with Google's Firebase software, which includes Google Analytics for Firebase. It can automatically collect limited information about how the App is used and the device it runs on, such as an app instance identifier, the App and iOS version, the device model, approximate country, and when the App is opened or used. We use it only to understand and improve the App. We do not use it for advertising, and we do not link it to your name, email address or account.
+- **Usage analytics.** The App uses Google Analytics for Firebase to count which features are used, as described below.
 - **AI usage counts.** To keep AI features fair and affordable, we count how many AI requests each account makes per day. The count is kept in our server's memory and is not stored long term.
 
 We do not use cookies in the App. We do not collect your device's advertising identifier, and the App does not ask for permission to track you.
+
+### Usage analytics
+
+The App uses Google Analytics for Firebase, provided by Google, to understand how CineList is used so we can fix problems and improve it. It collects:
+
+- A random **app instance identifier** created when the App is installed. It is not your device's advertising identifier, and it changes if you delete and reinstall the App
+- **Events** recording that you used certain features: signing up, accepting the Terms, creating a list, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, sharing a list, and sending a report (only the type of content and the reason you picked). Events never include film or list names, notes, messages, @usernames or anything else you type
+- **Device and App information**, such as the device model, iOS version, App version, language and time zone
+- **Approximate location** (country, region and city), which Google works out from your IP address. The App does not send your device's location
+- **Session information**, such as when the App is first opened, how often and for how long it is used, and when it is updated
+
+We do not set a user ID in Google Analytics, so this information is not linked to your name, email address, phone number or account. The App uses the version of Google Analytics that does not collect your device's advertising identifier, and we have turned off ad personalisation signals and Google's collection of the identifier for vendors. We do not use analytics for advertising, and it is not used to track you across other companies' apps or websites. Google processes this information on our behalf as our service provider.
+
+Analytics are on unless you turn them off. You can turn them off at any time with **Share Usage Analytics** in Settings, after which the App stops sending analytics. The setting applies to this iPhone.
 
 ## 4. Information That Stays on Your iPhone
 
@@ -122,7 +137,7 @@ If data protection laws such as the GDPR or UK GDPR apply to you, we rely on the
 
 - **Contract:** to provide the App and the features you ask for under our Terms of Service
 - **Consent:** for optional features you turn on, such as AI features, adding a phone number, contacts matching, location features and notifications. You can withdraw consent at any time, without affecting what happened before
-- **Legitimate interests:** to keep the App secure, prevent abuse, understand and improve the App, and communicate with you about it, where these interests are not overridden by your rights
+- **Legitimate interests:** to keep the App secure, prevent abuse, understand and improve the App (including usage analytics, which you can turn off in Settings), and communicate with you about it, where these interests are not overridden by your rights
 - **Legal obligation:** where we must keep or disclose information to comply with the law
 
 ## 9. What Other People Can See
@@ -146,7 +161,7 @@ We do not sell your personal information, and we do not share it for cross-conte
 
 We use trusted companies to run the App. They process personal information on our behalf and only for the purposes we set:
 
-- **Google Firebase** (Google LLC), for sign-in, phone number verification, push notifications and usage analytics
+- **Google Firebase** (Google LLC), for sign-in, phone number verification, push notifications and usage analytics (Google Analytics for Firebase, described in Section 3)
 - **Render** (Render Services, Inc.), which hosts our servers
 - **Supabase** (Supabase, Inc.), which hosts our database
 - **Anthropic** (Anthropic, PBC), which provides the AI model behind the optional AI features
@@ -192,6 +207,7 @@ We keep your information for as long as your account exists, because we need it 
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
 - Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
 - Daily AI usage counts are kept in memory only and are reset at least daily
+- Usage analytics are kept by Google Analytics for 14 months and then deleted automatically
 - Server logs are kept by our hosting providers for a limited time, usually no more than a few weeks
 - Emails you send us are kept as long as needed to deal with your request and any follow-up
 
@@ -207,7 +223,7 @@ You can permanently delete your account at any time in Settings by tapping **Del
 - Films you added to someone else's shared list, and films you suggested in a group you did not own, stay there without your name
 - The App signs you out and removes what it kept on your iPhone for your account, such as your lists, Discover history and preferences, AI and personalization settings (including any birthday, age range and pronouns), Theatre Check-ins and notification settings. Device-wide preferences, such as appearance, are kept
 
-Deleted information may remain in encrypted backups for a limited period until they are overwritten. Deleting the App from your iPhone does not delete your account. You can also ask us to delete your account by emailing {{CONTACT_EMAIL}} from the email address on your account.
+Usage analytics are not linked to your account, so they are not deleted with it; they are deleted automatically after the period in Section 12. The Share Usage Analytics setting belongs to your iPhone rather than your account, so it is kept. Deleted information may remain in encrypted backups for a limited period until they are overwritten. Deleting the App from your iPhone does not delete your account. You can also ask us to delete your account by emailing {{CONTACT_EMAIL}} from the email address on your account.
 
 ## 14. Your Choices and Rights
 
@@ -216,7 +232,7 @@ Deleted information may remain in encrypted backups for a limited period until t
 - Change your display name, @username, photo, phone number, notification settings, streaming services and AI setting in Settings
 - Make your account private, approve or decline follow requests, choose each list's visibility, and block people
 - Edit or delete your lists, notes, diary entries and recommendations
-- Turn off AI features, location features, contacts access and notifications
+- Turn off AI features, location features, contacts access, notifications and usage analytics
 - Reset your Discover history and preferences
 - Export your lists in Letterboxd's format
 - Delete your account
@@ -244,7 +260,7 @@ If the GDPR, the UK GDPR or Swiss data protection law applies to you, you have t
 
 If you are a California resident, the California Consumer Privacy Act, as amended by the California Privacy Rights Act, gives you the right to know what personal information we collect, use and disclose, to access, correct and delete it, and not to be discriminated against for exercising these rights. Residents of some other US states have similar rights.
 
-In the past 12 months, we have collected these categories of personal information, from you, your device and the service providers described in this Policy, for the purposes described in Section 8: identifiers (such as your name, email address, @username, phone number, account ID, IP address and device tokens); customer records (such as your email address and phone number); internet or other electronic network activity (such as your lists, ratings, activity in the App and usage information); and inferences drawn from them (such as film recommendations). We disclose these categories for business purposes to the service providers listed in Section 10. Your sign-in details are sensitive personal information, which we use only to provide and secure your account.
+In the past 12 months, we have collected these categories of personal information, from you, your device and the service providers described in this Policy, for the purposes described in Section 8: identifiers (such as your name, email address, @username, phone number, account ID, IP address, device tokens and the analytics app instance identifier); customer records (such as your email address and phone number); internet or other electronic network activity (such as your lists, ratings, activity in the App and usage analytics); approximate location derived from your IP address (for usage analytics); and inferences drawn from them (such as film recommendations). We disclose these categories for business purposes to the service providers listed in Section 10. Your sign-in details are sensitive personal information, which we use only to provide and secure your account.
 
 We do not sell personal information or share it for cross-context behavioural advertising, and we have not done so in the past 12 months. We have no actual knowledge of selling or sharing the personal information of anyone under 16. Because we do not track you across other services, we do not respond differently to Do Not Track or Global Privacy Control signals.
 

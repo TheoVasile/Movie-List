@@ -224,6 +224,7 @@ class ListViewModel: ObservableObject {
     func createAndSaveMovie(from networkMovie: Movie) {
         movieList.addMovie(networkMovie, context: context) { newMovie in
             guard let newMovie else { return }
+            AppAnalytics.log(.filmAdded(.search))
             // Look up the new film's genres and ratings
             self.loadInfo()
             withAnimation(Theme.spring) {
@@ -269,6 +270,7 @@ class ListViewModel: ObservableObject {
             movie.rank = Int32(index + 1)
         }
         try? context.save()
+        AppAnalytics.log(.filmRanked(.drag))
 
         APIService.shared.updateMovieRanking(list_id: movieList.id, movie_id: movie.id, rank: newIndex + 1) { result in
             DispatchQueue.main.async {
@@ -361,6 +363,7 @@ class ListViewModel: ObservableObject {
             }
         }
         group.notify(queue: .main) {
+            if !added.isEmpty { AppAnalytics.log(.filmAdded(.otherList)) }
             completion(lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } })
         }
     }
@@ -381,6 +384,7 @@ class ListViewModel: ObservableObject {
             DispatchQueue.main.async {
                 switch result {
                 case .success(let placement):
+                    AppAnalytics.log(.aiPickUsed(.smartPlacement))
                     AIPlacement.set(true, listID: self.movieList.id, movieID: movie.id)
                     self.placementVersion += 1
                     self.moveLocally(movie, to: placement.rank)
@@ -517,6 +521,7 @@ class ListViewModel: ObservableObject {
     /// film, so every copy is updated. The change shows straight away and is undone if the server rejects it
     func setWatched(_ movie: CDMovie, _ watched: Bool) {
         let previous = applyWatched(watched, toMovieIDs: [movie.id])
+        if watched { AppAnalytics.log(.filmWatched(.list)) }
         APIService.shared.setMovieWatched(movie_id: movie.id, watched: watched) { result in
             if case .failure(let error) = result {
                 print("Error updating watched status:", error)

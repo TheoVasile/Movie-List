@@ -397,6 +397,7 @@ struct TermsAcceptanceView: View {
             switch result {
             case .success:
                 Haptics.success()
+                AppAnalytics.log(.termsAccepted)
                 social.reloadProfile { isAccepting = false }
             case .failure(let error):
                 isAccepting = false

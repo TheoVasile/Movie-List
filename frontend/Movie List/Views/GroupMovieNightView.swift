@@ -444,6 +444,7 @@ struct GroupMovieNightView: View {
             refreshing = false
             switch result {
             case .success(let loaded):
+                if usesAI && canUseAI { AppAnalytics.log(.aiPickUsed(.movieNight)) }
                 withAnimation(Theme.spring) { picks = loaded }
                 if loaded.isEmpty {
                     errorMessage = MovieNightMessages.empty(filtered: !filters.isEmpty, usesAI: usesAI)
@@ -493,6 +494,7 @@ struct GroupMovieNightView: View {
     private func add(_ movie: Movie, to lists: [CDMovieList]) {
         guard !lists.isEmpty else { return }
         added.insert(movie.id)
+        AppAnalytics.log(.filmAdded(.movieNight))
         for list in lists {
             list.addMovie(movie, context: context) { saved in
                 if saved == nil {

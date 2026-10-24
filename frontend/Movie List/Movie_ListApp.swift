@@ -23,6 +23,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
     #endif
     FirebaseApp.configure()
+    // Usage analytics are on unless turned off in Settings
+    AppAnalytics.applySetting()
     Personalization.migrateGenderToPronouns()
     Personalization.migrateAIConsent()
 

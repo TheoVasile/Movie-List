@@ -173,6 +173,7 @@ struct MovieNightView: View {
             isLoading = false
             switch result {
             case .success(let movies):
+                if usesAI && canUseAI { AppAnalytics.log(.aiPickUsed(.movieNight)) }
                 picks = movies
                 if movies.isEmpty {
                     errorMessage = MovieNightMessages.empty(filtered: !filters.isEmpty, usesAI: usesAI)
@@ -186,6 +187,7 @@ struct MovieNightView: View {
     private func add(_ movie: Movie, to lists: [CDMovieList]) {
         guard !lists.isEmpty else { return }
         added.insert(movie.id)
+        AppAnalytics.log(.filmAdded(.movieNight))
         for list in lists {
             list.addMovie(movie, context: context) { saved in
                 if saved == nil {

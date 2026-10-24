@@ -214,6 +214,7 @@ struct ReportSheet: View {
             sending = false
             if saved {
                 Haptics.success()
+                AppAnalytics.log(.reportSubmitted(contentType: target.kind.rawValue, reason: reason.rawValue))
                 withAnimation(Theme.spring) { sent = true }
             } else {
                 failure = "Couldn't send the report. Check your connection and try again."

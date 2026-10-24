@@ -108,6 +108,7 @@ struct ListView: View {
             else if viewModel.showSetRank, let selectedMovie = viewModel.selectedMovie {
                 SetRankView(movie: Binding.constant(selectedMovie), movieCount: viewModel.movies.count, showSetRank: $viewModel.showSetRank) {updatedMovie, rank in
                     withAnimation(Theme.spring) { viewModel.showSetRank = false }
+                    AppAnalytics.log(.filmRanked(.setRank))
                     viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
                 }
                 .transition(.opacity)
@@ -783,6 +784,7 @@ private extension ListView {
             let image = await ListShareImage.render(viewModel.movieList, colorScheme: colorScheme)
             isPreparingShare = false
             if let image {
+                AppAnalytics.log(.shareList(.image))
                 shareItem = ShareItem(items: [image])
             }
         }
@@ -792,6 +794,7 @@ private extension ListView {
         Haptics.tap()
         do {
             shareItem = ShareItem(items: [try ListExport.makeZip(lists: [viewModel.movieList])])
+            AppAnalytics.log(.shareList(.export))
         } catch {
             print("Error exporting list:", error)
         }
