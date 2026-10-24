@@ -17,6 +17,7 @@ struct ContentView: View {
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.useAIKey) private var useAI = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
+    @AppStorage(Personalization.birthdayKey) private var birthday = ""
     @ObservedObject private var social = SocialStore.shared
     // What has to be done before using the app, one at a time. First, agreeing to the current Terms of
     // Service, whenever the agreed version isn't the current one. Then an @username, which is how people
@@ -52,7 +53,7 @@ struct ContentView: View {
 
     // Sparkles mark Discover as AI-powered, so they only show while AI Picks is the chosen source
     private var discoverIcon: String {
-        aiAllowed && useAI && ageRange != Personalization.under18 ? "sparkles" : "rectangle.on.rectangle.angled"
+        aiAllowed && useAI && Personalization.ageRange(birthday: birthday, legacy: ageRange) != Personalization.under18 ? "sparkles" : "rectangle.on.rectangle.angled"
     }
     
     var body: some View {
@@ -107,6 +108,7 @@ struct ContentView: View {
         }
         .onChange(of: aiAllowed) { _ in Personalization.syncAIAllowed() }
         .onChange(of: ageRange) { _ in Personalization.syncAIAllowed() }
+        .onChange(of: birthday) { _ in Personalization.syncAIAllowed() }
         .fullScreenCover(item: gate) { gate in
             switch gate {
             case .terms:

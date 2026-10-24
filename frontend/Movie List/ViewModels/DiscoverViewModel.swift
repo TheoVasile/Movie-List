@@ -23,10 +23,19 @@ enum Personalization {
     // Whether the user has been asked about AI yet
     static let aiConsentAskedKey = "discover.aiConsentAsked"
     static let under18 = "Under 18"
+    // Earlier builds asked for an age range. Still used when there's no birthday, so existing answers carry on
     static let ageRangeKey = "personalization.ageRange"
+    // The user's birthday, as yyyy-MM-dd so it doesn't shift with time zones. Never sent anywhere: only the
+    // age range worked out from it goes with AI Discover requests
+    static let birthdayKey = "personalization.birthday"
+    // The youngest anyone can be to use CineList, per the Terms of Service
+    static let minimumAge = 13
     static let pronounsKey = "personalization.pronouns"
     static let notShared = "Prefer not to say"
-    static let ageRanges = [notShared, under18, "18–24", "25–34", "35–44", "45–54", "55–64", "65+"]
+    // The age ranges the AI is told, each with the youngest age in it
+    static let ageRanges: [(range: String, from: Int)] = [
+        (under18, 0), ("18–24", 18), ("25–34", 25), ("35–44", 35), ("45–54", 45), ("55–64", 55), ("65+", 65),
+    ]
     static let pronouns = [notShared, "She/Her", "He/Him", "They/Them", "She/They", "He/They", "Xe/Xem", "Ze/Hir", "It/Its"]
 
     /// Whether AI features may be used. Never for under-18s
@@ -49,13 +58,60 @@ enum Personalization {
     }
 
     /// Tells the server whether the user allows AI, so friends' Movie Nights can check it
+    /// Under-18s have AI switched off, so turning 18 lets them turn it on but never turns it on by itself
     static func syncAIAllowed() {
+        if isUnder18 {
+            UserDefaults.standard.set(false, forKey: aiAllowedKey)
+        }
         APIService.shared.setAIAllowed(aiAllowed) { _ in }
     }
 
     /// AI picks are never used for under-18s
     static var isUnder18: Bool {
-        UserDefaults.standard.string(forKey: ageRangeKey) == under18
+        ageRange == under18
+    }
+
+    /// The age range sent with AI Discover requests: worked out from the birthday when there is one,
+    /// otherwise the range chosen in earlier builds, otherwise not shared
+    static var ageRange: String {
+        let defaults = UserDefaults.standard
+        return ageRange(birthday: defaults.string(forKey: birthdayKey) ?? "",
+                        legacy: defaults.string(forKey: ageRangeKey) ?? notShared)
+    }
+
+    /// The same, from the stored values, so views watching them with @AppStorage update when they change
+    static func ageRange(birthday: String, legacy: String, today: Date = Date()) -> String {
+        guard let date = birthdayDate(birthday) else { return legacy }
+        let years = age(on: today, bornOn: date)
+        return ageRanges.last { years >= $0.from }?.range ?? under18
+    }
+
+    /// Whole years old on a day. Someone born on 29 February turns a year older on 1 March in other years
+    static func age(on today: Date, bornOn birthday: Date) -> Int {
+        let calendar = Calendar(identifier: .gregorian)
+        let born = calendar.dateComponents([.year, .month, .day], from: birthday)
+        let now = calendar.dateComponents([.year, .month, .day], from: today)
+        guard let bornYear = born.year, let year = now.year else { return 0 }
+        let hadBirthday = (now.month ?? 1, now.day ?? 1) >= (born.month ?? 1, born.day ?? 1)
+        return year - bornYear - (hadBirthday ? 0 : 1)
+    }
+
+    private static let birthdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// The stored birthday as a date, or nil when there isn't one
+    static func birthdayDate(_ stored: String) -> Date? {
+        stored.isEmpty ? nil : birthdayFormatter.date(from: stored)
+    }
+
+    /// A birthday as it's stored
+    static func birthdayString(_ date: Date) -> String {
+        birthdayFormatter.string(from: date)
     }
 
     /// Earlier builds asked for gender as well as pronouns. Carries a saved gender answer over to
@@ -705,7 +761,8 @@ class DiscoverViewModel: ObservableObject {
             like_count: profile.likeCount,
             region: Locale.current.region?.identifier,
             language: Locale.current.language.languageCode?.identifier,
-            age_range: Personalization.value(for: Personalization.ageRangeKey),
+            // Only the range, never the birthday it comes from
+            age_range: Personalization.ageRange == Personalization.notShared ? nil : Personalization.ageRange,
             pronouns: Personalization.value(for: Personalization.pronounsKey),
             already_suggested: Array(aiSuggestedTitles.suffix(400)),
             exclude_ids: Array(dislikedIDs.set.union(likedIDs.set).union(passedIDs.set).union(shownIDs).prefix(5000)),
