@@ -106,19 +106,20 @@ async function removeListEditor(user_id, list_id, handle) {
     return result.rowCount > 0;
 }
 
+// Deletes the list and its films together, on one connection so BEGIN and COMMIT wrap both deletes
 async function deleteList(list_id) {
+    const client = await pool.connect();
     try {
-        await pool.query("BEGIN");
-        await pool.query("DELETE FROM list_movies WHERE list_id = $1", [list_id]);
-        const result = await pool.query(
-            "DELETE FROM lists WHERE id = $1",
-            [list_id]
-        );
-        await pool.query("COMMIT");
+        await client.query("BEGIN");
+        await client.query("DELETE FROM list_movies WHERE list_id = $1", [list_id]);
+        const result = await client.query("DELETE FROM lists WHERE id = $1", [list_id]);
+        await client.query("COMMIT");
         return result.rows[0];
     } catch (error) {
-        await pool.query("ROLLBACK");
+        await client.query("ROLLBACK").catch(() => {});
         throw error;
+    } finally {
+        client.release();
     }
 }
 
@@ -137,13 +138,19 @@ async function updateList(list_id, { name, overview, visibility, is_ranked }) {
     return result.rows[0];
 }
 
+/// SQL that's true unless one of the two users has blocked the other, e.g. notBlocked("$1", "u.firebase_uid").
+/// Here rather than in socialModel (which re-exports it) because visibleTo needs it and socialModel requires this file
+const notBlocked = (a, b) => `NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ${a} AND b.blocked_id = ${b}) OR (b.blocker_id = ${b} AND b.blocked_id = ${a}))`;
+
 // SQL condition: the list aliased l can be seen by the user whose id is the given parameter. Owners see all
 // their lists; others see public ones, and followers-only ones once their follow is accepted. A private
-// profile's lists are only ever for followers, even one still marked public
+// profile's lists are only ever for followers, even one still marked public. Nobody sees the lists of someone
+// they blocked or who blocked them, so they can't follow them or hear about them in the digest either
 const visibleTo = (param) => `(l.user_id = ${param}
-    OR (l.visibility = 'public' AND NOT EXISTS (SELECT 1 FROM users vo WHERE vo.firebase_uid = l.user_id AND vo.is_private))
-    OR (l.visibility IN ('followers', 'public') AND EXISTS (
-        SELECT 1 FROM follows vf WHERE vf.follower_id = ${param} AND vf.followee_id = l.user_id AND vf.accepted)))`;
+    OR (${notBlocked(param, "l.user_id")} AND (
+        (l.visibility = 'public' AND NOT EXISTS (SELECT 1 FROM users vo WHERE vo.firebase_uid = l.user_id AND vo.is_private))
+        OR (l.visibility IN ('followers', 'public') AND EXISTS (
+            SELECT 1 FROM follows vf WHERE vf.follower_id = ${param} AND vf.followee_id = l.user_id AND vf.accepted)))))`;
 
 // Follows or unfollows someone else's list the user can see. Returns false when there's no such list,
 // it's the user's own, or they can't see it
@@ -168,5 +175,5 @@ async function isListOwner(list_id, user_id) {
 
 module.exports = {
     createList, deleteList, fetchLists, isListOwner, canEditList, addListEditor, removeListEditor, updateList,
-    setListFollowed, visibleTo, VISIBILITIES, MAX_EDITORS,
+    setListFollowed, visibleTo, notBlocked, VISIBILITIES, MAX_EDITORS,
 };

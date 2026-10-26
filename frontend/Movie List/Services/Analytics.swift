@@ -45,6 +45,8 @@ enum AppAnalytics {
         case filmRanked(RankMethod)
         case filmWatched(WatchSource)
         case aiPickUsed(AIFeature)
+        // A Discover card liked, disliked or skipped, and whether AI Picks was choosing the cards
+        case discoverSwipe(DiscoverReaction, ai: Bool)
         case recommendationSent(recipients: Int)
         case theatreCheckInOpened
         case reportSubmitted(contentType: String, reason: String)
@@ -73,6 +75,7 @@ enum AppAnalytics {
             case .filmRanked: return "film_ranked"
             case .filmWatched: return "film_watched"
             case .aiPickUsed: return "ai_pick_used"
+            case .discoverSwipe: return "discover_swipe"
             case .recommendationSent: return "recommendation_sent"
             case .theatreCheckInOpened: return "theatre_checkin_opened"
             case .reportSubmitted: return "report_submitted"
@@ -99,6 +102,14 @@ enum AppAnalytics {
             case .filmRanked(let method): return [AnalyticsParameterMethod: method.rawValue]
             case .filmWatched(let source): return ["source": source.rawValue]
             case .aiPickUsed(let feature): return ["feature": feature.rawValue]
+            case .discoverSwipe(let reaction, let ai):
+                let direction: String
+                switch reaction {
+                case .liked: direction = "like"
+                case .disliked: direction = "dislike"
+                case .skipped: direction = "skip"
+                }
+                return ["direction": direction, "ai": ai ? "true" : "false"]
             // Capped, so it's a rough size rather than a count of the user's friends
             case .recommendationSent(let recipients): return ["recipients": min(recipients, 10)]
             // The report form's fixed choices (user, list, …; spam, harassment, …), never what was reported

@@ -9,8 +9,8 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Films the user liked with the heart or marked "Not for me" in Discover, newest first. Kept on this device,
-/// like the rest of what Discover learns
+/// Films the user liked (swiped right, the heart, or added from Discover) or disliked (swiped left or ✕) in
+/// Discover, newest first. Kept on this device, like the rest of what Discover learns
 final class DiscoverReactions: ObservableObject {
     static let shared = DiscoverReactions()
 
@@ -22,7 +22,7 @@ final class DiscoverReactions: ObservableObject {
 
     @Published private(set) var liked: [Entry]
     @Published private(set) var disliked: [Entry]
-    // Sent when a like or "not for me" is taken back here, so Discover can let the film come back
+    // Sent when a like or dislike is taken back here, so Discover can let the film come back
     let changed = PassthroughSubject<Void, Never>()
 
     private static let likedKey = "discover.likedFilms"
@@ -60,7 +60,7 @@ final class DiscoverReactions: ObservableObject {
         save()
     }
 
-    /// Takes back a like or "not for me": Discover forgets what it learned from it and may show the film again
+    /// Takes back a like or dislike: Discover forgets what it learned from it and may show the film again
     func forget(_ entry: Entry, liked isLiked: Bool) {
         remove(entry.id)
         let defaults = UserDefaults.standard
@@ -86,8 +86,8 @@ final class DiscoverReactions: ObservableObject {
     }
 }
 
-/// The films liked or marked "Not for me" in Discover. Tapping one shows its info, where it can be added to lists;
-/// swiping one away takes the like or "not for me" back
+/// The films liked or disliked in Discover. Tapping one shows its info, where it can be added to lists;
+/// swiping one away takes the like or dislike back
 struct DiscoverReactionsView: View {
     @ObservedObject private var reactions = DiscoverReactions.shared
     @Environment(\.managedObjectContext) private var context
@@ -112,8 +112,8 @@ struct DiscoverReactionsView: View {
             .listRowSeparator(.hidden)
             if entries.isEmpty {
                 Text(showingLiked
-                     ? "Tap the heart on a Discover card to like a film without adding it to a list. Discover will recommend more like it."
-                     : "Films you mark \"Not for me\" in Discover show up here, and Discover shows fewer like them.")
+                     ? "Swipe a Discover card right, or tap the heart, to like a film without adding it to a list. Discover will recommend more like it."
+                     : "Films you swipe left on, or ✕, in Discover show up here, and Discover shows fewer like them.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
