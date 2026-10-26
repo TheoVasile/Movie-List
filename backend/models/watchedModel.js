@@ -44,6 +44,15 @@ async function logWatch(user_id, movie_id, watched_on) {
     return "rewatch";
 }
 
+// Marks a film watched on the given day unless it's already watched. Unlike logWatch it never adds a rewatch,
+// so importing the same spreadsheet twice doesn't double the diary
+async function markWatchedOn(user_id, movie_id, watched_on) {
+    await pool.query(
+        "INSERT INTO watched_movies (user_id, movie_id, watched_at) VALUES ($1, $2, $3::date) ON CONFLICT DO NOTHING",
+        [user_id, movie_id, watched_on]
+    );
+}
+
 // Removes one rewatch. Returns whether it was the user's to remove
 async function deleteRewatch(user_id, log_id) {
     const result = await pool.query("DELETE FROM watch_log WHERE id = $1 AND user_id = $2", [log_id, user_id]);
@@ -88,4 +97,4 @@ async function fetchDiary(user_id, movie_id = null) {
     }));
 }
 
-module.exports = { setMovieWatched, setListWatched, logWatch, deleteRewatch, fetchDiary };
+module.exports = { setMovieWatched, setListWatched, logWatch, markWatchedOn, deleteRewatch, fetchDiary };

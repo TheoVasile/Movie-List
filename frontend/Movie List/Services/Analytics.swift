@@ -35,7 +35,7 @@ enum AppAnalytics {
     enum AIFeature: String { case discover, movieNight = "movie_night", smartPlacement = "smart_placement" }
     enum ShareFormat: String { case image, export }
     enum ShareKind: String { case listImage = "list_image", yearInReview = "year_in_review", stats, export }
-    enum ImportSource: String { case letterboxd }
+    enum ImportSource: String { case letterboxd, excel, csv }
 
     enum Event {
         case signUp(SignUpMethod)

@@ -19,7 +19,7 @@ struct Home: View {
     @State private var exportItem: ShareItem? = nil
     @State var showPopup: Bool = false
     @State var listName = ""
-    @State var showFileSelector: Bool = false
+    @State var showExcelImport: Bool = false
     @State var showLetterboxdImport: Bool = false
     // The list whose name and description are being edited
     @State private var editingList: CDMovieList? = nil
@@ -64,7 +64,8 @@ struct Home: View {
                             Label("New List", systemImage: "plus.rectangle.on.rectangle")
                         }
                         Button {
-                            showFileSelector = true
+                            Haptics.tap()
+                            showExcelImport = true
                         } label: {
                             Label("Import from Excel", systemImage: "square.and.arrow.down")
                         }
@@ -91,11 +92,6 @@ struct Home: View {
                 }
             }
         }
-        .overlay {
-            if showFileSelector {
-                ExcelFilePickerView(showFileSelector: $showFileSelector)
-            }
-        }
         .task {
             // Signed in from an earlier launch: the lists on this phone may be out of date
             if sync.lastSynced == nil {
@@ -118,6 +114,11 @@ struct Home: View {
         }
         .sheet(isPresented: $showLetterboxdImport) {
             LetterboxdImportView()
+                .environmentObject(viewModel)
+                .environment(\.managedObjectContext, context)
+        }
+        .sheet(isPresented: $showExcelImport) {
+            ExcelImportView()
                 .environmentObject(viewModel)
                 .environment(\.managedObjectContext, context)
         }

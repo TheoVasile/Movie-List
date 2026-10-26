@@ -72,20 +72,28 @@ async function matchFilm({ name, year }) {
     return results.find(isMatch) ?? results[0] ?? null;
 }
 
-// Resolves every film in a list to a TMDb movie, reporting the ones that couldn't be matched
-async function resolveFilms(films) {
-    const resolved = await mapWithConcurrency(films, async (film) => {
+// How an unmatched film is listed back to the user
+const describeFilm = (film) => film.year ? `${film.name} (${film.year})` : film.name;
+
+// The TMDb movie for each film, in the same order, with null for the ones that couldn't be matched
+async function matchFilms(films) {
+    return mapWithConcurrency(films, async (film) => {
         try {
             return await matchFilm(film);
         } catch (error) {
-            console.error(`Failed to match Letterboxd film ${film.name} (${film.year}):`, error.message);
+            console.error(`Failed to match film ${film.name} (${film.year}):`, error.message);
             return null;
         }
     });
+}
+
+// Resolves every film in a list to a TMDb movie, reporting the ones that couldn't be matched
+async function resolveFilms(films) {
+    const resolved = await matchFilms(films);
     return {
         movies: resolved.filter(Boolean),
-        skipped: films.filter((_, i) => !resolved[i]).map((film) => film.year ? `${film.name} (${film.year})` : film.name),
+        skipped: films.filter((_, i) => !resolved[i]).map(describeFilm),
     };
 }
 
-module.exports = { resolveFilms, mapWithConcurrency, createLimiter };
+module.exports = { resolveFilms, matchFilms, describeFilm, mapWithConcurrency, createLimiter };
