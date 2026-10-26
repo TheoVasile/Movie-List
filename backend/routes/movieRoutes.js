@@ -1,6 +1,6 @@
 const express = require("express");
 const { setMovieNote } = require("../models/notesModel");
-const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
+const { ensureMovie, movieJSON, parseTmdbId, appendMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
 const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
@@ -635,16 +635,25 @@ router.post("/ai-discover", async (req, res) => {
     }
 });
 
+// The film's saved row, e.g. { "tmdb_id": 771, "title": "Home Alone", ... } -> { id, tmdb_id, title, ... }, saving
+// it first if it's new. Only tmdb_id is used: the title, poster and overview come from TMDb (ensureMovie), and the
+// rest of the body is only a stand-in when TMDb can't be reached. App builds that send the whole film still work.
+// Newer builds add films with POST /lists/:id/films instead
 router.post("/create", async (req, res) => {
+    const body = req.body ?? {};
+    if (parseTmdbId(body.tmdb_id) === null) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
     try {
-        const { tmdb_id, title, release_date, overview, poster_path, original_language, popularity } = req.body;
-        console.log(req.body)
-        if (!tmdb_id || !title) {
-            return res.status(400).json({ error: "tmdb ID and title are required." });
-        }
-        const newMovie = await createMovie(tmdb_id, title, release_date, overview, poster_path, original_language, popularity);
-        res.status(201).json(newMovie);
+        const movie = await ensureMovie(body.tmdb_id, body);
+        if (!movie) return res.status(404).json({ error: "TMDb has no film with that id." });
+        res.status(201).json(movieJSON(movie));
     } catch (error) {
+        // TMDb couldn't be reached and the body had no title to use instead
+        if (error.isAxiosError) {
+            console.error("Couldn't reach TMDb to save a film:", error.message);
+            return res.status(503).json({ error: "Couldn't look the film up. Try again in a moment." });
+        }
         console.error("Error creating movie:", error);
         res.status(500).json({ error: "Internal server error" });
     }
@@ -707,10 +716,15 @@ router.put("/approve-placement", editsBodyList, async (req, res) => {
     }
 });
 
+// Moves a film in a list, e.g. { "list_id": 3, "movie_id": 120, "rank": 1 }. A rank past either end puts it there
 router.put("/updateRank", editsBodyList, async (req, res) => {
     try {
-        const { list_id, movie_id, rank } = req.body;
-        const updatedMovie = await updateMovieRank(list_id, movie_id, rank);
+        const listId = Number(req.body.list_id), movieId = Number(req.body.movie_id), rank = Number(req.body.rank);
+        if (!Number.isInteger(movieId) || !Number.isInteger(rank)) {
+            return res.status(400).json({ error: "movie_id and a whole-number rank are required." });
+        }
+        const updatedMovie = await updateMovieRank(listId, movieId, rank);
+        if (!updatedMovie) return res.status(404).json({ error: "That film isn't in this list." });
         res.status(200).json(updatedMovie);
     } catch (error) {
         console.error("Error updating movie rank:", error);
@@ -1043,11 +1057,17 @@ router.delete("/removeFromList/:list_id/:movie_id", requireListOwner.requireList
     }
 });
 
+// Adds a saved film (its movies row id) to the end of a list, e.g. { "list_id": 3, "movie_id": 120 }. The rank
+// older app builds send is ignored: the server puts it last. Adding a film that's already there changes nothing
+// -> { movie_id, rank }, 201 when it was added and 200 when it was already in the list
 router.post("/addToList", editsBodyList, async (req, res) => {
     try {
-        const { list_id, movie_id, rank } = req.body;
-        const newMovie = await addMovieToList(list_id, movie_id, rank, req.user.uid);
-        res.status(201).json(newMovie);
+        const listId = Number(req.body.list_id), movieId = Number(req.body.movie_id);
+        if (!Number.isInteger(movieId)) return res.status(400).json({ error: "A movie_id is required." });
+        const movie = await pool.query("SELECT 1 FROM movies WHERE id = $1", [movieId]);
+        if (!movie.rowCount) return res.status(404).json({ error: "Film not found." });
+        const { added, ...placed } = await appendMovieToList(listId, movieId, req.user.uid);
+        res.status(added ? 201 : 200).json(placed);
     } catch (error) {
         console.error("Error adding movie to list:", error);
         res.status(500).json({ error: "Internal server error" });

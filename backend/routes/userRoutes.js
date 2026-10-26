@@ -14,6 +14,7 @@ const pool = require("../config/db");
 const { TERMS_VERSION } = require("../config/terms");
 const { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, notifyOperator, fetchOpenReports } = require("../models/reportsModel");
 const { blockedField } = require("../services/moderation");
+const { ensureMovie, parseTmdbId } = require("../models/movieModel");
 const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
@@ -99,7 +100,7 @@ async function sendAvatar(res, who) {
     }
 }
 router.get("/me/avatar", (req, res) => sendAvatar(res, { user_id: req.user.uid }));
-router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase() }));
+router.get("/:handle/avatar", (req, res) => sendAvatar(res, { handle: req.params.handle.toLowerCase(), viewer_id: req.user.uid }));
 
 // Saves the phone number the user just verified, so friends can find them from their contacts. The app verifies it
 // with Firebase (a code sent by text) and adds it to the user's Firebase account; the number is read from there,
@@ -260,26 +261,47 @@ router.get("/me/groups/:id/picks", async (req, res) => {
     }
 });
 
-// Suggests a film to the group, e.g. { "tmdb_id": 949, "title": "Heat", "poster_path": "/x.jpg",
-// "release_date": "1995-12-15", "overview": "...", "original_language": "en", "popularity": 30.1 }. It counts
-// as the user's like, and everyone else hears about it. Returns the shortlist
+// A film to share (a group suggestion or a recommendation) from its saved movies row, which ensureMovie fills from
+// TMDb if it's new, so the title in other people's pushes and the AI's prompts is TMDb's rather than the sender's.
+// The film fields older app builds send are only a stand-in when TMDb can't be reached. null when there's no such film
+async function sharedFilm(body) {
+    const movie = await ensureMovie(body.tmdb_id, body);
+    if (!movie) return null;
+    return {
+        tmdb_id: Number(movie.tmdb_id),
+        title: movie.title,
+        poster_path: movie.poster_path || null,
+        release_date: movie.release_date ?? "",
+        overview: movie.overview ?? "",
+        original_language: movie.original_language ?? "",
+        popularity: movie.popularity ?? 0,
+    };
+}
+
+// What to answer when sharedFilm fails: TMDb unreachable for a new film, or anything else
+function sharedFilmError(res, error, what) {
+    if (error.isAxiosError) {
+        console.error(`Couldn't reach TMDb for ${what}:`, error.message);
+        return res.status(503).json({ error: "Couldn't look the film up. Try again in a moment." });
+    }
+    console.error(`Error ${what}:`, error);
+    res.status(500).json({ error: "Internal server error" });
+}
+
+// Suggests a film to the group, e.g. { "tmdb_id": 949 }. Its title and poster come from the film's saved row; any
+// other film fields older builds send are ignored. It counts as the user's like, and everyone else hears about it.
+// Returns the shortlist
 router.post("/me/groups/:id/picks", async (req, res) => {
     const groupId = Number(req.params.id);
     const body = req.body ?? {};
-    const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
-    const film = {
-        tmdb_id: Number(body.tmdb_id),
-        title: text(body.title, 255),
-        poster_path: text(body.poster_path, 255) || null,
-        release_date: text(body.release_date, 20),
-        overview: text(body.overview, 2000),
-        original_language: text(body.original_language, 10),
-        popularity: Number(body.popularity) || 0,
-    };
-    if (!Number.isInteger(groupId) || !Number.isInteger(film.tmdb_id) || film.tmdb_id <= 0 || !film.title) {
-        return res.status(400).json({ error: "A tmdb_id and title are required." });
+    const tmdbId = parseTmdbId(body.tmdb_id);
+    // Films only: a group's shortlist has no shows
+    if (!Number.isInteger(groupId) || tmdbId === null || tmdbId < 0) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
     }
     try {
+        const film = await sharedFilm(body);
+        if (!film) return res.status(404).json({ error: "TMDb has no film with that id." });
         if (!(await suggestPick(req.user.uid, groupId, film))) return res.status(404).json({ error: "Group not found." });
         const me = await getProfile(req.user.uid);
         const group = (await fetchGroups(req.user.uid)).find((g) => g.id === groupId);
@@ -293,8 +315,7 @@ router.post("/me/groups/:id/picks", async (req, res) => {
         }
         res.status(201).json(await fetchPicks(req.user.uid, groupId));
     } catch (error) {
-        console.error("Error suggesting film:", error);
-        res.status(500).json({ error: "Internal server error" });
+        sharedFilmError(res, error, "suggesting film");
     }
 });
 
@@ -758,31 +779,24 @@ router.get("/me/recommendations", async (req, res) => {
 });
 
 // Sends a film to people who follow the user or whom the user follows, e.g. { "handles": ["sam"], "tmdb_id": 329865,
-// "title": "Arrival", "poster_path", "release_date", "overview", "original_language", "popularity", "note": "..." }.
-// Replies with the @handles it went to, and note_status "flagged" when moderation is holding the note for review
+// "note": "..." } (tmdb_id negative for a TV show). Its title and poster come from the film's saved row; any other
+// film fields older builds send are ignored. Replies with the @handles it went to, and note_status "flagged" when
+// moderation is holding the note for review
 router.post("/me/recommendations", async (req, res) => {
     const body = req.body ?? {};
     const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
     const handles = (Array.isArray(body.handles) ? body.handles : [])
         .map((handle) => text(handle, 40).replace(/^@/, "").toLowerCase()).filter(Boolean);
-    const film = {
-        // Negative for a TV show (services/tmdbMedia.js)
-        tmdb_id: Number(body.tmdb_id),
-        title: text(body.title, 255),
-        poster_path: text(body.poster_path, 255) || null,
-        release_date: text(body.release_date, 20),
-        overview: text(body.overview, 2000),
-        original_language: text(body.original_language, 10),
-        popularity: Number(body.popularity) || 0,
-    };
     const note = text(body.note, 300) || null;
     if (!handles.length || handles.length > MAX_RECIPIENTS) {
         return res.status(400).json({ error: `Pick between 1 and ${MAX_RECIPIENTS} people.` });
     }
-    if (!Number.isInteger(film.tmdb_id) || film.tmdb_id === 0 || !film.title) {
-        return res.status(400).json({ error: "A tmdb_id and title are required." });
+    if (parseTmdbId(body.tmdb_id) === null) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
     }
     try {
+        const film = await sharedFilm(body);
+        if (!film) return res.status(404).json({ error: "TMDb has no film with that id." });
         const { sentTo, status } = await sendRecommendation(req.user.uid, handles, film, note);
         if (!sentTo.length) return res.status(403).json({ error: "You can only send films to people you follow or who follow you." });
         const me = await getProfile(req.user.uid);
@@ -798,8 +812,7 @@ router.post("/me/recommendations", async (req, res) => {
         }
         res.status(201).json({ sent_to: sentTo.map((recipient) => recipient.handle), note_status: note ? status : null });
     } catch (error) {
-        console.error("Error sending recommendation:", error);
-        res.status(500).json({ error: "Internal server error" });
+        sharedFilmError(res, error, "sending recommendation");
     }
 });
 
@@ -845,7 +858,8 @@ router.post("/reports", async (req, res) => {
         const saved = await createReport(req.user.uid, handle, report);
         if (!saved) return res.status(404).json({ error: "User not found." });
         if (!saved.duplicate) notifyOperator({ ...report, id: saved.id, handle });
-        res.status(201).json({ id: saved.id, received: true });
+        // No report id: it would tell people how many reports there are. received is for app builds that read it
+        res.status(201).json({ ok: true, received: true });
     } catch (error) {
         console.error("Error saving report:", error);
         res.status(500).json({ error: "Internal server error" });

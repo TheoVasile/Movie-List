@@ -286,6 +286,10 @@ const createTables = async () => {
                 popularity DOUBLE PRECISION,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+            -- Where a film's title, poster and overview came from: 'tmdb', or 'client' when TMDb couldn't be reached
+            -- the first time the film was saved and the app's copy was used instead, to be repaired by
+            -- scripts/refreshMovies.js. Null for films saved before this was kept (unknown: once trusted from the app)
+            ALTER TABLE movies ADD COLUMN IF NOT EXISTS metadata_source VARCHAR(10);
 
             CREATE TABLE IF NOT EXISTS lists (
                 id SERIAL PRIMARY KEY,

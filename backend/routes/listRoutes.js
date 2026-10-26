@@ -8,7 +8,7 @@ const { notifyUser } = require("../services/pushService");
 const pool = require("../config/db");
 const { setListWatched } = require("../models/watchedModel");
 const { isPrivate } = require("../models/socialModel");
-const { setListOrder } = require("../models/movieModel");
+const { setListOrder, ensureMovie, appendMovieToList, movieJSON, parseTmdbId } = require("../models/movieModel");
 const { blockedField } = require("../services/moderation");
 
 const router = express.Router();
@@ -58,6 +58,31 @@ router.put("/:id/watched", requireListEditor((req) => req.params.id), async (req
         res.status(200).json({ list_id: Number(req.params.id), watched: req.body.watched });
     } catch (error) {
         console.error("Error updating watched status for list:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Adds a film or show to the end of the list, e.g. { "tmdb_id": 771 } (negative for a show). Its title, poster and
+// overview come from the film's saved row, or from TMDb the first time anyone adds it; nothing about the film is
+// taken from the request. Adding one that's already there changes nothing ->
+// { movie_id, rank, movie: { id, tmdb_id, title, release_date, overview, poster_path, original_language, popularity,
+// created_at } }, 201 when it was added and 200 when it was already in the list
+router.post("/:id/films", requireListEditor((req) => req.params.id), async (req, res) => {
+    if (parseTmdbId(req.body?.tmdb_id) === null) {
+        return res.status(400).json({ error: "A tmdb_id is required." });
+    }
+    try {
+        const movie = await ensureMovie(req.body.tmdb_id);
+        if (!movie) return res.status(404).json({ error: "TMDb has no film with that id." });
+        const { added, ...placed } = await appendMovieToList(Number(req.params.id), movie.id, req.user.uid);
+        res.status(added ? 201 : 200).json({ ...placed, movie: movieJSON(movie) });
+    } catch (error) {
+        // ensureMovie throws axios's error when the film is new and TMDb can't be reached
+        if (error.isAxiosError) {
+            console.error("Couldn't reach TMDb to add a film:", error.message);
+            return res.status(503).json({ error: "Couldn't look the film up. Try again in a moment." });
+        }
+        console.error("Error adding film to list:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

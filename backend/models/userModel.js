@@ -1,9 +1,18 @@
 const pool = require("../config/db");
 const admin = require("../config/firebase");
 
+// The only account columns sign-in and sign-up send back. Everything else on the row (the picture's bytes, phone,
+// birthday, email, the internal row id) stays on the server; the app reads the rest from GET /users/me
+const ACCOUNT_COLUMNS = "firebase_uid, handle, username";
+
+/// An account row as the auth routes send it: { firebase_uid, handle, name }
+function accountJSON(user) {
+    return { firebase_uid: user.firebase_uid, handle: user.handle ?? null, name: user.username ?? null };
+}
+
 async function getUserByFirebaseUID(firebase_uid) {
     const result = await pool.query(
-        "SELECT * FROM users WHERE firebase_uid = $1",
+        `SELECT ${ACCOUNT_COLUMNS} FROM users WHERE firebase_uid = $1`,
         [firebase_uid]
     );
     return result.rows[0];
@@ -41,7 +50,7 @@ async function deleteUser(firebase_uid) {
 async function createUser(firebase_uid, email, username) {
     // Check if user already exists
     const existingUser = await pool.query(
-        "SELECT * FROM users WHERE firebase_uid = $1",
+        `SELECT ${ACCOUNT_COLUMNS} FROM users WHERE firebase_uid = $1`,
         [firebase_uid]
     );
 
@@ -52,7 +61,7 @@ async function createUser(firebase_uid, email, username) {
     // Insert new user if not exists. username is a display name, but it has to be unique, so a name already
     // in use (two people called Sam, or the "no name" placeholder) gets part of the account id added
     const insert = (name) => pool.query(
-        "INSERT INTO users (firebase_uid, email, username) VALUES ($1, $2, $3) RETURNING *",
+        `INSERT INTO users (firebase_uid, email, username) VALUES ($1, $2, $3) RETURNING ${ACCOUNT_COLUMNS}`,
         [firebase_uid, email, name]
     );
     try {
@@ -63,4 +72,4 @@ async function createUser(firebase_uid, email, username) {
     }
 }
 
-module.exports = { getUserByFirebaseUID, createUser, deleteUser };
+module.exports = { getUserByFirebaseUID, createUser, deleteUser, accountJSON };
