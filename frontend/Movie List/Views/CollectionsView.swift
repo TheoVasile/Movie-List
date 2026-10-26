@@ -30,14 +30,20 @@ final class FilmographyStore: ObservableObject {
     @Published private(set) var version = 0
     private var entries: [String: Entry]
     private var loading: Set<String> = []
+    // Ones whose last fetch failed, so the screen can offer to try again rather than spin forever
+    private var failed: Set<String> = []
     private var queue: [(kind: Filmography.Kind, id: Int)] = []
     private var running = 0
 
-    private static let storageKey = "filmographies"
+    // v2: filmographies saved before the server stopped leaving out directors' less-rated features (Taika
+    // Waititi's Boy) are thrown away
+    private static let storageKey = "filmographies.v2"
+    private static let oldStorageKeys = ["filmographies"]
     private static let maxAge: TimeInterval = 7 * 24 * 60 * 60
     private static let concurrency = 4
 
     private init() {
+        Self.oldStorageKeys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
         entries = UserDefaults.standard.data(forKey: Self.storageKey)
             .flatMap { try? JSONDecoder().decode([String: Entry].self, from: $0) } ?? [:]
     }
@@ -48,17 +54,31 @@ final class FilmographyStore: ObservableObject {
         entries[Self.key(kind, id)]?.filmography
     }
 
+    /// Whether it's being fetched (or waiting its turn)
+    func isLoading(_ kind: Filmography.Kind, id: Int) -> Bool {
+        loading.contains(Self.key(kind, id))
+    }
+
+    /// Whether the last try to fetch it failed
+    func didFail(_ kind: Filmography.Kind, id: Int) -> Bool {
+        failed.contains(Self.key(kind, id))
+    }
+
     /// Fetches the ones not fetched in the last week, a few at a time
     func load(_ wanted: [(kind: Filmography.Kind, id: Int)]) {
         let now = Date()
+        var started = false
         for item in wanted {
             let key = Self.key(item.kind, item.id)
             let fresh = entries[key].map { now.timeIntervalSince($0.fetched) < Self.maxAge } ?? false
             if !fresh && !loading.contains(key) {
                 loading.insert(key)
+                failed.remove(key)
                 queue.append(item)
+                started = true
             }
         }
+        if started { version += 1 }
         while running < Self.concurrency, !queue.isEmpty { startNext() }
     }
 
@@ -70,13 +90,16 @@ final class FilmographyStore: ObservableObject {
             let key = Self.key(item.kind, item.id)
             self.loading.remove(key)
             self.running -= 1
-            if case .success(let filmography) = result {
+            switch result {
+            case .success(let filmography):
                 self.entries[key] = Entry(filmography: filmography, fetched: Date())
-                self.version += 1
                 if let data = try? JSONEncoder().encode(self.entries) {
                     UserDefaults.standard.set(data, forKey: Self.storageKey)
                 }
+            case .failure:
+                self.failed.insert(key)
             }
+            self.version += 1
             self.startNext()
         }
     }
@@ -265,8 +288,9 @@ struct CollectionDetailView: View {
             .padding(.vertical, 8)
             .listRowBackground(Color.clear)
             if films.isEmpty {
-                ProgressView()
+                emptyState
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
             }
             ForEach(films) { film in
@@ -303,6 +327,33 @@ struct CollectionDetailView: View {
             .environment(\.managedObjectContext, context)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+    }
+
+    // Until the filmography arrives a spinner; if it couldn't be fetched, a way to try again
+    @ViewBuilder private var emptyState: some View {
+        let loading = filmographies.isLoading(collection.kind, id: collection.id)
+        let loaded = filmographies.filmography(collection.kind, id: collection.id) != nil
+        if filmographies.didFail(collection.kind, id: collection.id) && !loading && !loaded {
+            VStack(spacing: 10) {
+                Text(collection.kind == .director ? "Couldn't load their films." : "Couldn't load the films.")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+                Button("Try Again") {
+                    Haptics.tap()
+                    filmographies.load([(kind: collection.kind, id: collection.id)])
+                }
+                .font(.subheadline.weight(.semibold))
+                .tint(Theme.accent)
+            }
+        } else if loaded && !loading {
+            Text("No released films yet.")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+        } else {
+            ProgressView("Loading films…")
+                .tint(Theme.accent)
+                .foregroundColor(Theme.textSecondary)
         }
     }
 
