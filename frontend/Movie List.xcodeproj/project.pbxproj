@@ -20,6 +20,7 @@
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
 		FA7E5A012F00000000000012 /* ListSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000011 /* ListSharing.swift */; };
 		FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000016 /* ListPickerSheet.swift */; };
+		AD2F10A1B2C3D4E5F6A7B802 /* AddToListFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2F10A1B2C3D4E5F6A7B801 /* AddToListFlow.swift */; };
 		7E2A5C1D9B3F4E6A8C0D2F12 /* TermsOfServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */; };
 		A880A729C8FF8A64A5C17B28 /* PhoneNumberField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */; };
 		77256AACB4B7F27835914928 /* AvatarCropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */; };
@@ -146,6 +147,7 @@
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000011 /* ListSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSharing.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000016 /* ListPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListPickerSheet.swift; sourceTree = "<group>"; };
+		AD2F10A1B2C3D4E5F6A7B801 /* AddToListFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToListFlow.swift; sourceTree = "<group>"; };
 		7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsOfServiceView.swift; sourceTree = "<group>"; };
 		7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberField.swift; sourceTree = "<group>"; };
 		19F553D019CDFA70B957FFC0 /* AvatarCropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarCropView.swift; sourceTree = "<group>"; };
@@ -359,6 +361,7 @@
 				136D73C186092B82C1D05137 /* StreamingServicesView.swift */,
 				FA16136C2D6C394400CD99D0 /* ExcelImportView.swift */,
 				FA7E5A012F00000000000016 /* ListPickerSheet.swift */,
+				AD2F10A1B2C3D4E5F6A7B801 /* AddToListFlow.swift */,
 				7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */,
 				FA7E5A012F000000000000A3 /* TheatreCheckInSheet.swift */,
 				7CEF54766A6BCA814F220C1A /* PhoneNumberField.swift */,
@@ -578,6 +581,7 @@
 				FA16136D2D6C394400CD99D0 /* ExcelImportView.swift in Sources */,
 				FA1613E22D6C394400CD99D0 /* SpreadsheetImport.swift in Sources */,
 				FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */,
+				AD2F10A1B2C3D4E5F6A7B802 /* AddToListFlow.swift in Sources */,
 				7E2A5C1D9B3F4E6A8C0D2F12 /* TermsOfServiceView.swift in Sources */,
 				FA7E5A012F000000000000A4 /* TheatreCheckInSheet.swift in Sources */,
 				FA7E5A012F000000000000A2 /* TheatreCheckIns.swift in Sources */,

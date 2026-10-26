@@ -132,21 +132,8 @@ struct FriendActivityView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = movie }
             })
         }
-        .sheet(item: $adding) { movie in
-            ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
-                for chosen in lists {
-                    chosen.addMovie(tmdbID: movie.id, context: context) { _ in }
-                }
-                if !lists.isEmpty {
-                    Haptics.success()
-                    AppAnalytics.log(.filmAdded(.friend))
-                }
-            }
-            .environmentObject(authViewModel)
-            .environment(\.managedObjectContext, context)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
+        // The same list picker and Compare as adding anywhere else
+        .addToListFlow(movie: $adding, source: .friend)
     }
 
     private func row(_ item: FriendActivity) -> some View {
