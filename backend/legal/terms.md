@@ -28,7 +28,7 @@ You also confirm that you are not barred from using the App under the laws of an
 
 ### Creating an account
 
-To use most of the App you need an account. You can sign up with an email address and password or with your Google account. When you sign up you choose a display name and a unique @username. You may also choose to add a profile photo and to add and verify a phone number, which helps friends who have your number find you.
+To use most of the App you need an account. You can sign up with an email address and password, with your Google account or with Sign in with Apple. When you sign up you choose a display name and a unique @username. You may also choose to add a profile photo and to add and verify a phone number, which helps friends who have your number find you.
 
 ### Keeping your account accurate and secure
 
@@ -181,7 +181,7 @@ The App relies on, links to and displays content from services we do not own or 
 
 - **The Movie Database (TMDb)**, which provides film and TV information, images, posters, recommendations, trailer listings and streaming availability. This product uses the TMDB API but is not endorsed or certified by TMDB.
 - **JustWatch**, whose streaming availability data is provided through TMDb
-- **Google Firebase**, which we use for sign-in and to deliver push notifications, and **Google Sign-In** if you choose to sign in with Google
+- **Google Firebase**, which we use for sign-in and to deliver push notifications, **Google Sign-In** if you choose to sign in with Google, and **Sign in with Apple** if you choose to sign in with Apple
 - **Anthropic**, which provides the AI model behind the optional AI features
 - **Apple**, including Apple Maps (for theatre check-ins), location services, contacts, notifications and widgets on your device
 - **YouTube**, which hosts the trailers shown in the App. Trailers play in YouTube's player and are subject to YouTube's terms

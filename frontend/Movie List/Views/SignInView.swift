@@ -7,13 +7,30 @@
 
 import Foundation
 import SwiftUI
+import AuthenticationServices
 
 struct SignInView: View {
     @EnvironmentObject var viewModel: AuthenticationViewModel
     @Environment(\.dismiss) var dismiss
     @State var invalidCredentials: Bool = false
     @State private var showPasswordReset = false
-    
+    @State private var signingInWithApple = false
+    // Why Apple sign-in failed; nothing when they closed Apple's sheet
+    @State private var appleError: String? = nil
+
+    private func signInWithApple(_ result: Result<ASAuthorization, Error>) {
+        signingInWithApple = true
+        appleError = nil
+        Task {
+            defer { signingInWithApple = false }
+            if await viewModel.signInWithApple(result) {
+                dismiss()
+            } else if !viewModel.errorMessage.isEmpty {
+                appleError = viewModel.errorMessage
+            }
+        }
+    }
+
     private func signInWithGoogle() {
         Task {
             if await viewModel.signInWithGoogle() == true {
@@ -85,6 +102,16 @@ struct SignInView: View {
                         }
                         .padding(.vertical, 6)
 
+                        if let appleError {
+                            Label(appleError, systemImage: "exclamationmark.circle.fill")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundColor(Theme.accentSecondary)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+
+                        AppleSignInButton(isWorking: signingInWithApple, onCompletion: signInWithApple)
+                            .appearAnimation(delay: 0.22)
+
                         // Styled like the app's other buttons; Google's own button is square and
                         // clipping its corners cut into the logo
                         Button(action: signInWithGoogle) {
@@ -98,7 +125,7 @@ struct SignInView: View {
                         .buttonStyle(SecondaryButtonStyle())
                         .appearAnimation(delay: 0.24)
 
-                        // Signing in with Google can create the account, so it's agreed to here too
+                        // Signing in with Apple or Google can create the account, so it's agreed to here too
                         TermsNotice()
                             .appearAnimation(delay: 0.26)
 
@@ -116,7 +143,10 @@ struct SignInView: View {
                     }
                     .padding(24)
                     .padding(.top, 40)
+                    // Nothing else can be tapped while Apple sign-in finishes
+                    .disabled(signingInWithApple)
                     .animation(Theme.spring, value: invalidCredentials)
+                    .animation(Theme.spring, value: appleError)
                 }
             }
         }
@@ -207,6 +237,34 @@ struct PasswordResetView: View {
 }
 
 // MARK: - Shared auth components
+
+/// Apple's own Sign in with Apple button, black in light mode and white in dark as Apple asks, shaped and sized
+/// like the Google button below it. Shows a spinner over itself while signing in
+struct AppleSignInButton: View {
+    @EnvironmentObject var viewModel: AuthenticationViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    var label: SignInWithAppleButton.Label = .signIn
+    let isWorking: Bool
+    let onCompletion: (Result<ASAuthorization, Error>) -> Void
+
+    var body: some View {
+        SignInWithAppleButton(label, onRequest: viewModel.prepareAppleRequest, onCompletion: onCompletion)
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            // The style is only read when the button is made, so switching appearance makes a new one
+            .id(colorScheme)
+            .frame(height: 52)
+            .clipShape(Capsule())
+            .opacity(isWorking ? 0 : 1)
+            .overlay {
+                if isWorking {
+                    ProgressView()
+                        .tint(colorScheme == .dark ? .black : .white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(colorScheme == .dark ? Color.white : Color.black, in: Capsule())
+                }
+            }
+    }
+}
 
 struct AuthBackground: View {
     @State private var shift = false
