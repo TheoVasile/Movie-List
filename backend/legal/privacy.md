@@ -143,7 +143,7 @@ We use personal information to:
 - Find streaming availability and send the notifications and alerts you have chosen, including the daily friends summary
 - Provide the optional AI features you have turned on
 - Check that you are old enough to use the App and its AI features, and work out the age range used for AI Discover, from your birthday if you have added one
-- Keep the App safe, prevent abuse and fraud, enforce our Terms of Service and respond to reports, including automatically checking what you write for slurs and offensive words (see "Automated moderation" below)
+- Keep the App safe, prevent abuse and fraud, enforce our Terms of Service and respond to reports, including automatically checking what you write for slurs, hate speech and harassment (see "Automated moderation" below)
 - Understand how the App is used, fix problems and improve it
 - Respond to your messages and requests, and tell you about changes to the App, our Terms or this Policy
 - Comply with the law and protect our rights and the rights of others
@@ -152,7 +152,7 @@ We do not use your information to show you advertising, and we do not make decis
 
 ### Automated moderation
 
-To keep the App safe, our servers automatically check text you write in the App against a list of slurs and offensive words: your display name and @username, list names and descriptions, movie night group names, notes on films and messages you add to recommendations, including ones you import. Film titles and other information from TMDb are not checked. The check runs entirely on our own servers, and what you write is not sent to any third party for it. A name that matches is not saved, and the App asks you to choose another. A note or message that matches is saved but hidden from everyone except you, and a report about it is created for us to review, as if another user had reported it; we then make it visible again or remove it. This check does not, on its own, lead to your account being suspended or deleted; a person reviews it first.
+To keep the App safe, our servers automatically check text you write in the App against a list of slurs and hateful or harassing words: your display name and @username, list names and descriptions, movie night group names, notes on films and messages you add to recommendations, including ones you import. Film titles and other information from TMDb are not checked. The check runs entirely on our own servers, and what you write is not sent to any third party for it. A name that matches is not saved, and the App asks you to choose another. A note or message that matches is saved but hidden from everyone except you, and a report about it is created for us to review, as if another user had reported it; we then make it visible again or remove it. This check does not, on its own, lead to your account being suspended or deleted; a person reviews it first.
 
 ### Legal bases (EEA, UK and Switzerland)
 
