@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreData
 import FirebaseAnalytics
 
 /// Counts how Marquee is used, with Firebase Analytics (the version without the advertising ID). Only the events
@@ -33,6 +34,8 @@ enum AppAnalytics {
     enum WatchSource: String { case list, diary, checkIn = "check_in" }
     enum AIFeature: String { case discover, movieNight = "movie_night", smartPlacement = "smart_placement" }
     enum ShareFormat: String { case image, export }
+    enum ShareKind: String { case listImage = "list_image", yearInReview = "year_in_review", stats, export }
+    enum ImportSource: String { case letterboxd }
 
     enum Event {
         case signUp(SignUpMethod)
@@ -46,6 +49,20 @@ enum AppAnalytics {
         case theatreCheckInOpened
         case reportSubmitted(contentType: String, reason: String)
         case shareList(ShareFormat)
+        // Once per device, alongside the first list_created and film_ranked, for the sign-up funnel
+        case firstListCreated
+        case firstRanking
+        case signIn(SignUpMethod)
+        case pushPermission(granted: Bool)
+        case reviewPromptShown(ReviewPrompter.Trigger)
+        // Whether the share sheet was finished (sent, saved, ...) or closed
+        case shareCompleted(ShareKind, completed: Bool)
+        case importCompleted(ImportSource, films: Int)
+        // Not logged yet: Phase 1 (onboarding, links and invites) wires these
+        case onboardingStep(String)
+        case linkOpened(String)
+        case inviteSent
+        case inviteAccepted
 
         var name: String {
             switch self {
@@ -60,6 +77,17 @@ enum AppAnalytics {
             case .theatreCheckInOpened: return "theatre_checkin_opened"
             case .reportSubmitted: return "report_submitted"
             case .shareList: return "share_list"
+            case .firstListCreated: return "first_list_created"
+            case .firstRanking: return "first_ranking"
+            case .signIn: return "sign_in"
+            case .pushPermission: return "push_permission"
+            case .reviewPromptShown: return "review_prompt_shown"
+            case .shareCompleted: return "share_completed"
+            case .importCompleted: return "import_completed"
+            case .onboardingStep: return "onboarding_step"
+            case .linkOpened: return "link_opened"
+            case .inviteSent: return "invite_sent"
+            case .inviteAccepted: return "invite_accepted"
             }
         }
 
@@ -76,12 +104,37 @@ enum AppAnalytics {
             // The report form's fixed choices (user, list, …; spam, harassment, …), never what was reported
             case .reportSubmitted(let contentType, let reason): return ["content_type": contentType, "reason": reason]
             case .shareList(let format): return ["format": format.rawValue]
-            case .termsAccepted, .theatreCheckInOpened: return nil
+            case .signIn(let method): return [AnalyticsParameterMethod: method.rawValue]
+            case .pushPermission(let granted): return ["granted": granted ? "true" : "false"]
+            case .reviewPromptShown(let trigger): return ["trigger": trigger.rawValue]
+            case .shareCompleted(let kind, let completed): return ["kind": kind.rawValue, "completed": completed ? "true" : "false"]
+            // A size band rather than the count
+            case .importCompleted(let source, let films):
+                return ["source": source.rawValue, "count": films <= 10 ? "1-10" : films <= 100 ? "11-100" : "100+"]
+            // A fixed step or link kind, never the link itself
+            case .onboardingStep(let step): return ["step": step]
+            case .linkOpened(let kind): return ["kind": kind]
+            case .termsAccepted, .theatreCheckInOpened, .firstListCreated, .firstRanking, .inviteSent, .inviteAccepted: return nil
             }
         }
     }
 
     static func log(_ event: Event) {
         Analytics.logEvent(event.name, parameters: event.parameters)
+        switch event {
+        // Lists sync down after a reinstall, so a list made while others are already there isn't the first
+        case .listCreated:
+            let lists = (try? PersistenceController.shared.container.viewContext.count(for: CDMovieList.fetch())) ?? 0
+            logOnce(.firstListCreated, key: "analytics.firstListCreated", skip: lists > 1)
+        case .filmRanked: logOnce(.firstRanking, key: "analytics.firstRanking")
+        default: break
+        }
+    }
+
+    // Logged the first time only; a skipped one is marked done too, so it can't come later
+    private static func logOnce(_ event: Event, key: String, skip: Bool = false) {
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if !skip { log(event) }
     }
 }

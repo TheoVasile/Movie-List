@@ -240,7 +240,7 @@ struct ListView: View {
             AddMovieView(viewModel: viewModel)
         }
         .sheet(item: $shareItem) { item in
-            ShareSheet(items: item.items)
+            ShareSheet(item: item)
                 .presentationDetents([.medium, .large])
         }
         .navigationDestination(isPresented: $showDetail) {
@@ -790,7 +790,7 @@ private extension ListView {
             isPreparingShare = false
             if let image {
                 AppAnalytics.log(.shareList(.image))
-                shareItem = ShareItem(items: [image])
+                shareItem = ShareItem(items: [image], kind: .listImage)
             }
         }
     }
@@ -798,7 +798,7 @@ private extension ListView {
     func exportZip() {
         Haptics.tap()
         do {
-            shareItem = ShareItem(items: [try ListExport.makeZip(lists: [viewModel.movieList])])
+            shareItem = ShareItem(items: [try ListExport.makeZip(lists: [viewModel.movieList])], kind: .export)
             AppAnalytics.log(.shareList(.export))
         } catch {
             print("Error exporting list:", error)

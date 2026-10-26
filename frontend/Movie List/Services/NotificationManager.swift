@@ -102,8 +102,11 @@ final class NotificationManager: NSObject, ObservableObject {
 
     /// Shows the system prompt the first time; afterwards iOS only lets the user change it in Settings
     func requestPermission(completion: ((Bool) -> Void)? = nil) {
+        // Logged only when the system prompt is actually shown
+        let firstAsk = authorization == .notDetermined
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             DispatchQueue.main.async {
+                if firstAsk { AppAnalytics.log(.pushPermission(granted: granted)) }
                 self.refreshAuthorization()
                 if granted {
                     UIApplication.shared.registerForRemoteNotifications()

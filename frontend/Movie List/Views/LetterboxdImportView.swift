@@ -7,11 +7,13 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import StoreKit
 
 struct LetterboxdImportView: View {
     @FetchRequest(fetchRequest: CDMovieList.fetch()) var existingLists: FetchedResults<CDMovieList>
     @Environment(\.managedObjectContext) var context
     @Environment(\.dismiss) var dismiss
+    @Environment(\.requestReview) private var requestReview
     @EnvironmentObject var viewModel: AuthenticationViewModel
 
     private enum Step {
@@ -311,9 +313,11 @@ private extension LetterboxdImportView {
                     print("Failed to save imported lists", error)
                 }
                 Haptics.success()
+                AppAnalytics.log(.importCompleted(.letterboxd, films: imported.reduce(0) { $0 + $1.movies.count }))
                 withAnimation(Theme.spring) {
                     step = .finished(imported)
                 }
+                ReviewPrompter.ask(requestReview, after: .importCompleted)
             case .failure(let error):
                 print("Letterboxd import failed:", error.localizedDescription)
                 errorMessage = "Something went wrong while importing. Check your connection and try again."
