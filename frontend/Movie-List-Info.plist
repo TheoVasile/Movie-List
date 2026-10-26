@@ -64,7 +64,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Marquee connects to its server on your local network to load and save your lists.</string>
 	<!-- Firebase Analytics: no ad personalisation, no SKAdNetwork registration and no IDFV; collection itself is
-	     turned on or off by Share Usage Analytics in Settings -->
+	     turned on or off by Share Usage & Crash Data in Settings -->
 	<key>GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS</key>
 	<false/>
 	<key>GOOGLE_ANALYTICS_REGISTRATION_WITH_AD_NETWORK_ENABLED</key>

@@ -54,6 +54,7 @@ struct UserProfileView: View {
                         Image(systemName: "gearshape.fill")
                             .foregroundColor(Theme.textSecondary)
                     }
+                    .accessibilityLabel("Settings")
                 }
             }
             .sheet(isPresented: $showSettings, content: {
