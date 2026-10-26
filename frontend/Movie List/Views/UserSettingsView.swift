@@ -322,7 +322,7 @@ struct UserSettingsView : View {
                     Text(isUnder18
                          ? "AI features aren't available under 18. Discover uses TMDb's recommendations for films in your lists."
                          : aiAllowed
-                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, your Discover swipes and genre leanings, and your iPhone's country and language to a third-party AI provider. Discover requests also include your pronouns, if you've chosen them, and the age range worked out from your birthday in Profile, never the birthday itself. Your name and email are never sent. Movie Night only works when both of you allow AI. Choose AI Picks or Classic recommendations from Discover's ⋯ menu."
+                         ? "AI Picks in Discover and Movie Night with friends send the titles in your lists, the films you like and dislike in Discover and your genre leanings, and your iPhone's country and language to a third-party AI provider. Discover requests also include your pronouns, if you've chosen them, and the age range worked out from your birthday in Profile, never the birthday itself. Your name and email are never sent. Movie Night only works when both of you allow AI. Switch between AI Picks and Classic recommendations with the AI Picks button at the top of Discover."
                          : "Nothing is sent to an AI. Discover uses TMDb's recommendations for films in your lists, and friends can't plan a Movie Night with you.")
                 }
                 .listRowBackground(Theme.surface)
