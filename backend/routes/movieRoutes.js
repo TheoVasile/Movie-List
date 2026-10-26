@@ -15,6 +15,7 @@ const { cached, tmdbGet, fetchTmdb, HOUR, DAY } = require("../services/tmdbCache
 const { streamingPreferences } = require("../services/streamingAlerts");
 const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
 const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
+const { directedFilms } = require("../services/directorFilmography");
 
 const router = express.Router();
 // The list's owner, or someone they invited to edit it
@@ -770,8 +771,8 @@ router.get("/info", async (req, res) => {
 
 // The films in a franchise (TMDb collection) or directed by someone, oldest first, for Directors & Franchises, e.g.
 // /collection/10 -> { name: "Star Wars Collection", films: [discover movie...] } and /director/525 -> { name, films }.
-// Only released feature films; a director's films leave out ones too obscure to count (shorts, student films)
-// Kept for a day
+// Only released films; a director's are the features they directed (see directorFilmography.js), leaving out
+// shorts and anthology segments. Kept for a day
 const filmography = (key, load) => cached(key, DAY, load);
 
 const releasedFilm = (movie) => /^\d{4}-\d{2}-\d{2}$/.test(movie.release_date ?? "") && movie.release_date <= new Date().toISOString().slice(0, 10);
@@ -797,22 +798,19 @@ router.get("/director/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!(id > 0)) return res.status(400).json({ error: "A person id is required." });
     try {
-        res.json(await filmography(`director:${id}`, async () => {
+        // v2: earlier answers left out features with fewer votes than the director's biggest film
+        res.json(await filmography(`director:v2:${id}`, async () => {
             const [person, credits] = await Promise.all([
                 fetchTmdb(`person/${id}`),
                 fetchTmdb(`person/${id}/movie_credits`),
             ]);
-            const seen = new Set();
-            const directed = (credits.crew ?? [])
-                .filter((movie) => movie.job === "Director" && releasedFilm(movie))
-                .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
-            // Shorts and student films have a tiny share of the votes their best-known films get, whoever the
-            // director is, so the bar is relative to their most-rated film
-            const most = Math.max(0, ...directed.map((movie) => movie.vote_count ?? 0));
-            const bar = Math.max(50, most * 0.03);
-            const films = directed.filter((movie) => (movie.vote_count ?? 0) >= bar)
-                .map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
-            return { name: person.name ?? "", films };
+            // A film's length tells shorts apart; it never changes, so it's kept for a month
+            const runtimeOf = (movieId) => cached(`runtime:${movieId}`, 30 * DAY,
+                async () => (await fetchTmdb(`movie/${movieId}`)).runtime ?? 0);
+            const directed = await directedFilms(credits, runtimeOf, {
+                map: (items, fn) => mapWithConcurrency(items, fn, 6),
+            });
+            return { name: person.name ?? "", films: directed.map(toDiscoverMovie).filter(Boolean) };
         }));
     } catch (error) {
         if (error.response?.status === 404) return res.status(404).json({ error: "Person not found." });

@@ -1,0 +1,1513 @@
+{
+ "asOf": "2026-10-26",
+ "people": {
+  "21684": {
+   "name": "Bong Joon-ho",
+   "credits": {
+    "cast": [
+     {
+      "id": 67415,
+      "title": "Incoherence",
+      "release_date": "2025-08-27",
+      "poster_path": "/A8D7xLxLlr1HtvuLgEVSvG0sLdT.jpg",
+      "adult": false,
+      "vote_count": 7,
+      "character": "Paperboy's Brother"
+     },
+     {
+      "id": 118624,
+      "title": "Doomsday Book",
+      "release_date": "2012-04-11",
+      "poster_path": "/1HQBqpGtsN8f65kzHoZhLKbMchr.jpg",
+      "adult": false,
+      "vote_count": 118,
+      "character": "Lee Joon-ho"
+     },
+     {
+      "id": 967309,
+      "title": "Making Memories of Murder",
+      "release_date": "2005-08-09",
+      "poster_path": "/3KJ9o6svlHhmcT7Ds4p3USF8nVu.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "character": "Self"
+     },
+     {
+      "id": 998169,
+      "title": "Memories, Back to the Crime Scenes",
+      "release_date": "2018-07-11",
+      "poster_path": "/wQxvWEt0rfz2p2eI6ZypbuOXS8K.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "character": "Self"
+     },
+     {
+      "id": 260066,
+      "title": "Kurosawa's Way",
+      "release_date": "2011-05-13",
+      "poster_path": "/i3JGehaVvbGjm8dlZYDyn9CXcsC.jpg",
+      "adult": false,
+      "vote_count": 13,
+      "character": "Self"
+     },
+     {
+      "id": 1224234,
+      "title": "The Host : Histoires de famille",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "character": "Bong Joon-ho"
+     },
+     {
+      "id": 888032,
+      "title": "보는 것을 사랑한다",
+      "release_date": "2021-10-28",
+      "poster_path": "/wrb84UC5rzvE1rCk7TgjQU39Oyk.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "character": ""
+     },
+     {
+      "id": 466663,
+      "title": "40 x 15: The Forty Years of the Directors' Fortnight",
+      "release_date": "2008-05-18",
+      "poster_path": "/mDY9D1xUX0fDrQDDaWY5PBhiPaT.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "character": "Self"
+     }
+    ],
+    "crew": [
+     {
+      "id": 1255,
+      "title": "The Host",
+      "release_date": "2006-07-27",
+      "poster_path": "/dEDLY3KeghKFzks5nTDWdigVikr.jpg",
+      "adult": false,
+      "vote_count": 3285,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1255,
+      "title": "The Host",
+      "release_date": "2006-07-27",
+      "poster_path": "/dEDLY3KeghKFzks5nTDWdigVikr.jpg",
+      "adult": false,
+      "vote_count": 3285,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 21531,
+      "title": "Barking Dogs Never Bite",
+      "release_date": "2000-02-19",
+      "poster_path": "/msLr6T2RhqZNZtdCZScAA8nOWbU.jpg",
+      "adult": false,
+      "vote_count": 328,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 30018,
+      "title": "Mother",
+      "release_date": "2009-05-28",
+      "poster_path": "/8oBnSkZE6GDVugAbLPO6uJd4GcS.jpg",
+      "adult": false,
+      "vote_count": 1774,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 30018,
+      "title": "Mother",
+      "release_date": "2009-05-28",
+      "poster_path": "/8oBnSkZE6GDVugAbLPO6uJd4GcS.jpg",
+      "adult": false,
+      "vote_count": 1774,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 11423,
+      "title": "Memories of Murder",
+      "release_date": "2003-04-25",
+      "poster_path": "/jcgUjx1QcupGzjntTVlnQ15lHqy.jpg",
+      "adult": false,
+      "vote_count": 4906,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 11423,
+      "title": "Memories of Murder",
+      "release_date": "2003-04-25",
+      "poster_path": "/jcgUjx1QcupGzjntTVlnQ15lHqy.jpg",
+      "adult": false,
+      "vote_count": 4906,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 8938,
+      "title": "Tokyo!",
+      "release_date": "2008-08-16",
+      "poster_path": "/6xbq2EBAOwy0V7bzd1um3sJX1jd.jpg",
+      "adult": false,
+      "vote_count": 276,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 638373,
+      "title": "Jeonju Digital Project 2004",
+      "release_date": "2004-04-23",
+      "poster_path": "/1yWLv7kXlxRJrcm6PW6pmCIruf3.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 67415,
+      "title": "Incoherence",
+      "release_date": "2025-08-27",
+      "poster_path": "/A8D7xLxLlr1HtvuLgEVSvG0sLdT.jpg",
+      "adult": false,
+      "vote_count": 7,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 829202,
+      "title": "Ally",
+      "release_date": "",
+      "poster_path": "/iGcRMKFXe9AlKPFlMkbV15Fb9pC.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 110415,
+      "title": "Snowpiercer",
+      "release_date": "2013-08-01",
+      "poster_path": "/kw6YQudA0TMcNmGUGy5XIw7zbnV.jpg",
+      "adult": false,
+      "vote_count": 10791,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 110415,
+      "title": "Snowpiercer",
+      "release_date": "2013-08-01",
+      "poster_path": "/kw6YQudA0TMcNmGUGy5XIw7zbnV.jpg",
+      "adult": false,
+      "vote_count": 10791,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 118179,
+      "title": "Influenza",
+      "release_date": "2004-05-06",
+      "poster_path": "/eJIUhG3FrsQGkOo4KWnwb0xLKQf.jpg",
+      "adult": false,
+      "vote_count": 19,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 187425,
+      "title": "Sink & Rise",
+      "release_date": "2004-03-01",
+      "poster_path": "/AdWFNGop0s3XvZYHm89qbVz8RX8.jpg",
+      "adult": false,
+      "vote_count": 13,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 224130,
+      "title": "Phantom: The Submarine",
+      "release_date": "1999-07-31",
+      "poster_path": "/kucw7dQ6fLhu9lygGaFzlTx9KuN.jpg",
+      "adult": false,
+      "vote_count": 17,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1199006,
+      "title": "Looking For Paradise",
+      "release_date": "1992-12-02",
+      "poster_path": "/eBoHmG6ByBx52lbxjK4li1kOFem.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1199006,
+      "title": "Looking For Paradise",
+      "release_date": "1992-12-02",
+      "poster_path": "/eBoHmG6ByBx52lbxjK4li1kOFem.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 272691,
+      "title": "Sea Fog",
+      "release_date": "2014-08-13",
+      "poster_path": "/gnqv8hSNKfNZXKsJXMxJocDVGK7.jpg",
+      "adult": false,
+      "vote_count": 185,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 696506,
+      "title": "Mickey 17",
+      "release_date": "2025-02-28",
+      "poster_path": "/edKpE9B5qN3e559OuMCLZdW1iBZ.jpg",
+      "adult": false,
+      "vote_count": 4144,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 696506,
+      "title": "Mickey 17",
+      "release_date": "2025-02-28",
+      "poster_path": "/edKpE9B5qN3e559OuMCLZdW1iBZ.jpg",
+      "adult": false,
+      "vote_count": 4144,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 1226696,
+      "title": "Untitled Lee Isaac Chung Project",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 387426,
+      "title": "Okja",
+      "release_date": "2017-06-28",
+      "poster_path": "/pHlRr2MfjK77VIIAO7p0R4jhsJI.jpg",
+      "adult": false,
+      "vote_count": 4678,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 398149,
+      "title": "3.11 A Sense of Home Films",
+      "release_date": "2011-09-11",
+      "poster_path": "/4XhJRrJ4b4IuRiKF1G5DF2WpU6D.jpg",
+      "adult": false,
+      "vote_count": 2,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 387426,
+      "title": "Okja",
+      "release_date": "2017-06-28",
+      "poster_path": "/pHlRr2MfjK77VIIAO7p0R4jhsJI.jpg",
+      "adult": false,
+      "vote_count": 4678,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 8938,
+      "title": "Tokyo!",
+      "release_date": "2008-08-16",
+      "poster_path": "/6xbq2EBAOwy0V7bzd1um3sJX1jd.jpg",
+      "adult": false,
+      "vote_count": 276,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 829202,
+      "title": "Ally",
+      "release_date": "",
+      "poster_path": "/iGcRMKFXe9AlKPFlMkbV15Fb9pC.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 67415,
+      "title": "Incoherence",
+      "release_date": "2025-08-27",
+      "poster_path": "/A8D7xLxLlr1HtvuLgEVSvG0sLdT.jpg",
+      "adult": false,
+      "vote_count": 7,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 49190,
+      "title": "Antarctic Journal",
+      "release_date": "2005-05-19",
+      "poster_path": "/jnfYwQUnvdNLNV1nm2n20b6y6mH.jpg",
+      "adult": false,
+      "vote_count": 65,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 272691,
+      "title": "Sea Fog",
+      "release_date": "2014-08-13",
+      "poster_path": "/gnqv8hSNKfNZXKsJXMxJocDVGK7.jpg",
+      "adult": false,
+      "vote_count": 185,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 153423,
+      "title": "Motel Cactus",
+      "release_date": "1997-10-25",
+      "poster_path": "/smBbvJ3O1aGLeOTpoiuHq9d85Qv.jpg",
+      "adult": false,
+      "vote_count": 17,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 387426,
+      "title": "Okja",
+      "release_date": "2017-06-28",
+      "poster_path": "/pHlRr2MfjK77VIIAO7p0R4jhsJI.jpg",
+      "adult": false,
+      "vote_count": 4678,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 21531,
+      "title": "Barking Dogs Never Bite",
+      "release_date": "2000-02-19",
+      "poster_path": "/msLr6T2RhqZNZtdCZScAA8nOWbU.jpg",
+      "adult": false,
+      "vote_count": 328,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 153423,
+      "title": "Motel Cactus",
+      "release_date": "1997-10-25",
+      "poster_path": "/smBbvJ3O1aGLeOTpoiuHq9d85Qv.jpg",
+      "adult": false,
+      "vote_count": 17,
+      "department": "Directing",
+      "job": "Assistant Director"
+     },
+     {
+      "id": 623631,
+      "title": "White Man",
+      "release_date": "1994-08-01",
+      "poster_path": "/eIRGWKW8UMhTf7Yb53fnqvnOyxA.jpg",
+      "adult": false,
+      "vote_count": 15,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 623630,
+      "title": "The Memories in My Frame",
+      "release_date": "1994-08-01",
+      "poster_path": "/7OUh1T9ImhkyzDJaaBiJBcgFsoG.jpg",
+      "adult": false,
+      "vote_count": 14,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 623630,
+      "title": "The Memories in My Frame",
+      "release_date": "1994-08-01",
+      "poster_path": "/7OUh1T9ImhkyzDJaaBiJBcgFsoG.jpg",
+      "adult": false,
+      "vote_count": 14,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 623631,
+      "title": "White Man",
+      "release_date": "1994-08-01",
+      "poster_path": "/eIRGWKW8UMhTf7Yb53fnqvnOyxA.jpg",
+      "adult": false,
+      "vote_count": 15,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 118179,
+      "title": "Influenza",
+      "release_date": "2004-05-06",
+      "poster_path": "/eJIUhG3FrsQGkOo4KWnwb0xLKQf.jpg",
+      "adult": false,
+      "vote_count": 19,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 187425,
+      "title": "Sink & Rise",
+      "release_date": "2004-03-01",
+      "poster_path": "/AdWFNGop0s3XvZYHm89qbVz8RX8.jpg",
+      "adult": false,
+      "vote_count": 13,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 638373,
+      "title": "Jeonju Digital Project 2004",
+      "release_date": "2004-04-23",
+      "poster_path": "/1yWLv7kXlxRJrcm6PW6pmCIruf3.jpg",
+      "adult": false,
+      "vote_count": 1,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 496243,
+      "title": "Parasite",
+      "release_date": "2019-05-30",
+      "poster_path": "/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
+      "adult": false,
+      "vote_count": 21578,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 496243,
+      "title": "Parasite",
+      "release_date": "2019-05-30",
+      "poster_path": "/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
+      "adult": false,
+      "vote_count": 21578,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 496243,
+      "title": "Parasite",
+      "release_date": "2019-05-30",
+      "poster_path": "/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
+      "adult": false,
+      "vote_count": 21578,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 696506,
+      "title": "Mickey 17",
+      "release_date": "2025-02-28",
+      "poster_path": "/edKpE9B5qN3e559OuMCLZdW1iBZ.jpg",
+      "adult": false,
+      "vote_count": 4144,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1436834,
+      "title": "Untitled Bong Joon-ho Horror Film",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1436834,
+      "title": "Untitled Bong Joon-ho Horror Film",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 829202,
+      "title": "Ally",
+      "release_date": "",
+      "poster_path": "/iGcRMKFXe9AlKPFlMkbV15Fb9pC.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 623630,
+      "title": "The Memories in My Frame",
+      "release_date": "1994-08-01",
+      "poster_path": "/7OUh1T9ImhkyzDJaaBiJBcgFsoG.jpg",
+      "adult": false,
+      "vote_count": 14,
+      "department": "Production",
+      "job": "Producer"
+     }
+    ]
+   }
+  },
+  "45400": {
+   "name": "Greta Gerwig",
+   "credits": {
+    "cast": [
+     {
+      "id": 5759,
+      "title": "Baghead",
+      "release_date": "2008-01-21",
+      "poster_path": "/pO3Au8iDpZsJt7Xco6fRsNvm3vz.jpg",
+      "adult": false,
+      "vote_count": 131,
+      "character": "Michelle"
+     },
+     {
+      "id": 5761,
+      "title": "Hannah Takes the Stairs",
+      "release_date": "2007-08-22",
+      "poster_path": "/hy0wRpAtjed2yV1WE78gWj4BLrJ.jpg",
+      "adult": false,
+      "vote_count": 55,
+      "character": "Hannah"
+     },
+     {
+      "id": 25983,
+      "title": "The House of the Devil",
+      "release_date": "2009-10-30",
+      "poster_path": "/4abKUbc9IbsndbaY1hacN1iPM0Y.jpg",
+      "adult": false,
+      "vote_count": 898,
+      "character": "Megan"
+     },
+     {
+      "id": 27583,
+      "title": "Greenberg",
+      "release_date": "2010-03-26",
+      "poster_path": "/jAsN4vPpycVxC89QlA6NYBXRuK7.jpg",
+      "adult": false,
+      "vote_count": 649,
+      "character": "Florence Marr"
+     },
+     {
+      "id": 41630,
+      "title": "No Strings Attached",
+      "release_date": "2011-01-21",
+      "poster_path": "/9C09L1U9S13J4Ut029Qhu0oLcTQ.jpg",
+      "adult": false,
+      "vote_count": 5112,
+      "character": "Patrice"
+     },
+     {
+      "id": 44434,
+      "title": "LOL",
+      "release_date": "2006-03-13",
+      "poster_path": "/mNlTN77u8XVzXCnxRl8lVpWUdYQ.jpg",
+      "adult": false,
+      "vote_count": 92,
+      "character": "Greta"
+     },
+     {
+      "id": 49012,
+      "title": "Arthur",
+      "release_date": "2011-04-08",
+      "poster_path": "/foUTAJurvnbUoIUbnuUk5dyHx7M.jpg",
+      "adult": false,
+      "vote_count": 828,
+      "character": "Naomi Quinn"
+     },
+     {
+      "id": 48204,
+      "title": "Nights and Weekends",
+      "release_date": "2008-10-10",
+      "poster_path": "/zFPvD0dxmqrfKu0qqAgzGVEfCn3.jpg",
+      "adult": false,
+      "vote_count": 52,
+      "character": "Mattie"
+     }
+    ],
+    "crew": [
+     {
+      "id": 48204,
+      "title": "Nights and Weekends",
+      "release_date": "2008-10-10",
+      "poster_path": "/zFPvD0dxmqrfKu0qqAgzGVEfCn3.jpg",
+      "adult": false,
+      "vote_count": 52,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 121986,
+      "title": "Frances Ha",
+      "release_date": "2013-05-17",
+      "poster_path": "/jrq1NoKvsxWCcffVOjegiYwloFN.jpg",
+      "adult": false,
+      "vote_count": 1887,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 331482,
+      "title": "Little Women",
+      "release_date": "2019-12-25",
+      "poster_path": "/yn5ihODtZ7ofn8pDYfxCmxh8AXI.jpg",
+      "adult": false,
+      "vote_count": 7084,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 5761,
+      "title": "Hannah Takes the Stairs",
+      "release_date": "2007-08-22",
+      "poster_path": "/hy0wRpAtjed2yV1WE78gWj4BLrJ.jpg",
+      "adult": false,
+      "vote_count": 55,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 396613,
+      "title": "Northern Comfort",
+      "release_date": "2010-05-28",
+      "poster_path": "/kdfDbS2FiBpaomOFSYQzXsFx1U6.jpg",
+      "adult": false,
+      "vote_count": 5,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 48204,
+      "title": "Nights and Weekends",
+      "release_date": "2008-10-10",
+      "poster_path": "/zFPvD0dxmqrfKu0qqAgzGVEfCn3.jpg",
+      "adult": false,
+      "vote_count": 52,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 309245,
+      "title": "Mistress America",
+      "release_date": "2015-08-14",
+      "poster_path": "/w0V4M9nY9bjsoTKdaAYzL9gRpWY.jpg",
+      "adult": false,
+      "vote_count": 614,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 48204,
+      "title": "Nights and Weekends",
+      "release_date": "2008-10-10",
+      "poster_path": "/zFPvD0dxmqrfKu0qqAgzGVEfCn3.jpg",
+      "adult": false,
+      "vote_count": 52,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 1147573,
+      "title": "Untitled Chronicles of Narnia Film #2",
+      "release_date": "",
+      "poster_path": "/5KCrKpvO9JF6X6yI7Ww6vjZ6DUP.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1147572,
+      "title": "Narnia: The Magician's Nephew",
+      "release_date": "2027-02-10",
+      "poster_path": "/yrqR0qquy4JOfqZCsFJV7vJoOSh.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1147573,
+      "title": "Untitled Chronicles of Narnia Film #2",
+      "release_date": "",
+      "poster_path": "/5KCrKpvO9JF6X6yI7Ww6vjZ6DUP.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 331482,
+      "title": "Little Women",
+      "release_date": "2019-12-25",
+      "poster_path": "/yn5ihODtZ7ofn8pDYfxCmxh8AXI.jpg",
+      "adult": false,
+      "vote_count": 7084,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 391713,
+      "title": "Lady Bird",
+      "release_date": "2017-09-01",
+      "poster_path": "/gl66K7zRdtNYGrxyS2YDUP5ASZd.jpg",
+      "adult": false,
+      "vote_count": 9239,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 391713,
+      "title": "Lady Bird",
+      "release_date": "2017-09-01",
+      "poster_path": "/gl66K7zRdtNYGrxyS2YDUP5ASZd.jpg",
+      "adult": false,
+      "vote_count": 9239,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 346698,
+      "title": "Barbie",
+      "release_date": "2023-07-19",
+      "poster_path": "/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
+      "adult": false,
+      "vote_count": 11741,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 346698,
+      "title": "Barbie",
+      "release_date": "2023-07-19",
+      "poster_path": "/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
+      "adult": false,
+      "vote_count": 11741,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1482921,
+      "title": "China, Il The Musical",
+      "release_date": "2015-06-14",
+      "poster_path": "/kp9NlF5Xc485rDgAdJMvTWhUKnu.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1147572,
+      "title": "Narnia: The Magician's Nephew",
+      "release_date": "2027-02-10",
+      "poster_path": "/yrqR0qquy4JOfqZCsFJV7vJoOSh.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 309245,
+      "title": "Mistress America",
+      "release_date": "2015-08-14",
+      "poster_path": "/w0V4M9nY9bjsoTKdaAYzL9gRpWY.jpg",
+      "adult": false,
+      "vote_count": 614,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1147572,
+      "title": "Narnia: The Magician's Nephew",
+      "release_date": "2027-02-10",
+      "poster_path": "/yrqR0qquy4JOfqZCsFJV7vJoOSh.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Writer"
+     }
+    ]
+   }
+  },
+  "55934": {
+   "name": "Taika Waititi",
+   "credits": {
+    "cast": [
+     {
+      "id": 617762,
+      "title": "The Electrical Life of Louis Wain",
+      "release_date": "2021-10-21",
+      "poster_path": "/jmlul0Y8KBXPqJ0LUcTfsCoRcoI.jpg",
+      "adult": false,
+      "vote_count": 560,
+      "character": "Max Kase"
+     },
+     {
+      "id": 718789,
+      "title": "Lightyear",
+      "release_date": "2022-06-15",
+      "poster_path": "/ox4goZd956BxqJH6iLwhWPL9ct4.jpg",
+      "adult": false,
+      "vote_count": 3993,
+      "character": "Mo Morrison (voice)"
+     },
+     {
+      "id": 13892,
+      "title": "Scarfies",
+      "release_date": "1999-08-05",
+      "poster_path": "/rpA3BziC2xPK9eLFaKTEDrYmVKg.jpg",
+      "adult": false,
+      "vote_count": 23,
+      "character": "Alex"
+     },
+     {
+      "id": 44912,
+      "title": "Green Lantern",
+      "release_date": "2011-06-14",
+      "poster_path": "/fj21HwUprqjjwTdkKC1XZurRSpV.jpg",
+      "adult": false,
+      "vote_count": 7926,
+      "character": "Tom Kalmaku"
+     },
+     {
+      "id": 436969,
+      "title": "The Suicide Squad",
+      "release_date": "2021-07-28",
+      "poster_path": "/q61qEyssk2ku3okWICKArlAdhBn.jpg",
+      "adult": false,
+      "vote_count": 10029,
+      "character": "Ratcatcher"
+     },
+     {
+      "id": 39356,
+      "title": "Boy",
+      "release_date": "2010-03-25",
+      "poster_path": "/jOcwOnCwTbCvJm7jAbeSo4Jgv0H.jpg",
+      "adult": false,
+      "vote_count": 515,
+      "character": "Alamein"
+     },
+     {
+      "id": 621587,
+      "title": "Next Goal Wins",
+      "release_date": "2023-11-16",
+      "poster_path": "/xTQCL1zGugIck8MgvJ2lXSrxENR.jpg",
+      "adult": false,
+      "vote_count": 619,
+      "character": "American Samoan Priest"
+     },
+     {
+      "id": 964708,
+      "title": "Toy Boy",
+      "release_date": "2004-07-20",
+      "poster_path": "/bLXavOWv2boCsvBbSSlqpYNYMt3.jpg",
+      "adult": false,
+      "vote_count": 3,
+      "character": "Jack Hammer"
+     }
+    ],
+    "crew": [
+     {
+      "id": 413279,
+      "title": "Team Thor",
+      "release_date": "2016-08-28",
+      "poster_path": "/hpHvGuMc46pppwpcW0Xk7eys3L4.jpg",
+      "adult": false,
+      "vote_count": 601,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 413279,
+      "title": "Team Thor",
+      "release_date": "2016-08-28",
+      "poster_path": "/hpHvGuMc46pppwpcW0Xk7eys3L4.jpg",
+      "adult": false,
+      "vote_count": 601,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 8748,
+      "title": "Eagle vs Shark",
+      "release_date": "2007-06-15",
+      "poster_path": "/bHGHxXX8jOLV33r8rf1wjBkIdgr.jpg",
+      "adult": false,
+      "vote_count": 352,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 8748,
+      "title": "Eagle vs Shark",
+      "release_date": "2007-06-15",
+      "poster_path": "/bHGHxXX8jOLV33r8rf1wjBkIdgr.jpg",
+      "adult": false,
+      "vote_count": 352,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 823723,
+      "title": "Blazed",
+      "release_date": "2013-09-13",
+      "poster_path": "/iyTlLcwgJbOZFxbmD9ptrUy2SAe.jpg",
+      "adult": false,
+      "vote_count": 2,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 39356,
+      "title": "Boy",
+      "release_date": "2010-03-25",
+      "poster_path": "/jOcwOnCwTbCvJm7jAbeSo4Jgv0H.jpg",
+      "adult": false,
+      "vote_count": 515,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 39356,
+      "title": "Boy",
+      "release_date": "2010-03-25",
+      "poster_path": "/jOcwOnCwTbCvJm7jAbeSo4Jgv0H.jpg",
+      "adult": false,
+      "vote_count": 515,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 51896,
+      "title": "Two Cars, One Night",
+      "release_date": "2004-06-09",
+      "poster_path": "/a3BkwY76IUwadgxeKByxWv5Qukf.jpg",
+      "adult": false,
+      "vote_count": 80,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 51896,
+      "title": "Two Cars, One Night",
+      "release_date": "2004-06-09",
+      "poster_path": "/a3BkwY76IUwadgxeKByxWv5Qukf.jpg",
+      "adult": false,
+      "vote_count": 80,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 246741,
+      "title": "What We Do in the Shadows",
+      "release_date": "2014-06-19",
+      "poster_path": "/a2rD3i3DBMeYbA34rBv6z3B9S3a.jpg",
+      "adult": false,
+      "vote_count": 4131,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 246741,
+      "title": "What We Do in the Shadows",
+      "release_date": "2014-06-19",
+      "poster_path": "/a2rD3i3DBMeYbA34rBv6z3B9S3a.jpg",
+      "adult": false,
+      "vote_count": 4131,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 616037,
+      "title": "Thor: Love and Thunder",
+      "release_date": "2022-07-06",
+      "poster_path": "/pIkRyD18kl4FhoCNQuWxWu5cBLM.jpg",
+      "adult": false,
+      "vote_count": 9090,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 998863,
+      "title": "Heinous Crime",
+      "release_date": "2004-08-14",
+      "poster_path": "/piXiHUUeym8EkOjYdiyHBEhsruT.jpg",
+      "adult": false,
+      "vote_count": 6,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 998863,
+      "title": "Heinous Crime",
+      "release_date": "2004-08-14",
+      "poster_path": "/piXiHUUeym8EkOjYdiyHBEhsruT.jpg",
+      "adult": false,
+      "vote_count": 6,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 413279,
+      "title": "Team Thor",
+      "release_date": "2016-08-28",
+      "poster_path": "/hpHvGuMc46pppwpcW0Xk7eys3L4.jpg",
+      "adult": false,
+      "vote_count": 601,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 505945,
+      "title": "Team Darryl",
+      "release_date": "2018-02-20",
+      "poster_path": "/edroTAeTEM9ILyAnumA0ALxRSne.jpg",
+      "adult": false,
+      "vote_count": 208,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 246741,
+      "title": "What We Do in the Shadows",
+      "release_date": "2014-06-19",
+      "poster_path": "/a2rD3i3DBMeYbA34rBv6z3B9S3a.jpg",
+      "adult": false,
+      "vote_count": 4131,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 844166,
+      "title": "Tower of Terror",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 284053,
+      "title": "Thor: Ragnarok",
+      "release_date": "2017-10-24",
+      "poster_path": "/rzRwTcFvttcN1ZpX2xv4j3tSdJu.jpg",
+      "adult": false,
+      "vote_count": 22685,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 371645,
+      "title": "Hunt for the Wilderpeople",
+      "release_date": "2016-01-22",
+      "poster_path": "/hkmz9rxgcweizXNElozGeKwmAJE.jpg",
+      "adult": false,
+      "vote_count": 2431,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 371645,
+      "title": "Hunt for the Wilderpeople",
+      "release_date": "2016-01-22",
+      "poster_path": "/hkmz9rxgcweizXNElozGeKwmAJE.jpg",
+      "adult": false,
+      "vote_count": 2431,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 441829,
+      "title": "Team Thor: Part 2",
+      "release_date": "2017-02-14",
+      "poster_path": "/2jmP71A5Un0jDNqBesDPQSN8hjJ.jpg",
+      "adult": false,
+      "vote_count": 380,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 392264,
+      "title": "Tama Tū",
+      "release_date": "2004-10-21",
+      "poster_path": "/awgOjT2PHcpkB1yK2or6VZNlrbt.jpg",
+      "adult": false,
+      "vote_count": 19,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 392264,
+      "title": "Tama Tū",
+      "release_date": "2004-10-21",
+      "poster_path": "/awgOjT2PHcpkB1yK2or6VZNlrbt.jpg",
+      "adult": false,
+      "vote_count": 19,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 858035,
+      "title": "Klara and the Sun",
+      "release_date": "2026-10-21",
+      "poster_path": "/xqovj2p6HRsgHxN81qYAYF4StgM.jpg",
+      "adult": false,
+      "vote_count": 15,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 411354,
+      "title": "What We Do in the Shadows: Interviews with Some Vampires",
+      "release_date": "2005-01-01",
+      "poster_path": "/86Tbvgibf08d8y9iGGVgjN7DZac.jpg",
+      "adult": false,
+      "vote_count": 68,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 411354,
+      "title": "What We Do in the Shadows: Interviews with Some Vampires",
+      "release_date": "2005-01-01",
+      "poster_path": "/86Tbvgibf08d8y9iGGVgjN7DZac.jpg",
+      "adult": false,
+      "vote_count": 68,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 211785,
+      "title": "The Captain",
+      "release_date": "2013-08-08",
+      "poster_path": "/fFZrmADpmgYdAdHCm3GSFDTyK6c.jpg",
+      "adult": false,
+      "vote_count": 17,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 371645,
+      "title": "Hunt for the Wilderpeople",
+      "release_date": "2016-01-22",
+      "poster_path": "/hkmz9rxgcweizXNElozGeKwmAJE.jpg",
+      "adult": false,
+      "vote_count": 2431,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 858035,
+      "title": "Klara and the Sun",
+      "release_date": "2026-10-21",
+      "poster_path": "/xqovj2p6HRsgHxN81qYAYF4StgM.jpg",
+      "adult": false,
+      "vote_count": 15,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 505945,
+      "title": "Team Darryl",
+      "release_date": "2018-02-20",
+      "poster_path": "/edroTAeTEM9ILyAnumA0ALxRSne.jpg",
+      "adult": false,
+      "vote_count": 208,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1264525,
+      "title": "42 One Dream Rush",
+      "release_date": "2010-09-15",
+      "poster_path": "/1anNOEH1yx4aVLtZzb7rsTrBa75.jpg",
+      "adult": false,
+      "vote_count": 3,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 515001,
+      "title": "Jojo Rabbit",
+      "release_date": "2019-10-18",
+      "poster_path": "/1mqL7VG4Ix8wmxwypmCA1HTHBky.jpg",
+      "adult": false,
+      "vote_count": 10803,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 515001,
+      "title": "Jojo Rabbit",
+      "release_date": "2019-10-18",
+      "poster_path": "/1mqL7VG4Ix8wmxwypmCA1HTHBky.jpg",
+      "adult": false,
+      "vote_count": 10803,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 515001,
+      "title": "Jojo Rabbit",
+      "release_date": "2019-10-18",
+      "poster_path": "/1mqL7VG4Ix8wmxwypmCA1HTHBky.jpg",
+      "adult": false,
+      "vote_count": 10803,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 1307214,
+      "title": "James",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 621587,
+      "title": "Next Goal Wins",
+      "release_date": "2023-11-16",
+      "poster_path": "/xTQCL1zGugIck8MgvJ2lXSrxENR.jpg",
+      "adult": false,
+      "vote_count": 619,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 621587,
+      "title": "Next Goal Wins",
+      "release_date": "2023-11-16",
+      "poster_path": "/xTQCL1zGugIck8MgvJ2lXSrxENR.jpg",
+      "adult": false,
+      "vote_count": 619,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 616037,
+      "title": "Thor: Love and Thunder",
+      "release_date": "2022-07-06",
+      "poster_path": "/pIkRyD18kl4FhoCNQuWxWu5cBLM.jpg",
+      "adult": false,
+      "vote_count": 9090,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 621587,
+      "title": "Next Goal Wins",
+      "release_date": "2023-11-16",
+      "poster_path": "/xTQCL1zGugIck8MgvJ2lXSrxENR.jpg",
+      "adult": false,
+      "vote_count": 619,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 441829,
+      "title": "Team Thor: Part 2",
+      "release_date": "2017-02-14",
+      "poster_path": "/2jmP71A5Un0jDNqBesDPQSN8hjJ.jpg",
+      "adult": false,
+      "vote_count": 380,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1385485,
+      "title": "The Boy & the Octopus",
+      "release_date": "2024-11-12",
+      "poster_path": "/4PxZT8I9M92DGpkqoj9IqjK0Rhy.jpg",
+      "adult": false,
+      "vote_count": 29,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1396028,
+      "title": "Falling Leaves",
+      "release_date": "2005-03-05",
+      "poster_path": "/jxotnVbqBXKIXcmIVc4r1HZdZhD.jpg",
+      "adult": false,
+      "vote_count": 3,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1396028,
+      "title": "Falling Leaves",
+      "release_date": "2005-03-05",
+      "poster_path": "/jxotnVbqBXKIXcmIVc4r1HZdZhD.jpg",
+      "adult": false,
+      "vote_count": 3,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 1396028,
+      "title": "Falling Leaves",
+      "release_date": "2005-03-05",
+      "poster_path": "/jxotnVbqBXKIXcmIVc4r1HZdZhD.jpg",
+      "adult": false,
+      "vote_count": 3,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1514883,
+      "title": "Untitled Judge Dredd Film",
+      "release_date": "",
+      "poster_path": "/fI39eTkZNkWVAI6jwa2ym5GZuEO.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1578602,
+      "title": "A Holiday Short: Best Christmas Ever",
+      "release_date": "2025-11-10",
+      "poster_path": "/5Q07rEmkArjOxHOvoztZySZRO8Y.jpg",
+      "adult": false,
+      "vote_count": 11,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1597473,
+      "title": "Barn 8",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 1597473,
+      "title": "Barn 8",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Production",
+      "job": "Producer"
+     },
+     {
+      "id": 1424981,
+      "title": "Flash Gordon",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Writing",
+      "job": "Writer"
+     },
+     {
+      "id": 1424981,
+      "title": "Flash Gordon",
+      "release_date": "",
+      "poster_path": null,
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     },
+     {
+      "id": 858035,
+      "title": "Klara and the Sun",
+      "release_date": "2026-10-21",
+      "poster_path": "/xqovj2p6HRsgHxN81qYAYF4StgM.jpg",
+      "adult": false,
+      "vote_count": 15,
+      "department": "Writing",
+      "job": "Screenplay"
+     },
+     {
+      "id": 1798498,
+      "title": "Feel It Forever",
+      "release_date": "2026-05-01",
+      "poster_path": "/mTV4FTEiUvTgONYzwsUy2BLiNFM.jpg",
+      "adult": false,
+      "vote_count": 0,
+      "department": "Directing",
+      "job": "Director"
+     }
+    ]
+   }
+  }
+ },
+ "runtimes": {
+  "1255": 120,
+  "8748": 87,
+  "8938": 112,
+  "11423": 131,
+  "21531": 110,
+  "30018": 129,
+  "39356": 88,
+  "48204": 80,
+  "51896": 12,
+  "67415": 31,
+  "110415": 127,
+  "118179": 28,
+  "187425": 6,
+  "246741": 86,
+  "284053": 131,
+  "331482": 135,
+  "346698": 114,
+  "371645": 101,
+  "387426": 120,
+  "391713": 94,
+  "392264": 18,
+  "398149": 75,
+  "411354": 28,
+  "413279": 3,
+  "441829": 5,
+  "496243": 133,
+  "505945": 6,
+  "515001": 108,
+  "616037": 119,
+  "621587": 104,
+  "623630": 5,
+  "623631": 19,
+  "638373": 98,
+  "696506": 137,
+  "823723": 2,
+  "858035": 116,
+  "998863": 8,
+  "1199006": 23,
+  "1264525": 42,
+  "1385485": 5,
+  "1396028": 8,
+  "1578602": 3,
+  "1798498": 2
+ }
+}
