@@ -1,0 +1,20 @@
+{
+    "about": [
+        "Words and phrases that contain a listed term but are fine (the Scunthorpe problem). A match that falls inside one of these is ignored.",
+        "Lowercase. The obscenity dataset already allows many common ones (e.g. Scunthorpe, assassin, classic, Sussex)."
+    ],
+    "phrases": [
+        "cockpit", "cockney", "peacock", "hancock", "babcock", "hitchcock", "shuttlecock", "cocktail", "cockatoo", "cockroach", "cockerel",
+        "penistone", "dickens", "dickinson", "moby dick", "dick tracy", "philip k dick",
+        "cum laude", "cumberbatch", "cumbria", "cumberland",
+        "sex and the city", "sex education", "sex lies and videotape",
+        "the vagina monologues", "i am not your negro",
+        "titanic", "title", "titus", "titan", "entitle",
+        "therapist", "grape", "rapeseed", "scrape", "drape", "trapeze",
+        "shitake", "shiitake", "analysis", "analyst", "analog", "analg", "analec", "analph", "annal", "canal", "banal",
+        "retardant", "retardation", "cuckold", "cumin", "cummerbund", "cocksure", "feckless", "pussycat", "pussyfoot",
+        "rapper", "rappel", "rapport", "fagin", "pussy riot",
+        "scathing", "scatter", "mascot", "spice", "spicy", "raccoon", "cocoon", "tycoon", "pakistan", "pakistani",
+        "matsushita", "arsenal", "assume", "assassin", "buttress", "button", "john lee hooker"
+    ]
+}

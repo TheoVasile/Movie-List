@@ -36,7 +36,7 @@ You agree to give accurate information when you create your account and to keep 
 
 ### Usernames
 
-Usernames are first come, first served. You may not choose a username that impersonates another person or organization, infringes someone else's rights, or is offensive or misleading. We may reclaim or require you to change a username that breaks these rules or that we reasonably believe is being held only to prevent others from using it.
+Usernames are first come, first served. You may not choose a username that impersonates another person or organization, infringes someone else's rights, or is offensive or misleading. We may reclaim or require you to change a username that breaks these rules or that we reasonably believe is being held only to prevent others from using it. Some usernames, such as ones containing offensive words or names that could be mistaken for Marquee or its staff (for example "admin" or "support"), are not available, and the App will ask you to choose another.
 
 ## 5. What Marquee Does
 
@@ -106,6 +106,10 @@ You are responsible for Your Content. You confirm that you have the rights neede
 ### Removal
 
 We do not review all content before it appears, but we may (without being obligated to) review, restrict or remove any content, or limit its visibility, if we reasonably believe it breaks these Terms or the law, or puts users or others at risk.
+
+### Automated filtering
+
+We use automated filtering to help enforce Section 6. Names that other people can see, such as your display name, @username, list names and descriptions and movie night group names, are checked when you save them, and one containing slurs or other offensive words will not be saved; the App will ask you to choose another. Notes on films and messages you add to recommendations are checked too. If one may break these Terms, we may save it but hide it from everyone except you until we have reviewed it, and the App shows it as under review. Automated filtering can make mistakes in both directions. If you think something was caught by mistake, contact us at {{CONTACT_EMAIL}}.
 
 ## 8. Community, Following, Blocking and Reporting
 

@@ -5,6 +5,7 @@ const verifyToken = require("../middleware/authMiddleware");
 const { rateLimit } = require("../middleware/rateLimit");
 const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
 const pool = require("../config/db");
+const { blockedField } = require("../services/moderation");
 const { TERMS_VERSION, TERMS_UPDATED, PRIVACY_VERSION, PRIVACY_UPDATED, loadTerms, loadPrivacy } = require("../config/terms");
 
 const router = express.Router();
@@ -12,14 +13,16 @@ const router = express.Router();
 router.post("/login", verifyToken, loginUser);
 
 // Makes the account, e.g. { "username": "Theo", "handle": "theo.v" }. The handle is saved too when it's
-// valid and free; handle_saved says whether it was, and the app asks for another one if not
+// valid, allowed and free; handle_saved says whether it was, and the app asks for another one if not. A name
+// moderation doesn't allow is swapped for a neutral one they can change later
 router.post("/create", verifyToken, async (req, res) => {
     try {
         const { username } = req.body;
-        const newUser = await createUser(req.user.uid, req.user.email ?? req.body.email, username);
+        const name = blockedField({ display_name: username }) ? `user_${req.user.uid.slice(0, 6)}` : username;
+        const newUser = await createUser(req.user.uid, req.user.email ?? req.body.email, name);
         const handle = typeof req.body.handle === "string" ? req.body.handle.trim().toLowerCase() : "";
         let handle_saved = false;
-        if (isValidHandle(handle)) {
+        if (isValidHandle(handle) && !blockedField({ handle })) {
             try {
                 await setHandle(req.user.uid, handle);
                 handle_saved = true;
@@ -39,10 +42,13 @@ const MAX_CHECKS_PER_MINUTE = 30;
 const limitChecks = rateLimit({ limit: MAX_CHECKS_PER_MINUTE, message: "Too many checks. Try again in a minute." });
 
 // Whether an @username is free, for the sign-up form before the account exists, e.g.
-// /auth/handle-available?handle=theo.v -> { "valid": true, "available": false }
+// /auth/handle-available?handle=theo.v -> { "valid": true, "available": false }. One moderation doesn't allow
+// isn't valid, and error says why
 router.get("/handle-available", limitChecks, async (req, res) => {
     const handle = String(req.query.handle ?? "").trim().toLowerCase().replace(/^@/, "");
     if (!isValidHandle(handle)) return res.json({ valid: false, available: false });
+    const blocked = blockedField({ handle });
+    if (blocked) return res.json({ valid: false, available: false, error: blocked.error });
     try {
         const taken = await pool.query("SELECT 1 FROM users WHERE handle = $1", [handle]);
         res.json({ valid: true, available: taken.rowCount === 0 });

@@ -136,7 +136,8 @@ final class SocialStore: ObservableObject {
             case .failure(let error):
                 switch (error as NSError).code {
                 case 409: completion("That username is taken.")
-                case 400: completion("Usernames are 3 to 20 letters, numbers, underscores or dots.")
+                // Says why, e.g. that moderation doesn't allow it or it's reserved
+                case 400: completion(error.serverMessage ?? "Usernames are 3 to 20 letters, numbers, underscores or dots.")
                 default: completion("Couldn't save your username. Check your connection and try again.")
                 }
             }
@@ -225,6 +226,7 @@ struct UsernameSetupView: View {
                         .focused($focused)
                         .submitLabel(.done)
                         .onSubmit { save() }
+                        .disabled(isSaving)
                 }
                 .padding(16)
                 .cardStyle(cornerRadius: 14)

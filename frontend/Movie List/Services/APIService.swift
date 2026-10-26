@@ -81,6 +81,8 @@ struct MovieDetailsResponse: Codable {
     let watched: Bool?
     // The user's private note on the film; nil when they haven't written one
     let note: String?
+    // "flagged" while moderation holds the note for review (only the user sees it until then); nil without a note
+    let note_status: String?
     // Placed by Smart Placement and not yet approved
     let ai_placed: Bool?
     // On shared lists, who added it when it wasn't the user
@@ -108,6 +110,8 @@ struct ListDetailsResponse: Codable {
     let movies: [MovieDetailsResponse]
     // Only set on Letterboxd imports: films that couldn't be matched to TMDb
     let skipped: [String]?
+    // Only set on Letterboxd imports: true when moderation didn't allow the list's name, so it's "Imported list"
+    let renamed_from_blocked: Bool?
     // "public", "followers" or "private"
     let visibility: String?
     // False for unranked lists, whose order means nothing; nil from servers before lists could be unranked
@@ -138,6 +142,10 @@ struct SpreadsheetImportResponse: Decodable {
     let already_in_list: Int
     // Films that couldn't be matched to TMDb, as "Title (Year)"
     let skipped: [String]
+    // The new list's name when moderation didn't allow the one given
+    let renamed_to: String?
+    // Imported notes moderation is holding for review
+    let notes_under_review: Int?
 }
 
 struct AIDiscoverRequest: Encodable {
@@ -498,8 +506,31 @@ struct FriendTake: Decodable, Identifiable {
     let ranking: Ranking?
 }
 
+extension Error {
+    /// Why the server turned the request down, e.g. that a name isn't allowed, to show by the field. nil when it
+    /// didn't say, or the request failed for another reason (no connection, a server error)
+    var serverMessage: String? { (self as NSError).userInfo[APIService.serverMessageKey] as? String }
+    /// Which field serverMessage is about, e.g. "list_name" or "list_description", when the server said
+    var serverField: String? { (self as NSError).userInfo[APIService.serverFieldKey] as? String }
+}
+
 class APIService {
     static let shared = APIService()
+    static let serverMessageKey = "serverMessage"
+    static let serverFieldKey = "serverField"
+
+    /// The error for a request the server turned down: its code is the HTTP status, and for a 4xx it carries the
+    /// server's message and field ({ "error": "...", "field": "..." }) as serverMessage and serverField
+    static func requestError(_ domain: String, status: Int, data: Data?) -> NSError {
+        let body = (400..<500).contains(status)
+            ? data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            : nil
+        var userInfo: [String: Any] = [:]
+        if let message = body?["error"] as? String { userInfo[serverMessageKey] = message }
+        if let field = body?["field"] as? String { userInfo[serverFieldKey] = field }
+        return NSError(domain: domain, code: status, userInfo: userInfo)
+    }
+
     #if !DEBUG
     // Release builds, including TestFlight, use the backend hosted on Render (see render.yaml)
     let baseURL = "https://movie-list-backend-dgct.onrender.com"
@@ -654,17 +685,18 @@ class APIService {
         }
     }
 
-    /// Whether an @username is free, checked before the account exists. nil when it couldn't be checked
-    func isHandleAvailable(_ handle: String, completion: @escaping (Bool?) -> Void) {
+    /// Whether an @username is free, checked before the account exists, and why it isn't allowed when moderation
+    /// says so. nil when it couldn't be checked
+    func isHandleAvailable(_ handle: String, completion: @escaping (Bool?, String?) -> Void) {
         var components = URLComponents(string: "\(baseURL)/auth/handle-available")
         components?.queryItems = [URLQueryItem(name: "handle", value: handle)]
-        guard let url = components?.url else { return completion(nil) }
-        struct Availability: Decodable { let available: Bool }
+        guard let url = components?.url else { return completion(nil, nil) }
+        struct Availability: Decodable { let available: Bool; let error: String? }
         // No account yet, so this one goes without a token
         URLSession.shared.dataTask(with: url) { data, response, _ in
             let ok = (response as? HTTPURLResponse)?.statusCode == 200
-            let available = ok ? data.flatMap { try? JSONDecoder().decode(Availability.self, from: $0) }?.available : nil
-            DispatchQueue.main.async { completion(available) }
+            let availability = ok ? data.flatMap { try? JSONDecoder().decode(Availability.self, from: $0) } : nil
+            DispatchQueue.main.async { completion(availability?.available, availability?.error) }
         }.resume()
     }
 
@@ -751,7 +783,7 @@ class APIService {
             if let data, (200...299).contains(status), let decoded = try? JSONDecoder().decode(T.self, from: data) {
                 result = .success(decoded)
             } else {
-                result = .failure(error ?? NSError(domain: "Request failed", code: status, userInfo: nil))
+                result = .failure(error ?? Self.requestError("Request failed", status: status, data: data))
             }
             DispatchQueue.main.async { completion(result) }
         }
@@ -967,10 +999,11 @@ class APIService {
         sendJSON("GET", "/users/me/recommendations", completion: completion)
     }
 
-    private struct SentResponse: Decodable { let sent_to: [String] }
+    private struct SentResponse: Decodable { let sent_to: [String]; let note_status: String? }
 
-    /// Sends a film to people the user follows or who follow them. Calls back with the @handles it went to
-    func sendRecommendation(_ movie: Movie, to handles: [String], note: String?, completion: @escaping (Result<[String], Error>) -> Void) {
+    /// Sends a film to people the user follows or who follow them. Calls back with the @handles it went to, and
+    /// whether moderation is holding the note for review
+    func sendRecommendation(_ movie: Movie, to handles: [String], note: String?, completion: @escaping (Result<(sentTo: [String], noteUnderReview: Bool), Error>) -> Void) {
         var body: [String: Any] = [
             "handles": handles, "tmdb_id": movie.id, "title": movie.title, "release_date": movie.release_date,
             "overview": movie.overview, "original_language": movie.original_language, "popularity": movie.popularity,
@@ -978,7 +1011,7 @@ class APIService {
         if let poster = movie.poster_path { body["poster_path"] = poster }
         if let note { body["note"] = note }
         sendJSON("POST", "/users/me/recommendations", body: body) { (result: Result<SentResponse, Error>) in
-            completion(result.map(\.sent_to))
+            completion(result.map { ($0.sent_to, $0.note_status == "flagged") })
         }
     }
 
@@ -1038,10 +1071,11 @@ class APIService {
 
     private struct NameResponse: Decodable { let name: String }
 
-    /// Saves the name friends see on the server
-    func setDisplayName(_ name: String, completion: @escaping (Bool) -> Void) {
+    /// Saves the name friends see on the server. Fails with 400, and a serverMessage to show, when moderation
+    /// doesn't allow it
+    func setDisplayName(_ name: String, completion: @escaping (Result<Void, Error>) -> Void) {
         sendJSON("PUT", "/users/me/name", body: ["name": name]) { (result: Result<NameResponse, Error>) in
-            completion((try? result.get()) != nil)
+            completion(result.map { _ in () })
         }
     }
 
@@ -1158,10 +1192,11 @@ class APIService {
 
     private struct CreatedGroup: Decodable { let id: Int64 }
 
-    /// Makes a movie night group from people the user follows. Calls back with whether it worked
-    func createGroup(name: String, handles: [String], completion: @escaping (Bool) -> Void) {
+    /// Makes a movie night group from people the user follows. Fails with 400, and a serverMessage to show, when
+    /// moderation doesn't allow the name
+    func createGroup(name: String, handles: [String], completion: @escaping (Result<Void, Error>) -> Void) {
         sendJSON("POST", "/users/me/groups", body: ["name": name, "handles": handles]) { (result: Result<CreatedGroup, Error>) in
-            completion((try? result.get()) != nil)
+            completion(result.map { _ in () })
         }
     }
 
@@ -1655,8 +1690,9 @@ class APIService {
         }
     }
 
-    /// Saves the user's note on a film; an empty note deletes it. Calls back on the main thread
-    func setMovieNote(movie_id: Int64, note: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    /// Saves the user's note on a film; an empty note deletes it. Calls back on the main thread with whether
+    /// moderation is holding the note for review
+    func setMovieNote(movie_id: Int64, note: String, completion: @escaping (Result<Bool, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/note") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
@@ -1668,14 +1704,17 @@ class APIService {
             return
         }
 
-        send(request) { _, response, error in
-            let result: Result<Void, Error>
+        struct Saved: Decodable { let status: String? }
+        send(request) { data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 500
+            let result: Result<Bool, Error>
             if let error = error {
                 result = .failure(error)
-            } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                result = .success(())
+            } else if (200...299).contains(status) {
+                let saved = data.flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
+                result = .success(saved?.status == "flagged")
             } else {
-                result = .failure(NSError(domain: "Note save failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
+                result = .failure(Self.requestError("Note save failed", status: status, data: data))
             }
             DispatchQueue.main.async { completion(result) }
         }
@@ -1862,14 +1901,15 @@ class APIService {
             return
         }
 
-        send(request) { _, response, error in
+        send(request) { data, response, error in
             let result: Result<Void, Error>
             if let error = error {
                 result = .failure(error)
             } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 result = .success(())
             } else {
-                result = .failure(NSError(domain: "List update failed", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: nil))
+                // A 400 says why, e.g. that moderation doesn't allow the name, to show by the field
+                result = .failure(Self.requestError("List update failed", status: (response as? HTTPURLResponse)?.statusCode ?? 500, data: data))
             }
             DispatchQueue.main.async { completion(result) }
         }
@@ -1903,6 +1943,14 @@ class APIService {
             guard let data = data else {
                 DispatchQueue.main.async {
                     completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
+                }
+                return
+            }
+            // A 400 says why, e.g. that moderation doesn't allow the name, to show by the field
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200...299).contains(status) else {
+                DispatchQueue.main.async {
+                    completion(.failure(Self.requestError("List create failed", status: status, data: data)))
                 }
                 return
             }

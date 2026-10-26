@@ -543,9 +543,9 @@ class ListViewModel: ObservableObject {
 
     // Returns each changed copy's old value so a failed request can put it back
     /// Saves the user's note on a film (empty deletes it). Like watched, the note belongs to the film rather
-    /// than the list, so every list's copy is updated. Calls back with whether the server saved it; on failure
-    /// the old note is put back
-    func setNote(_ movie: CDMovie, _ note: String, completion: @escaping (Bool) -> Void = { _ in }) {
+    /// than the list, so every list's copy is updated. Calls back with nil once the server saved it, or a message
+    /// to show; on failure the old note is put back. A saved note moderation flags is marked as under review
+    func setNote(_ movie: CDMovie, _ note: String, completion: @escaping (String?) -> Void = { _ in }) {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = CDMovie.fetchRequest()
         request.predicate = NSPredicate(format: "id == %lld", movie.id)
@@ -556,14 +556,16 @@ class ListViewModel: ObservableObject {
         saveContext()
 
         APIService.shared.setMovieNote(movie_id: movie.id, note: trimmed) { result in
-            if case .failure(let error) = result {
+            switch result {
+            case .success(let underReview):
+                NoteReview.shared.set(underReview, movieID: movie.id)
+                completion(nil)
+            case .failure(let error):
                 print("Error saving note:", error)
                 self.objectWillChange.send()
                 previous.forEach { copy, note in copy.note = note }
                 self.saveContext()
-                completion(false)
-            } else {
-                completion(true)
+                completion(error.serverMessage ?? "Couldn't save your note. Check your connection and try again.")
             }
         }
     }

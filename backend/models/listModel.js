@@ -15,9 +15,9 @@ async function createList(user_id, name, overview, is_ranked, visibility) {
 const editableBy = (param) => `(l.user_id = ${param} OR EXISTS (
     SELECT 1 FROM list_editors le WHERE le.list_id = l.id AND le.user_id = ${param}))`;
 
-// Every list the user owns or edits, each with its films (plus rank, watched, note and who added it). Shared
-// lists also say whether the user owns them, and who owns and edits them. A handful of queries in total, rather
-// than one per film, which took over a minute for lists with hundreds of films
+// Every list the user owns or edits, each with its films (plus rank, watched, note, the note's moderation status
+// and who added it). Shared lists also say whether the user owns them, and who owns and edits them. A handful of
+// queries in total, rather than one per film, which took over a minute for lists with hundreds of films
 async function fetchLists(user_id) {
     // One after another, so a single database connection is enough
     const lists = await pool.query(
@@ -53,7 +53,9 @@ async function fetchLists(user_id) {
 
     const byList = new Map(lists.rows.map((list) => [list.id, { ...list, movies: [], members: [] }]));
     for (const { list_id, ...film } of films.rows) {
-        film.note = notes.get(film.id) ?? null;
+        film.note = notes.get(film.id)?.note ?? null;
+        // "flagged" while moderation holds the note for review, so the app can say so; only the author sees it then
+        film.note_status = notes.get(film.id)?.moderation_status ?? null;
         byList.get(list_id)?.movies.push(film);
     }
     for (const { list_id, ...person } of people.rows) {

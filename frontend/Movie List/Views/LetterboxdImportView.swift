@@ -222,6 +222,12 @@ private extension LetterboxdImportView {
     func finishedView(_ imported: [ListDetailsResponse]) -> some View {
         let filmCount = imported.reduce(0) { $0 + $1.movies.count }
         let skipped = imported.flatMap { list in (list.skipped ?? []).map { (list: list.name, film: $0) } }
+        var message = "Added \(imported.count) \(imported.count == 1 ? "list" : "lists") with \(filmCount) \(filmCount == 1 ? "film" : "films")."
+        // Lists whose Letterboxd name moderation didn't allow
+        let renamed = imported.filter { $0.renamed_from_blocked == true }.count
+        if renamed > 0 {
+            message += " \(renamed) list \(renamed == 1 ? "name isn't" : "names aren't") allowed, so \(renamed == 1 ? "it's" : "they're") called \"Imported list\". You can rename \(renamed == 1 ? "it" : "them") from the list's ••• menu."
+        }
 
         return VStack(spacing: 0) {
             ScrollView {
@@ -229,7 +235,7 @@ private extension LetterboxdImportView {
                     EmptyStateView(
                         icon: "checkmark.seal.fill",
                         title: "Import complete",
-                        message: "Added \(imported.count) \(imported.count == 1 ? "list" : "lists") with \(filmCount) \(filmCount == 1 ? "film" : "films")."
+                        message: message
                     )
 
                     if !skipped.isEmpty {

@@ -7,13 +7,19 @@ const { createMovie, addMovieToList } = require("../models/movieModel");
 const { setMovieWatched, markWatchedOn } = require("../models/watchedModel");
 const { setMovieNote, fetchNotes } = require("../models/notesModel");
 const { isPrivate } = require("../models/socialModel");
+const { blockedField } = require("../services/moderation");
+
+// What a new list is called instead when moderation doesn't allow the name it was given
+const NEUTRAL_NAME = "Imported list";
 
 const router = express.Router();
 
 // Adds one batch of films read from a spreadsheet (Excel or CSV) to the bottom of a list, in the sheet's order.
 // The first batch passes a name to make a new list; later batches, or imports into an existing list, pass its
 // list_id. Films are matched on TMDb the same way as Letterboxd imports, and films already in the list are left
-// where they are. Watched dates and notes from the sheet are saved too, without overwriting ones the user has
+// where they are. Watched dates and notes from the sheet are saved too, without overwriting ones the user has.
+// A new list's name moderation doesn't allow becomes "Imported list" (renamed_to says so), and notes it flags are
+// saved for review like any other (notes_under_review counts them)
 router.post("/films", async (req, res) => {
     const user_id = req.user.uid;
     const { list_id, name } = req.body;
@@ -27,6 +33,7 @@ router.post("/films", async (req, res) => {
 
     let listId = Number(list_id);
     let createdList = null;
+    let renamedTo = null;
     try {
         if (list_id !== undefined) {
             if (!Number.isInteger(listId) || !(await canEditList(listId, user_id))) {
@@ -35,7 +42,9 @@ router.post("/films", async (req, res) => {
         } else {
             // Only followers can see a private profile's lists, so the new list starts followers-only there
             const visibility = (await isPrivate(user_id)) ? "followers" : "public";
-            createdList = await createList(user_id, name.trim().slice(0, 100), "", true, visibility);
+            let listName = name.trim().slice(0, 100);
+            if (blockedField({ list_name: listName })) listName = renamedTo = NEUTRAL_NAME;
+            createdList = await createList(user_id, listName, "", true, visibility);
             listId = createdList.id;
         }
 
@@ -66,6 +75,7 @@ router.post("/films", async (req, res) => {
 
             // Watched dates and notes belong to the user rather than the list, so they apply to every matched row
             const notes = await fetchNotes(user_id);
+            let notesUnderReview = 0;
             await mapWithConcurrency(films.map((film, i) => ({ film, movie: matched[i] && movieByTmdbId.get(matched[i].id) })), async ({ film, movie }) => {
                 if (!movie) return;
                 if (film.watched_on) {
@@ -74,7 +84,7 @@ router.post("/films", async (req, res) => {
                     await setMovieWatched(user_id, movie.id, true);
                 }
                 if (film.note && !notes.has(movie.id)) {
-                    await setMovieNote(user_id, movie.id, film.note);
+                    if ((await setMovieNote(user_id, movie.id, film.note)) === "flagged") notesUnderReview++;
                 }
             });
 
@@ -83,6 +93,8 @@ router.post("/films", async (req, res) => {
                 added: newMovies.length,
                 already_in_list: movies.length - newMovies.length,
                 skipped: films.filter((_, i) => !matched[i]).map(describeFilm),
+                renamed_to: renamedTo,
+                notes_under_review: notesUnderReview,
             });
         } catch (error) {
             // A list made by this request shouldn't be left behind half-filled

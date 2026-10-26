@@ -2,11 +2,16 @@ const express = require("express");
 const { resolveFilms, mapWithConcurrency } = require("../services/letterboxdService");
 const { createList, deleteList } = require("../models/listModel");
 const { createMovie, addMovieToList } = require("../models/movieModel");
+const { blockedField } = require("../services/moderation");
+
+// What a list is called instead when moderation doesn't allow its name
+const NEUTRAL_NAME = "Imported list";
 
 const router = express.Router();
 
 // Takes lists parsed from a Letterboxd data export and copies each into a new ranked list,
-// keeping Letterboxd's order as the ranking
+// keeping Letterboxd's order as the ranking. A name or description moderation doesn't allow is replaced (with
+// "Imported list", or nothing), and the list's renamed_from_blocked says so for the import summary
 router.post("/import", async (req, res) => {
     const user_id = req.user.uid;
     const { lists } = req.body;
@@ -23,7 +28,11 @@ router.post("/import", async (req, res) => {
             // The same TMDb movie can be matched twice, e.g. a remake listed alongside its original
             const uniqueMovies = movies.filter((movie, i) => movies.findIndex((m) => m.id === movie.id) === i);
 
-            const list = await createList(user_id, (letterboxdList.name || "Letterboxd List").slice(0, 100), letterboxdList.overview ?? "", true);
+            const name = (letterboxdList.name || "Letterboxd List").slice(0, 100);
+            const overview = letterboxdList.overview ?? "";
+            const nameBlocked = Boolean(blockedField({ list_name: name }));
+            const list = await createList(user_id, nameBlocked ? NEUTRAL_NAME : name,
+                blockedField({ list_description: overview }) ? "" : overview, true);
             try {
                 list.movies = await mapWithConcurrency(uniqueMovies, async (tmdbMovie, index) => {
                     const movie = await createMovie(
@@ -44,6 +53,7 @@ router.post("/import", async (req, res) => {
             }
 
             list.skipped = skipped;
+            list.renamed_from_blocked = nameBlocked;
             imported.push(list);
         }
         res.status(201).json(imported);

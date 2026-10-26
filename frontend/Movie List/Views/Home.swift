@@ -33,6 +33,9 @@ struct Home: View {
     @State private var newListVisibility = ListVisibility.public
     @State private var newListRanked = true
     @State private var newListEditors: Set<String> = []
+    // While the new list is being saved, and why it couldn't be (e.g. a name that isn't allowed), shown by the name
+    @State private var creatingList = false
+    @State private var newListError: String? = nil
     @ObservedObject private var social = SocialStore.shared
     
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
@@ -312,35 +315,36 @@ private extension Home {
     }
 
 
+    /// Saves the new list on the server, then adds it here and closes the sheet. The sheet stays open, with the
+    /// reason under the name, when the server turns it down
     func addNewList() {
         let name = listName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty, let userID = viewModel.user?.uid else { return }
         let visibility = newListVisibility
         let editors = Array(newListEditors)
-        let newList = CDMovieList(id: Int64(1), name: name, overview: "", context: context)
 
         let ranked = newListRanked
+        creatingList = true
+        newListError = nil
         APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: ranked, visibility: visibility) { result in
+            creatingList = false
             switch result {
             case .success(let serverList):
-                newList.id = serverList.id
-                ListVisibility.remember(visibility, for: serverList.id)
-                ListRanking.remember(ranked, for: serverList.id)
-                try? context.save()
-                AppAnalytics.log(.listCreated(ranked: ranked))
-                inviteEditors(editors, to: serverList.id)
-            case .failure(let error):
-                print("Backend request failed, deleting from Core Data:", error.localizedDescription)
-                // The list only exists on the phone, so it goes
                 withAnimation(Theme.spring) {
-                    context.delete(newList)
+                    _ = CDMovieList(id: serverList.id, name: name, overview: "", context: context)
                     try? context.save()
                 }
+                ListVisibility.remember(visibility, for: serverList.id)
+                ListRanking.remember(ranked, for: serverList.id)
+                AppAnalytics.log(.listCreated(ranked: ranked))
+                inviteEditors(editors, to: serverList.id)
+                Haptics.success()
+                showPopup = false
+            case .failure(let error):
+                print("Error creating list:", error.localizedDescription)
+                newListError = error.serverMessage ?? "Couldn't create the list. Check your connection and try again."
             }
         }
-
-        Haptics.success()
-        showPopup = false
     }
 
     /// Invites people to edit a list that was just made, one after another, then shows them on it
@@ -362,6 +366,7 @@ private extension Home {
         newListVisibility = .public
         newListRanked = true
         newListEditors = []
+        newListError = nil
     }
 
     /// Every list in one ZIP, laid out like Letterboxd's data export
@@ -377,10 +382,18 @@ private extension Home {
     var newListSheet: some View {
         NavigationStack {
             Form {
-                Section("Name") {
+                Section {
                     TextField("e.g. Christmas Classics", text: $listName)
                         .disableAutocorrection(true)
                         .submitLabel(.done)
+                        .onChange(of: listName) { _ in newListError = nil }
+                } header: {
+                    Text("Name")
+                } footer: {
+                    if let newListError {
+                        Text(newListError)
+                            .foregroundColor(Theme.accentSecondary)
+                    }
                 }
                 .listRowBackground(Theme.surface)
                 Section {
@@ -443,18 +456,25 @@ private extension Home {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
+            .disabled(creatingList)
             .navigationTitle(newListEditors.isEmpty ? "New List" : "New Shared List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showPopup = false }
+                        .disabled(creatingList)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") { addNewList() }
-                        .bold()
-                        .disabled(listName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if creatingList {
+                        ProgressView()
+                    } else {
+                        Button("Create") { addNewList() }
+                            .bold()
+                            .disabled(listName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
                 }
             }
+            .interactiveDismissDisabled(creatingList)
             .onAppear {
                 if social.following.isEmpty { social.load() }
                 // A private profile's lists can't be seen by everyone, so they start as Friends
@@ -576,6 +596,9 @@ struct EditListSheet: View {
     @State private var ranked: Bool
     @State private var isSaving = false
     @State private var saveFailed = false
+    // Why the server didn't allow the name or description, shown under that field
+    @State private var nameError: String? = nil
+    @State private var overviewError: String? = nil
     // Deleting the list (the owner) or leaving it (a contributor): asking first, the request, and why it failed
     @State private var confirmingRemove = false
     @State private var isRemoving = false
@@ -685,18 +708,32 @@ struct EditListSheet: View {
 
     @ViewBuilder
     private var ownerSections: some View {
-        Section("Name") {
+        Section {
             TextField("List name", text: $name)
                 .disableAutocorrection(true)
+                .onChange(of: name) { _ in nameError = nil }
+        } header: {
+            Text("Name")
+        } footer: {
+            if let nameError {
+                Text(nameError)
+                    .foregroundColor(Theme.accentSecondary)
+            }
         }
         .listRowBackground(Theme.surface)
         Section {
             TextField("What's this list about?", text: $overview, axis: .vertical)
                 .lineLimit(3...8)
+                .onChange(of: overview) { _ in overviewError = nil }
         } header: {
             Text("Description")
         } footer: {
-            Text("Optional. Shown at the top of the list.")
+            if let overviewError {
+                Text(overviewError)
+                    .foregroundColor(Theme.accentSecondary)
+            } else {
+                Text("Optional. Shown at the top of the list.")
+            }
         }
         .listRowBackground(Theme.surface)
         Section {
@@ -746,6 +783,8 @@ struct EditListSheet: View {
 
     private func save() {
         isSaving = true
+        nameError = nil
+        overviewError = nil
         APIService.shared.updateList(listID: movieList.id, name: trimmedName, overview: overview, visibility: visibility, isRanked: ranked) { result in
             isSaving = false
             switch result {
@@ -759,7 +798,12 @@ struct EditListSheet: View {
                 dismiss()
             case .failure(let error):
                 print("Error updating list:", error)
-                saveFailed = true
+                // A name or description that isn't allowed is explained by its field; anything else is an alert
+                switch (error.serverField, error.serverMessage) {
+                case ("list_description", let message?): overviewError = message
+                case (_, let message?) where (error as NSError).code == 400: nameError = message
+                default: saveFailed = true
+                }
             }
         }
     }
