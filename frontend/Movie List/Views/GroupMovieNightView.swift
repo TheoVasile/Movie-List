@@ -516,7 +516,7 @@ struct GroupMovieNightView: View {
         added.insert(movie.id)
         AppAnalytics.log(.filmAdded(.movieNight))
         for list in lists {
-            list.addMovie(movie, context: context) { saved in
+            list.addMovie(tmdbID: movie.id, context: context) { saved in
                 if saved == nil {
                     added.remove(movie.id)
                 }

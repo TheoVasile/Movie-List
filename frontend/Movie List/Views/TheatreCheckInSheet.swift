@@ -315,7 +315,7 @@ struct TheatreCheckInSheet: View {
         let group = DispatchGroup()
         for list in lists {
             group.enter()
-            list.addMovie(movie, context: context) { copy in
+            list.addMovie(tmdbID: movie.id, context: context) { copy in
                 if copy != nil { saved += 1 }
                 group.leave()
             }

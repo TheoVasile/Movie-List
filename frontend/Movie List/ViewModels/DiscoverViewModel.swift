@@ -558,7 +558,7 @@ class DiscoverViewModel: ObservableObject {
         let group = DispatchGroup()
         for (index, list) in lists.enumerated() {
             group.enter()
-            list.addMovie(movie, context: context) { newMovie in
+            list.addMovie(tmdbID: movie.id, context: context) { newMovie in
                 added[index] = newMovie
                 group.leave()
             }
