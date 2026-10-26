@@ -86,75 +86,14 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // AI Picks or Classic, one tap away. Under-18s only ever get Classic, so it isn't shown to them
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if !isUnder18 {
-                        aiToggle
-                    }
-                }
+                // Undo, Add and the ••• menu in one item, so they never collapse into an overflow menu
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    // Everything else Discover offers, in one menu: adding films, and what it has learned
-                    Menu {
-                        Section("Adding Films") {
-                            // Also on a long press of Add to List, and Add to Lists on the film's full details
-                            if quickAddList != nil {
-                                Button {
-                                    addTopMovie(forceAsk: true)
-                                } label: {
-                                    Label("Choose Lists for This Film…", systemImage: "list.bullet")
-                                }
-                                .disabled(viewModel.topMovie == nil || isSwiping)
-                            }
-                            Menu {
-                                Picker("When You Add a Film", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
-                                    Label("Ask Each Time", systemImage: "list.bullet").tag(false)
-                                    Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
-                                }
-                                .pickerStyle(.inline)
-                                if let list = quickAddList {
-                                    if ListRanking.isRanked(list.id) {
-                                        Picker(selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
-                                            Label("At the Bottom", systemImage: "arrow.down.to.line").tag(false)
-                                            Label("Where AI Places It", systemImage: "sparkles").tag(true)
-                                        } label: {
-                                            Label("Placement", systemImage: "list.number")
-                                        }
-                                        .pickerStyle(.menu)
-                                        .disabled(!canUseAI)
-                                    }
-                                    Button {
-                                        choosingQuickAddList = true
-                                    } label: {
-                                        Label("Change List…", systemImage: "arrow.left.arrow.right")
-                                    }
-                                }
-                            } label: {
-                                Label("Quick Add", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
-                                Text(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Ask Each Time")
-                            }
-                        }
-                        Section(profileDescription) {
-                            Button {
-                                showReactions = true
-                            } label: {
-                                Label("Liked & Not for Me", systemImage: "heart.text.square")
-                            }
-                            Button {
-                                withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
-                            } label: {
-                                Label("Show Skipped Again", systemImage: "arrow.counterclockwise")
-                            }
-                            Button(role: .destructive) {
-                                withAnimation(Theme.spring) { viewModel.resetProfile() }
-                            } label: {
-                                Label("Reset Taste Profile", systemImage: "trash")
-                            }
-                            .disabled(viewModel.profile.swipeCount == 0)
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                    HStack(spacing: 16) {
+                        undoButton
+                        addButton
+                        optionsMenu
                     }
-                    .accessibilityLabel("Discover Options")
+                    .fixedSize()
                 }
             }
         }
@@ -329,30 +268,93 @@ private extension DiscoverView {
         canUseAI && useAI
     }
 
-    // Switches between AI Picks and Classic. Until AI is allowed, it asks for that first
-    var aiToggle: some View {
-        Button {
-            Haptics.tap()
-            guard canUseAI else {
-                aiConsentAsked = false
-                return
-            }
-            useAI.toggle()
-            showToast(useAI ? "AI Picks on" : "Classic recommendations from TMDb")
-        } label: {
-            Label("AI Picks", systemImage: "sparkles")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(showingAIPicks ? AnyShapeStyle(Theme.onAccent) : AnyShapeStyle(Theme.textSecondary))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(showingAIPicks ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(showingAIPicks ? Color.clear : Theme.stroke, lineWidth: 1))
-                .fixedSize()
+    // Switches between AI Picks and Classic. Until AI is allowed, choosing AI Picks asks for that first
+    func setAIPicks(_ on: Bool) {
+        guard on != showingAIPicks else { return }
+        Haptics.tap()
+        guard canUseAI else {
+            if on { aiConsentAsked = false }
+            return
         }
-        .buttonStyle(PressableButtonStyle(scale: 0.92))
-        .accessibilityLabel("AI Picks")
-        .accessibilityValue(showingAIPicks ? "On" : "Off")
+        useAI = on
+        showToast(useAI ? "AI Picks on" : "Classic recommendations from TMDb")
+    }
+
+    // Everything else Discover offers, in one menu: where recommendations come from, adding films, and what it
+    // has learned
+    var optionsMenu: some View {
+        Menu {
+            // Under-18s only ever get Classic, so the choice isn't shown to them
+            if !isUnder18 {
+                Section("Recommendations") {
+                    Picker("Recommendations", selection: Binding(get: { showingAIPicks }, set: setAIPicks)) {
+                        Label("AI Picks", systemImage: "sparkles").tag(true)
+                        Label("Classic", systemImage: "film").tag(false)
+                    }
+                    .pickerStyle(.inline)
+                }
+            }
+            Section("Adding Films") {
+                // Also on a long press of Add, and Add to Lists on the film's full details
+                if quickAddList != nil {
+                    Button {
+                        addTopMovie(forceAsk: true)
+                    } label: {
+                        Label("Choose Lists for This Film…", systemImage: "list.bullet")
+                    }
+                    .disabled(viewModel.topMovie == nil || isSwiping)
+                }
+                Menu {
+                    Picker("When You Add a Film", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
+                        Label("Ask Each Time", systemImage: "list.bullet").tag(false)
+                        Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
+                    }
+                    .pickerStyle(.inline)
+                    if let list = quickAddList {
+                        if ListRanking.isRanked(list.id) {
+                            Picker(selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
+                                Label("At the Bottom", systemImage: "arrow.down.to.line").tag(false)
+                                Label("Where AI Places It", systemImage: "sparkles").tag(true)
+                            } label: {
+                                Label("Placement", systemImage: "list.number")
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(!canUseAI)
+                        }
+                        Button {
+                            choosingQuickAddList = true
+                        } label: {
+                            Label("Change List…", systemImage: "arrow.left.arrow.right")
+                        }
+                    }
+                } label: {
+                    Label("Quick Add", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
+                    Text(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Ask Each Time")
+                }
+            }
+            Section(profileDescription) {
+                Button {
+                    showReactions = true
+                } label: {
+                    Label("Liked & Not for Me", systemImage: "heart.text.square")
+                }
+                Button {
+                    withAnimation(Theme.spring) { viewModel.showSkippedAgain() }
+                } label: {
+                    Label("Show Skipped Again", systemImage: "arrow.counterclockwise")
+                }
+                Button(role: .destructive) {
+                    withAnimation(Theme.spring) { viewModel.resetProfile() }
+                } label: {
+                    Label("Reset Taste Profile", systemImage: "trash")
+                }
+                .disabled(viewModel.profile.swipeCount == 0)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .disabled(isSwiping)
+        .accessibilityLabel("Discover Options")
         .accessibilityHint(sourceDescription)
     }
 
@@ -704,61 +706,62 @@ private extension DiscoverView {
     }
 
     // The same as the swipes, so nothing is gesture-only: ✕ dislikes like a swipe left, the heart likes like a
-    // swipe right, and Skip in between just moves on. Adding to a list is its own button underneath
+    // swipe right, and Skip in between just moves on. Undo and Add are in the navigation bar
     var actionButtons: some View {
-        VStack(spacing: 14) {
-            HStack(alignment: .top, spacing: 26) {
-                circleButton(icon: "xmark", size: 64, style: AnyShapeStyle(Theme.accentSecondary), caption: "Nope") {
-                    react(.disliked)
-                }
-                .accessibilityLabel("Dislike")
-                .accessibilityHint("Same as swiping left. Discover shows fewer films like this")
-                circleButton(icon: "forward.fill", size: 48, style: AnyShapeStyle(Theme.textSecondary), caption: "Skip") {
-                    react(.skipped)
-                }
-                .accessibilityLabel("Skip")
-                .accessibilityHint("Haven't seen it or not sure. Moves on without changing your taste profile")
-                circleButton(icon: "heart.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), caption: "Like") {
-                    react(.liked)
-                }
-                .accessibilityLabel("Like")
-                .accessibilityHint("Same as swiping right. Discover finds more films like this")
+        HStack(alignment: .top, spacing: 26) {
+            circleButton(icon: "xmark", size: 64, style: AnyShapeStyle(Theme.accentSecondary), caption: "Nope") {
+                react(.disliked)
             }
-            HStack(spacing: 12) {
-                // Brings back the last card liked, disliked or skipped
-                circleButton(icon: "arrow.uturn.backward", size: 48, style: AnyShapeStyle(Theme.textSecondary)) {
-                    Haptics.tap()
-                    withAnimation(Theme.spring) {
-                        viewModel.undo()
-                        dragOffset = .zero
-                        showDetails = false
-                    }
-                }
-                .disabled(!viewModel.canUndo || isSwiping)
-                .opacity(viewModel.canUndo ? 1 : 0.4)
-                .accessibilityLabel("Undo")
-                .accessibilityHint("Brings back the last card you liked, disliked or skipped")
-                addButton
+            .accessibilityLabel("Dislike")
+            .accessibilityHint("Same as swiping left. Discover shows fewer films like this")
+            circleButton(icon: "forward.fill", size: 48, style: AnyShapeStyle(Theme.textSecondary), caption: "Skip") {
+                react(.skipped)
             }
+            .accessibilityLabel("Skip")
+            .accessibilityHint("Haven't seen it or not sure. Moves on without changing your taste profile")
+            circleButton(icon: "heart.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), caption: "Like") {
+                react(.liked)
+            }
+            .accessibilityLabel("Like")
+            .accessibilityHint("Same as swiping right. Discover finds more films like this")
         }
         .disabled(isSwiping)
     }
 
-    // Quick Adds in one tap when a Quick Add list is set, otherwise asks which lists
+    // Brings back the last card liked, disliked or skipped
+    var undoButton: some View {
+        Button {
+            Haptics.tap()
+            withAnimation(Theme.spring) {
+                viewModel.undo()
+                dragOffset = .zero
+                showDetails = false
+            }
+        } label: {
+            Image(systemName: "arrow.uturn.backward")
+        }
+        .disabled(!viewModel.canUndo || isSwiping)
+        .accessibilityLabel("Undo")
+        .accessibilityHint("Brings back the last card you liked, disliked or skipped")
+    }
+
+    // Quick Adds in one tap when a Quick Add list is set, otherwise asks which lists. A small bolt marks Quick Add
     var addButton: some View {
         Button {
             addTopMovie()
         } label: {
-            Label(quickAddList.map { "Add to \($0.name ?? "List")" } ?? "Add to List", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
-                .font(.headline)
-                .foregroundColor(Theme.onAccent)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(Theme.accentGradient, in: Capsule())
-                .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
+            Image(systemName: "plus")
+                .overlay(alignment: .topTrailing) {
+                    if quickAddList != nil {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Theme.accent)
+                            .offset(x: 7, y: -5)
+                    }
+                }
         }
-        .buttonStyle(PressableButtonStyle(scale: 0.96))
+        // Waits for a card, and for the last one to finish flying away
+        .disabled(viewModel.topMovie == nil || isSwiping)
         // With Quick Add on, touch and hold still lets one film go somewhere else. Also in the ••• menu
         .contextMenu {
             if let list = quickAddList {
@@ -774,7 +777,7 @@ private extension DiscoverView {
                 }
             }
         }
-        .accessibilityLabel(quickAddList.map { "Add to \($0.name ?? "your list")" } ?? "Add to a list")
+        .accessibilityLabel(quickAddList.map { "Quick Add to \($0.name ?? "your list")" } ?? "Add to a list")
         .accessibilityHint(quickAddList == nil ? "Also tells Discover you like it" : "Touch and hold to choose lists. Also tells Discover you like it")
     }
 
