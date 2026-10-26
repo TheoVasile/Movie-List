@@ -1,5 +1,4 @@
 const express = require("express");
-const axios = require("axios");
 const { setMovieNote } = require("../models/notesModel");
 const { createMovie, addMovieToList, removeMovieFromList, updateMovieRank } = require("../models/movieModel");
 
@@ -11,7 +10,8 @@ const { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILi
 const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, pickHistory, saveRecommendations } = require("../models/groupPicksModel");
 const pool = require("../config/db");
-const { parseFilters, hasFilters, matchesFilters, availableServices, streamingServices } = require("../services/filmFilters");
+const { parseFilters, hasFilters, matchesFilters, availableServices, streamingServices, watchProviders } = require("../services/filmFilters");
+const { cached, tmdbGet, fetchTmdb, HOUR, DAY } = require("../services/tmdbCache");
 const { streamingPreferences } = require("../services/streamingAlerts");
 const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
 const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
@@ -66,7 +66,6 @@ function relevanceScore(movie, query) {
 
 router.get("/search", async (req, res) => {
     try {
-        const API_KEY = process.env.API_KEY;
         const { name } = req.query;
         if (!name) {
             return res.status(400).json({ error: "Movie name is required" });
@@ -78,26 +77,29 @@ router.get("/search", async (req, res) => {
             query: name,
             include_adult: false,
             language: "en-US",
-            api_key: API_KEY,
         };
 
-        // Two pages, since the film being looked for can sit past TMDb's first 20 results
-        console.log("📡 Fetching movies from TMDb...");
-        const pages = await Promise.all(types.flatMap((type) => [1, 2].map((page) =>
-            axios.get(`https://api.themoviedb.org/3/search/${type}`, { params: { ...params, page } })
-                .then((response) => (type === "tv" ? response.data.results.map(showAsFilm) : response.data.results)))));
-        const seen = new Set();
-        const movies = pages
-            .flat()
-            .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
+        // The ranked results are cached for an hour, since many people search for the same few films
+        const key = `search:${types.join(",")}:${String(name).trim().toLowerCase()}`;
+        const ranked = await cached(key, HOUR, async () => {
+            // Two pages, since the film being looked for can sit past TMDb's first 20 results
+            console.log("📡 Fetching movies from TMDb...");
+            const pages = await Promise.all(types.flatMap((type) => [1, 2].map((page) =>
+                fetchTmdb(`search/${type}`, { ...params, page })
+                    .then((data) => (type === "tv" ? data.results.map(showAsFilm) : data.results)))));
+            const seen = new Set();
+            const movies = pages
+                .flat()
+                .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
 
-        // Array.prototype.sort is stable, so equal scores keep TMDb's order
-        const query = normalizeTitle(name);
-        const ranked = movies
-            .map((movie) => ({ movie, score: relevanceScore(movie, query) }))
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 20)
-            .map(({ movie }) => movie);
+            // Array.prototype.sort is stable, so equal scores keep TMDb's order
+            const query = normalizeTitle(name);
+            return movies
+                .map((movie) => ({ movie, score: relevanceScore(movie, query) }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 20)
+                .map(({ movie }) => movie);
+        }, (from) => console.log(`⚡ Search served from the ${from} cache`));
 
         console.log("✅ Movies fetched successfully!");
         res.json(ranked);
@@ -165,14 +167,15 @@ router.get("/discover", async (req, res) => {
         const onlyGenres = req.query.only_genres === "1";
         const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
         const avoidGenres = parseIds(req.query.avoid_genres, 3);
-        const params = { api_key: process.env.API_KEY, language: "en-US", page };
+        const params = { language: "en-US", page };
         // Optional: only films in these original languages, and/or streaming on these services in region
         const filters = parseFilters(req.query);
         // Genres are film genres; shows are asked for in the closest TV genres
         const genresFor = (type, ids) => (type === "tv" ? tvGenres(ids) : ids);
-        // TMDb results as films, shows included
-        const fetchResults = (type, path, extra = {}) => axios.get(`https://api.themoviedb.org/3/${path}`, { params: { ...params, ...extra } })
-            .then((response) => (response.data.results ?? []).map((item) => (type === "tv" ? showAsFilm(item) : item)));
+        // TMDb results as films, shows included. Each page is cached for an hour, since many people share seeds,
+        // genres and trending
+        const fetchResults = (type, path, extra = {}) => tmdbGet(path, { ...params, ...extra }, HOUR)
+            .then((data) => (data.results ?? []).map((item) => (type === "tv" ? showAsFilm(item) : item)));
 
         // Films in any of the favourite genres ("|" means or), skipping obscure titles
         const genreFeeds = genres.length
@@ -238,28 +241,21 @@ router.get("/discover", async (req, res) => {
 
 // Films in theatres in one country, most popular first, for theatre check-ins ("What did you see?"), e.g.
 // ?region=CA -> [discover movie...]. Cached per region for an hour, since TMDb's now-playing list changes slowly
-const nowPlayingCache = new Map();
-
 router.get("/now-playing", async (req, res) => {
     const region = String(req.query.region ?? "US").toUpperCase();
     if (!/^[A-Z]{2}$/.test(region)) {
         return res.status(400).json({ error: "region must be a two-letter country code." });
     }
-    const cached = nowPlayingCache.get(region);
-    if (cached && Date.now() - cached.at < 60 * 60 * 1000) return res.json(cached.movies);
     try {
-        const pages = await Promise.all([1, 2].map((page) => axios.get("https://api.themoviedb.org/3/movie/now_playing", {
-            params: { api_key: process.env.API_KEY, language: "en-US", region, page },
-            timeout: 15000,
-        })));
-        const seen = new Set();
-        const movies = pages.flatMap((response) => response.data.results ?? [])
-            .map(toDiscoverMovie)
-            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
-            .sort((a, b) => b.popularity - a.popularity)
-            .slice(0, 40);
-        nowPlayingCache.set(region, { at: Date.now(), movies });
-        res.json(movies);
+        res.json(await cached(`now-playing:${region}`, HOUR, async () => {
+            const pages = await Promise.all([1, 2].map((page) => fetchTmdb("movie/now_playing", { language: "en-US", region, page })));
+            const seen = new Set();
+            return pages.flatMap((data) => data.results ?? [])
+                .map(toDiscoverMovie)
+                .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
+                .sort((a, b) => b.popularity - a.popularity)
+                .slice(0, 40);
+        }));
     } catch (error) {
         console.error("Error fetching now playing movies:", error.message);
         res.status(500).json({ error: "Internal server error" });
@@ -285,10 +281,9 @@ function cleanStrings(value, limit) {
 // The TMDb film for an AI pick, matching on title and year (a year either side allows for festival
 // vs. general release dates), or null when TMDb doesn't have it
 async function findOnTmdb(title, year) {
-    const search = (params) => axios.get("https://api.themoviedb.org/3/search/movie", {
-        params: { api_key: process.env.API_KEY, query: title, include_adult: false, ...params },
-        timeout: 15000,
-    }).then((response) => response.data.results ?? []);
+    // Cached for a day, since the AI often picks the same films for different people
+    const search = (params) => tmdbGet("search/movie", { query: title, include_adult: false, ...params }, DAY)
+        .then((data) => data.results ?? []);
     let results = await search({ year });
     if (!results.length) {
         results = (await search({})).filter((movie) => Math.abs(Number(String(movie.release_date).slice(0, 4)) - year) <= 1);
@@ -350,16 +345,17 @@ async function classicMovieNight(people, count, filters, genres) {
     }
 
     // Which people's favourites TMDb recommends each film from
-    const params = { api_key: process.env.API_KEY, language: "en-US", page: 1 };
+    // The same as Discover asks for, so they share the cache
+    const params = { language: "en-US", page: 1 };
     // Movie night is for films, so shows in people's lists don't seed it
     const seeds = data.flatMap((person, index) => person.seeds.filter((seed) => !isTV(seed.tmdb_id)).map((seed) => ({ ...seed, person: index })));
     const outcomes = await Promise.allSettled(
-        seeds.map((seed) => axios.get(`https://api.themoviedb.org/3/movie/${seed.tmdb_id}/recommendations`, { params, timeout: 15000 }))
+        seeds.map((seed) => tmdbGet(`movie/${seed.tmdb_id}/recommendations`, params, HOUR))
     );
     const candidates = new Map();
     outcomes.forEach((outcome, i) => {
         if (outcome.status !== "fulfilled") return;
-        for (const result of outcome.value.data.results ?? []) {
+        for (const result of outcome.value.results ?? []) {
             const movie = toDiscoverMovie(result);
             if (!movie || (result.vote_count ?? 0) < MOVIE_NIGHT_MIN_VOTES || listedByAnyone.has(movie.id)) continue;
             const entry = candidates.get(movie.id) ?? { movie, from: new Map() };
@@ -738,30 +734,29 @@ router.get("/info", async (req, res) => {
         const ids = parseMediaIds(req.query.ids, 50);
         const films = await mapWithConcurrency(ids, async (id) => {
             try {
-                const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(id)}`, {
-                    params: { api_key: process.env.API_KEY, append_to_response: isTV(id) ? "content_ratings" : "release_dates,credits" },
-                    timeout: 15000,
+                // Only the summary is cached, for a day: TMDb's full answer with credits is far bigger
+                return await cached(`info:${id}`, DAY, async () => {
+                    const film = await fetchTmdb(tmdbPath(id), { append_to_response: isTV(id) ? "content_ratings" : "release_dates,credits" });
+                    const genreIds = (film.genres ?? []).map((genre) => genre.id);
+                    return {
+                        id,
+                        genre_ids: isTV(id) ? filmGenres(genreIds) : genreIds,
+                        // Shows have TV ratings ("TV-MA", "TV-14") rather than film ones
+                        certification: isTV(id)
+                            ? ((film.content_ratings?.results ?? []).find((rating) => rating.iso_3166_1 === "US")?.rating ?? "")
+                            : usCertification(film.release_dates),
+                        vote_average: film.vote_average ?? 0,
+                        vote_count: film.vote_count ?? 0,
+                        runtime: (isTV(id) ? film.episode_run_time?.[0] ?? film.last_episode_to_air?.runtime : film.runtime) || 0,
+                        seasons: film.number_of_seasons ?? 0,
+                        episodes: film.number_of_episodes ?? 0,
+                        // For Directors & Franchises: who directed a film, and the franchise (TMDb collection) it's part of
+                        directors: isTV(id) ? [] : (film.credits?.crew ?? [])
+                            .filter((person) => person.job === "Director")
+                            .map((person) => ({ id: person.id, name: person.name })),
+                        collection: film.belongs_to_collection ? { id: film.belongs_to_collection.id, name: film.belongs_to_collection.name } : null,
+                    };
                 });
-                const film = response.data;
-                const genreIds = (film.genres ?? []).map((genre) => genre.id);
-                return {
-                    id,
-                    genre_ids: isTV(id) ? filmGenres(genreIds) : genreIds,
-                    // Shows have TV ratings ("TV-MA", "TV-14") rather than film ones
-                    certification: isTV(id)
-                        ? ((film.content_ratings?.results ?? []).find((rating) => rating.iso_3166_1 === "US")?.rating ?? "")
-                        : usCertification(film.release_dates),
-                    vote_average: film.vote_average ?? 0,
-                    vote_count: film.vote_count ?? 0,
-                    runtime: (isTV(id) ? film.episode_run_time?.[0] ?? film.last_episode_to_air?.runtime : film.runtime) || 0,
-                    seasons: film.number_of_seasons ?? 0,
-                    episodes: film.number_of_episodes ?? 0,
-                    // For Directors & Franchises: who directed a film, and the franchise (TMDb collection) it's part of
-                    directors: isTV(id) ? [] : (film.credits?.crew ?? [])
-                        .filter((person) => person.job === "Director")
-                        .map((person) => ({ id: person.id, name: person.name })),
-                    collection: film.belongs_to_collection ? { id: film.belongs_to_collection.id, name: film.belongs_to_collection.name } : null,
-                };
             } catch (error) {
                 return null;
             }
@@ -776,15 +771,8 @@ router.get("/info", async (req, res) => {
 // The films in a franchise (TMDb collection) or directed by someone, oldest first, for Directors & Franchises, e.g.
 // /collection/10 -> { name: "Star Wars Collection", films: [discover movie...] } and /director/525 -> { name, films }.
 // Only released feature films; a director's films leave out ones too obscure to count (shorts, student films)
-const filmographyCache = new Map();
-
-async function filmography(key, load) {
-    const cached = filmographyCache.get(key);
-    if (cached && Date.now() - cached.at < 24 * 60 * 60 * 1000) return cached.value;
-    const value = await load();
-    filmographyCache.set(key, { at: Date.now(), value });
-    return value;
-}
+// Kept for a day
+const filmography = (key, load) => cached(key, DAY, load);
 
 const releasedFilm = (movie) => /^\d{4}-\d{2}-\d{2}$/.test(movie.release_date ?? "") && movie.release_date <= new Date().toISOString().slice(0, 10);
 const oldestFirst = (a, b) => a.release_date.localeCompare(b.release_date);
@@ -794,11 +782,9 @@ router.get("/collection/:id", async (req, res) => {
     if (!(id > 0)) return res.status(400).json({ error: "A collection id is required." });
     try {
         res.json(await filmography(`collection:${id}`, async () => {
-            const response = await axios.get(`https://api.themoviedb.org/3/collection/${id}`, {
-                params: { api_key: process.env.API_KEY }, timeout: 15000,
-            });
-            const films = (response.data.parts ?? []).filter(releasedFilm).map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
-            return { name: response.data.name ?? "", films };
+            const collection = await fetchTmdb(`collection/${id}`);
+            const films = (collection.parts ?? []).filter(releasedFilm).map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
+            return { name: collection.name ?? "", films };
         }));
     } catch (error) {
         if (error.response?.status === 404) return res.status(404).json({ error: "Collection not found." });
@@ -813,11 +799,11 @@ router.get("/director/:id", async (req, res) => {
     try {
         res.json(await filmography(`director:${id}`, async () => {
             const [person, credits] = await Promise.all([
-                axios.get(`https://api.themoviedb.org/3/person/${id}`, { params: { api_key: process.env.API_KEY }, timeout: 15000 }),
-                axios.get(`https://api.themoviedb.org/3/person/${id}/movie_credits`, { params: { api_key: process.env.API_KEY }, timeout: 15000 }),
+                fetchTmdb(`person/${id}`),
+                fetchTmdb(`person/${id}/movie_credits`),
             ]);
             const seen = new Set();
-            const directed = (credits.data.crew ?? [])
+            const directed = (credits.crew ?? [])
                 .filter((movie) => movie.job === "Director" && releasedFilm(movie))
                 .filter((movie) => !seen.has(movie.id) && seen.add(movie.id));
             // Shorts and student films have a tiny share of the votes their best-known films get, whoever the
@@ -826,7 +812,7 @@ router.get("/director/:id", async (req, res) => {
             const bar = Math.max(50, most * 0.03);
             const films = directed.filter((movie) => (movie.vote_count ?? 0) >= bar)
                 .map(toDiscoverMovie).filter(Boolean).sort(oldestFirst);
-            return { name: person.data.name ?? "", films };
+            return { name: person.name ?? "", films };
         }));
     } catch (error) {
         if (error.response?.status === 404) return res.status(404).json({ error: "Person not found." });
@@ -870,11 +856,9 @@ router.get("/imdb", async (req, res) => {
         return res.status(400).json({ error: "A tmdb_id is required." });
     }
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/external_ids`, {
-            params: { api_key: process.env.API_KEY },
-            timeout: 15000,
-        });
-        res.json({ tmdb_id: tmdbId, imdb_id: response.data.imdb_id || null });
+        // A film's IMDb id doesn't change, so it's kept for a week
+        const ids = await tmdbGet(`${tmdbPath(tmdbId)}/external_ids`, {}, 7 * DAY);
+        res.json({ tmdb_id: tmdbId, imdb_id: ids.imdb_id || null });
     } catch (error) {
         if (error.response?.status === 404) {
             return res.json({ tmdb_id: tmdbId, imdb_id: null });
@@ -888,31 +872,25 @@ router.get("/imdb", async (req, res) => {
 // or { key: null } when it has none. It looks for the film's main trailer: official trailers over teasers and TV
 // spots, ones named like a main trailer, and nothing that's a re-release, dub or home-video ad. The oldest wins
 // ties, since a film's first full trailer is usually its main one and later uploads tend to be variants
-const trailerCache = new Map();
-
 router.get("/trailer", async (req, res) => {
     const tmdbId = mediaId(req.query.tmdb_id);
     if (tmdbId === null) {
         return res.status(400).json({ error: "A tmdb_id is required." });
     }
-    const cached = trailerCache.get(tmdbId);
-    if (cached && Date.now() - cached.at < 24 * 60 * 60 * 1000) return res.json(cached.trailer);
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/videos`, {
+        // Kept for a day
+        res.json(await cached(`trailer:${tmdbId}`, DAY, async () => {
             // English videos plus ones with no language, which TMDb leaves out unless asked
-            params: { api_key: process.env.API_KEY, include_video_language: "en,null" },
-            timeout: 15000,
-        });
-        const variant = /version|b&w|dubbed|blu-?ray|dvd|digital|on demand|re-?release|anniversary|4k|35mm|tv spot|now playing|own it/i;
-        const main = /main trailer|^(official )?((us|international|int'l) )?trailer( \[[^\]]*\])?$/i;
-        const score = (video) => (video.type === "Trailer" ? 4 : 0) + (video.official ? 2 : 0) + (video.iso_639_1 === "en" ? 1 : 0)
-            + (main.test(video.name ?? "") ? 2 : 0) - (/teaser/i.test(video.name ?? "") ? 1 : 0) - (variant.test(video.name ?? "") ? 5 : 0);
-        const best = (response.data.results ?? [])
-            .filter((video) => video.site === "YouTube" && video.key && (video.type === "Trailer" || video.type === "Teaser"))
-            .sort((a, b) => score(b) - score(a) || String(a.published_at).localeCompare(String(b.published_at)))[0];
-        const trailer = best ? { key: best.key, name: best.name } : { key: null, name: null };
-        trailerCache.set(tmdbId, { at: Date.now(), trailer });
-        res.json(trailer);
+            const videos = await fetchTmdb(`${tmdbPath(tmdbId)}/videos`, { include_video_language: "en,null" });
+            const variant = /version|b&w|dubbed|blu-?ray|dvd|digital|on demand|re-?release|anniversary|4k|35mm|tv spot|now playing|own it/i;
+            const main = /main trailer|^(official )?((us|international|int'l) )?trailer( \[[^\]]*\])?$/i;
+            const score = (video) => (video.type === "Trailer" ? 4 : 0) + (video.official ? 2 : 0) + (video.iso_639_1 === "en" ? 1 : 0)
+                + (main.test(video.name ?? "") ? 2 : 0) - (/teaser/i.test(video.name ?? "") ? 1 : 0) - (variant.test(video.name ?? "") ? 5 : 0);
+            const best = (videos.results ?? [])
+                .filter((video) => video.site === "YouTube" && video.key && (video.type === "Trailer" || video.type === "Teaser"))
+                .sort((a, b) => score(b) - score(a) || String(a.published_at).localeCompare(String(b.published_at)))[0];
+            return best ? { key: best.key, name: best.name } : { key: null, name: null };
+        }));
     } catch (error) {
         if (error.response?.status === 404) return res.json({ key: null, name: null });
         console.error("Error fetching trailer:", error.message);
@@ -934,17 +912,15 @@ router.get("/providers", async (req, res) => {
     }
     const providers = (items) => {
         const seen = new Set();
-        return (items ?? [])
+        // Copied before sorting, since the cached answer is shared
+        return [...(items ?? [])]
             .sort((a, b) => (a.display_priority ?? 0) - (b.display_priority ?? 0))
             .filter((item) => !seen.has(item.provider_id) && seen.add(item.provider_id))
             .map((item) => ({ id: item.provider_id, name: item.provider_name, logo_path: item.logo_path ?? null }));
     };
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/${tmdbPath(tmdbId)}/watch/providers`, {
-            params: { api_key: process.env.API_KEY },
-            timeout: 15000,
-        });
-        const country = response.data.results?.[region] ?? {};
+        // Cached, and shared with the streaming filters and alerts
+        const country = await watchProviders(tmdbId, region);
         res.json({
             region,
             link: country.link ?? null,
