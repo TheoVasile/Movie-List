@@ -1,7 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const fixture = require("./fixtures/moderation.json");
-const { FIELDS, findTerms, isReservedHandle, check, blockedField, reviewStatus } = require("../services/moderation");
+const terms = require("../moderation/terms.json");
+const { FIELDS, THRESHOLDS, findTerms, isReservedHandle, check, blockedField, reviewStatus } = require("../services/moderation");
 
 const words = (text) => findTerms(text).map((term) => term.word);
 
@@ -29,29 +30,41 @@ test("reserves @usernames like admin and marquee, with dots, underscores and num
 
 test("reserved names only apply to @usernames", () => {
     for (const field of ["display_name", "list_name", "group_name"]) assert.strictEqual(check(field, "Support").action, "ok");
+    assert.strictEqual(check("handle", "marquee_official").category, "reserved");
 });
 
-test("names are blocked and free text is flagged, each from its own severity", () => {
-    const { low, medium, high } = fixture.policy;
-    // @usernames are strictest
-    assert.strictEqual(check("handle", low).action, "block");
-    // Names everyone sees: strong words, not mild ones
-    for (const field of ["display_name", "list_name", "list_description", "group_name"]) {
-        assert.strictEqual(FIELDS[field].action, "block");
-        assert.strictEqual(check(field, low).action, "ok", field);
-        assert.strictEqual(check(field, medium).action, "block", field);
+test("only slurs, hate and harassment are acted on, in every field", () => {
+    for (const field of Object.keys(FIELDS)) assert.strictEqual(THRESHOLDS[field], "high", field);
+    // Every word that's acted on is a slur, hate or harassment, never profanity or a sexual word
+    for (const [word, info] of Object.entries({ ...terms.dataset, ...Object.fromEntries(terms.terms.map((term) => [term.word, term])) })) {
+        if (info.severity === "high") assert.ok(["hate", "harassment"].includes(info.category), word);
     }
-    // Notes and messages: saved, and only slurs are flagged for review
-    for (const field of ["note", "recommendation_note"]) {
-        assert.strictEqual(check(field, medium).action, "ok", field);
-        assert.strictEqual(check(field, high).action, "flag", field);
+    assert.notStrictEqual(terms.datasetDefault.severity, "high");
+});
+
+test("profanity and sexual words are allowed in @usernames, names, notes and messages", () => {
+    for (const text of fixture.policy.allowed) {
+        assert.ok(findTerms(text).length, `${text} is still found`);
+        for (const field of Object.keys(FIELDS)) assert.strictEqual(check(field, text).action, "ok", `${field}: ${text}`);
     }
-    assert.deepStrictEqual(reviewStatus("note", `Great film, ${high}`), { status: "flagged", reason: "hate" });
+    assert.strictEqual(blockedField({ handle: "shithead", display_name: "fuck mondays", list_name: "Bitchin' 80s" }), null);
+});
+
+test("slurs are blocked in names and flagged in notes and messages, evasions included", () => {
+    for (const text of fixture.policy.slurs) {
+        for (const field of ["handle", "display_name", "list_name", "list_description", "group_name"]) {
+            assert.strictEqual(FIELDS[field].action, "block");
+            assert.strictEqual(check(field, text).action, "block", `${field}: ${text}`);
+        }
+        for (const field of ["note", "recommendation_note"]) assert.strictEqual(check(field, text).action, "flag", `${field}: ${text}`);
+    }
+    assert.deepStrictEqual(reviewStatus("note", `Great film, ${fixture.policy.slur}`), { status: "flagged", reason: "hate" });
+    assert.deepStrictEqual(reviewStatus("recommendation_note", "kys"), { status: "flagged", reason: "harassment" });
     assert.deepStrictEqual(reviewStatus("note", "Rewatch with Sam"), { status: "ok" });
 });
 
 test("blockedField gives the first blocked field and skips ones left out", () => {
     assert.strictEqual(blockedField({ list_name: "Best of 2026", list_description: undefined }), null);
-    assert.deepStrictEqual(blockedField({ list_name: "Best of 2026", list_description: fixture.policy.medium }),
+    assert.deepStrictEqual(blockedField({ list_name: "Best of 2026", list_description: fixture.policy.slur }),
         { error: FIELDS.list_description.message, field: "list_description" });
 });

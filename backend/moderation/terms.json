@@ -5,7 +5,8 @@
         "The base list is the English dataset of the obscenity npm package, which also handles leetspeak, look-alike letters and repeated letters.",
         "'dataset' gives each of its words a category and severity; a word it adds that isn't listed here gets 'datasetDefault'.",
         "'terms' are our own additions, in obscenity's pattern syntax: | at either end is a word boundary, [x] an optional part and ? any one character.",
-        "Severity decides what happens: low only blocks @usernames; medium also blocks display names, list names and descriptions and group names; high also flags notes and recommendation messages for review.",
+        "Severity decides what happens, through THRESHOLDS in services/moderation.js. Today only high (slurs, hate and harassment) is acted on: it blocks @usernames, display names, list names and descriptions and group names, and flags notes and recommendation messages for review. Low and medium (profanity and sexual words) are allowed everywhere, and kept here so the policy can be retuned.",
+        "obscenity's dataset gives its words no category, so a slur it matches only counts once it's listed here as high.",
         "To change the list: edit this file (or allowlist.json for words wrongly caught), add a test if it's subtle, open a PR, deploy."
     ],
     "datasetDefault": { "category": "profanity", "severity": "medium" },
