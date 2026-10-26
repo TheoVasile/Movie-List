@@ -238,6 +238,45 @@ enum AIPlacement {
 }
 
 
+/// Films whose note from the user moderation is holding for review: only the user sees the note until then, and
+/// the app marks it "Under review". Kept on the phone by film id (Core Data has no field for it) and refreshed
+/// from the server on every sync
+final class NoteReview: ObservableObject {
+    static let shared = NoteReview()
+
+    private static let storageKey = "notesUnderReview"
+
+    @Published private(set) var movieIDs: Set<Int64> = []
+
+    private init() {
+        movieIDs = Set((UserDefaults.standard.array(forKey: Self.storageKey) as? [Int64]) ?? [])
+    }
+
+    func isUnderReview(_ movieID: Int64) -> Bool { movieIDs.contains(movieID) }
+
+    func set(_ underReview: Bool, movieID: Int64) {
+        if underReview {
+            movieIDs.insert(movieID)
+        } else {
+            movieIDs.remove(movieID)
+        }
+        save()
+    }
+
+    /// Replaces everything with what the server says, after a sync
+    func replaceAll(from lists: [ListDetailsResponse]) {
+        movieIDs = Set(lists.flatMap { list in
+            list.movies.filter { $0.note != nil && $0.note_status == "flagged" }.map(\.id)
+        })
+        save()
+    }
+
+    private func save() {
+        UserDefaults.standard.set(Array(movieIDs), forKey: Self.storageKey)
+    }
+}
+
+
 /// Who's on each shared list and who added which film, kept on the phone (Core Data has no fields for them) and
 /// refreshed from the server on every sync. Lists that aren't shared have no entry
 final class ListSharing: ObservableObject {

@@ -66,6 +66,8 @@ struct RecommendFilmSheet: View {
     @State private var query = ""
     @State private var sending = false
     @State private var failure: String? = nil
+    // Sent, but moderation is holding the note for review, so the sheet stays open to say so
+    @State private var noteHeld = false
 
     private static let noteLimit = 300
 
@@ -103,6 +105,11 @@ struct RecommendFilmSheet: View {
                         .onChange(of: note) { typed in
                             if typed.count > Self.noteLimit { note = String(typed.prefix(Self.noteLimit)) }
                         }
+                } footer: {
+                    if noteHeld {
+                        Label("Sent. Your note is under review, so they'll see the film without it for now.", systemImage: "eye.slash")
+                            .foregroundColor(Theme.accentSecondary)
+                    }
                 }
                 .listRowBackground(Theme.surface)
 
@@ -148,16 +155,23 @@ struct RecommendFilmSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
+            .disabled(sending || noteHeld)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search people")
             .navigationTitle("Recommend")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    if !noteHeld {
+                        Button("Cancel") { dismiss() }
+                            .disabled(sending)
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if sending {
                         ProgressView()
+                    } else if noteHeld {
+                        Button("Done") { dismiss() }
+                            .bold()
                     } else {
                         Button(chosen.count > 1 ? "Send to \(chosen.count)" : "Send", action: send)
                             .bold()
@@ -166,6 +180,7 @@ struct RecommendFilmSheet: View {
                 }
             }
         }
+        .interactiveDismissDisabled(sending)
         .onAppear {
             APIService.shared.fetchConnections(handle: nil, followers: true) { result in
                 loadingFollowers = false
@@ -181,10 +196,16 @@ struct RecommendFilmSheet: View {
         APIService.shared.sendRecommendation(movie, to: Array(chosen), note: trimmed.isEmpty ? nil : trimmed) { result in
             sending = false
             switch result {
-            case .success(let sentTo) where !sentTo.isEmpty:
+            case .success(let sent) where !sent.sentTo.isEmpty:
                 Haptics.success()
-                AppAnalytics.log(.recommendationSent(recipients: sentTo.count))
-                dismiss()
+                AppAnalytics.log(.recommendationSent(recipients: sent.sentTo.count))
+                if sent.noteUnderReview {
+                    noteHeld = true
+                } else {
+                    dismiss()
+                }
+            case .failure(let error):
+                failure = error.serverMessage ?? "Couldn't send it. Check your connection and try again."
             default:
                 failure = "Couldn't send it. Check your connection and try again."
             }

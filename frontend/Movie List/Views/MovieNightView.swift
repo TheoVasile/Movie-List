@@ -738,14 +738,24 @@ struct NewGroupSheet: View {
     @State private var chosen: Set<String> = []
     @State private var isSaving = false
     @State private var failed = false
+    // Why the server didn't allow the name, shown under it
+    @State private var nameError: String? = nil
 
     private static let maxMembers = 7
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Name") {
+                Section {
                     TextField("e.g. Friday Crew", text: $name)
+                        .onChange(of: name) { _ in nameError = nil }
+                } header: {
+                    Text("Name")
+                } footer: {
+                    if let nameError {
+                        Text(nameError)
+                            .foregroundColor(Theme.accentSecondary)
+                    }
                 }
                 .listRowBackground(Theme.surface)
                 Section {
@@ -782,6 +792,7 @@ struct NewGroupSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
+            .disabled(isSaving)
             .navigationTitle("New Group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -808,13 +819,20 @@ struct NewGroupSheet: View {
 
     private func create() {
         isSaving = true
-        APIService.shared.createGroup(name: name.trimmingCharacters(in: .whitespaces), handles: Array(chosen)) { created in
+        nameError = nil
+        APIService.shared.createGroup(name: name.trimmingCharacters(in: .whitespaces), handles: Array(chosen)) { result in
             isSaving = false
-            if created {
+            switch result {
+            case .success:
                 Haptics.success()
                 dismiss()
-            } else {
-                failed = true
+            case .failure(let error):
+                // A name moderation doesn't allow is explained by the field; anything else is an alert
+                if let message = error.serverMessage, (error as NSError).code == 400 {
+                    nameError = message
+                } else {
+                    failed = true
+                }
             }
         }
     }

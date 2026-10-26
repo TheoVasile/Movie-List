@@ -231,6 +231,9 @@ const createTables = async () => {
                 CHECK (reporter_id <> reported_user_id)
             );
             CREATE INDEX IF NOT EXISTS reports_open ON reports (status, created_at);
+            -- Reports the server files itself when automatic moderation flags something (services/moderation.js) have
+            -- no reporter
+            ALTER TABLE reports ALTER COLUMN reporter_id DROP NOT NULL;
 
             -- Films people send each other to watch, with an optional note. seen turns true once the recipient opens them
             CREATE TABLE IF NOT EXISTS film_recommendations (
@@ -250,6 +253,9 @@ const createTables = async () => {
                 UNIQUE (sender_id, recipient_id, tmdb_id)
             );
             CREATE INDEX IF NOT EXISTS film_recommendations_recipient ON film_recommendations (recipient_id, created_at DESC);
+            -- 'ok', or 'flagged' when automatic moderation found something in the note: then only the sender sees it
+            -- until it's reviewed and set back to 'ok' or to 'removed'
+            ALTER TABLE film_recommendations ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(10) NOT NULL DEFAULT 'ok';
 
             -- TV episodes each person has watched, by the show's (positive) TMDb id
             CREATE TABLE IF NOT EXISTS episode_watches (
@@ -342,6 +348,9 @@ const createTables = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, movie_id)
             );
+            -- 'ok', or 'flagged' when automatic moderation found something in the note: then only its author sees it
+            -- until it's reviewed and set back to 'ok' or to 'removed'
+            ALTER TABLE movie_notes ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(10) NOT NULL DEFAULT 'ok';
 
             -- AI requests each user made each day, for the daily limit. Kept in the database so a restart or a
             -- second server doesn't reset it; rows older than a couple of days are deleted as new ones come in

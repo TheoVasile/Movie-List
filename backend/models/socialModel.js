@@ -328,15 +328,16 @@ async function fetchFollowedLists(user_id) {
     return lists;
 }
 
-// What the people the user follows have to say about one film: whether they've watched it, their note,
-// and their best placing of it in a list. Only people with at least one of those are returned, people
-// with a note first
+// What the people the user follows have to say about one film: whether they've watched it, their note (unless
+// moderation is holding it for review), and their best placing of it in a list. Only people with at least one of
+// those are returned, people with a note first
 async function fetchFriendsOnFilm(user_id, tmdb_id) {
     const result = await pool.query(
         `WITH film AS (SELECT id FROM movies WHERE tmdb_id = $2::text)
          SELECT u.handle, u.username AS display_name, FLOOR(EXTRACT(EPOCH FROM u.avatar_updated_at) * 1000)::double precision AS avatar_version,
                 EXISTS (SELECT 1 FROM watched_movies w WHERE w.user_id = u.firebase_uid AND w.movie_id IN (SELECT id FROM film)) AS watched,
-                (SELECT n.note FROM movie_notes n WHERE n.user_id = u.firebase_uid AND n.movie_id IN (SELECT id FROM film)) AS note,
+                (SELECT n.note FROM movie_notes n WHERE n.user_id = u.firebase_uid AND n.movie_id IN (SELECT id FROM film)
+                   AND n.moderation_status = 'ok') AS note,
                 (SELECT json_build_object('list_name', l.name, 'rank', lm.rank, 'list_size', (SELECT COUNT(*) FROM list_movies c WHERE c.list_id = l.id))
                  FROM lists l JOIN list_movies lm ON lm.list_id = l.id
                  WHERE l.user_id = u.firebase_uid AND lm.movie_id IN (SELECT id FROM film) AND l.visibility <> 'private' AND l.is_ranked

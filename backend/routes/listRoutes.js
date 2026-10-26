@@ -9,6 +9,7 @@ const pool = require("../config/db");
 const { setListWatched } = require("../models/watchedModel");
 const { isPrivate } = require("../models/socialModel");
 const { setListOrder } = require("../models/movieModel");
+const { blockedField } = require("../services/moderation");
 
 const router = express.Router();
 
@@ -24,6 +25,9 @@ router.post("/create", async (req, res) => {
         if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
             return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
         }
+        // Slurs and offensive words aren't allowed in a name or description; the app shows the error by the field
+        const blocked = blockedField({ list_name: name, list_description: overview });
+        if (blocked) return res.status(400).json(blocked);
         // Only followers can see a private profile's lists, so a public one starts followers-only instead
         const allowed = (visibility ?? "public") === "public" && (await isPrivate(req.user.uid)) ? "followers" : visibility;
         const newList = await createList(req.user.uid, name, overview, is_ranked, allowed);
@@ -99,6 +103,8 @@ router.put("/:id", requireListOwner((req) => req.params.id), async (req, res) =>
         if (name === undefined && overview === undefined && visibility === undefined && is_ranked === undefined) {
             return res.status(400).json({ error: "Nothing to update." });
         }
+        const blocked = blockedField({ list_name: name, list_description: overview });
+        if (blocked) return res.status(400).json(blocked);
         const list = await updateList(Number(req.params.id), { name: name?.trim(), overview, visibility, is_ranked });
         res.status(200).json(list);
     } catch (error) {

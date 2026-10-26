@@ -20,6 +20,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase-admin": "^13.10.0",
+    "obscenity": "^0.4.6",
     "pg": "^8.13.1"
   },
   "allowScripts": {

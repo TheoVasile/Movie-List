@@ -190,6 +190,13 @@ extension AuthenticationViewModel {
     let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty, name.count <= 40 else { return "Names are 1 to 40 characters." }
     guard let current = Auth.auth().currentUser else { return "You're not signed in." }
+    // The server first, so a name moderation doesn't allow is never saved on the account either
+    let serverError: Error? = await withCheckedContinuation { continuation in
+      APIService.shared.setDisplayName(name) { result in
+        if case .failure(let error) = result { continuation.resume(returning: error) } else { continuation.resume(returning: nil) }
+      }
+    }
+    if let message = serverError?.serverMessage { return message }
     do {
       let change = current.createProfileChangeRequest()
       change.displayName = name
@@ -201,11 +208,7 @@ extension AuthenticationViewModel {
     // Firebase updates the same User object, so publish it again for screens showing the name
     user = Auth.auth().currentUser
     objectWillChange.send()
-    return await withCheckedContinuation { continuation in
-      APIService.shared.setDisplayName(name) { saved in
-        continuation.resume(returning: saved ? nil : "Saved on this account, but friends may still see your old name. Try again later.")
-      }
-    }
+    return serverError == nil ? nil : "Saved on this account, but friends may still see your old name. Try again later."
   }
 
   /// Whether the account has a password, so deleting it is confirmed with that rather than with Google or Apple
