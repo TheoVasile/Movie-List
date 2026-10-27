@@ -1,6 +1,6 @@
 const express = require("express");
 const { loginUser } = require("../controllers/authController");
-const { deleteUser, createUser } = require("../models/userModel");
+const { deleteUser, createUser, accountJSON } = require("../models/userModel");
 const verifyToken = require("../middleware/authMiddleware");
 const { rateLimit } = require("../middleware/rateLimit");
 const { isValidHandle, setHandle, HandleTakenError } = require("../models/socialModel");
@@ -30,7 +30,8 @@ router.post("/create", verifyToken, async (req, res) => {
                 if (!(error instanceof HandleTakenError)) throw error;
             }
         }
-        res.status(200).json({ ...newUser, handle_saved });
+        // { firebase_uid, handle, name, handle_saved }: never the whole row, which holds the picture, phone and birthday
+        res.status(200).json({ ...accountJSON(newUser), handle: handle_saved ? handle : newUser.handle ?? null, handle_saved });
     } catch (error) {
         console.error("Error creating user:", error);
         res.status(500).json({ error: "Internal server error" });

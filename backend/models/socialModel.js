@@ -1,14 +1,11 @@
 const pool = require("../config/db");
-const { visibleTo } = require("./listModel");
+const { visibleTo, notBlocked } = require("./listModel");
 
 // @usernames: 3-20 lowercase letters, digits, underscores and dots, not starting or ending with a dot
 // and without two dots in a row
 const HANDLE_PATTERN = /^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9_.]{3,20}$/;
 
 class HandleTakenError extends Error {}
-
-/// SQL that's true unless one of the two users has blocked the other, e.g. notBlocked("$1", "u.firebase_uid")
-const notBlocked = (a, b) => `NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ${a} AND b.blocked_id = ${b}) OR (b.blocker_id = ${b} AND b.blocked_id = ${a}))`;
 
 function isValidHandle(handle) {
     return typeof handle === "string" && HANDLE_PATTERN.test(handle);
@@ -80,11 +77,13 @@ async function setAvatar(user_id, jpeg) {
     );
 }
 
-// The profile picture of the user, or of whoever has @handle. null when there isn't one
-async function fetchAvatar({ user_id, handle }) {
+// The profile picture of the user (user_id), or of @handle as viewer_id sees it, null when there isn't one. None
+// when either has blocked the other, like their profile. A private account's picture is still shown, as it is
+// next to their name in search and follow requests, so people can tell who they're asking to follow
+async function fetchAvatar({ user_id, handle, viewer_id }) {
     const result = user_id
         ? await pool.query("SELECT avatar FROM users WHERE firebase_uid = $1", [user_id])
-        : await pool.query("SELECT avatar FROM users WHERE handle = $1", [handle]);
+        : await pool.query(`SELECT avatar FROM users u WHERE u.handle = $1 AND ${notBlocked("$2", "u.firebase_uid")}`, [handle, viewer_id]);
     return result.rows[0]?.avatar ?? null;
 }
 

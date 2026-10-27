@@ -1,4 +1,4 @@
-const { getUserByFirebaseUID, createUser } = require("../models/userModel");
+const { getUserByFirebaseUID, createUser, accountJSON } = require("../models/userModel");
 
 async function loginUser(req, res) {
   try {
@@ -9,9 +9,11 @@ async function loginUser(req, res) {
       user = await createUser(uid, email, `user_${uid.substring(0, 6)}`);
     }
 
-    res.json({ user });
+    // Only { firebase_uid, handle, name }: never the whole row
+    res.json({ user: accountJSON(user) });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error signing in:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
 
