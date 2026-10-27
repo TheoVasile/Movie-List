@@ -260,8 +260,6 @@ struct CollectionsView: View {
 /// way to add the rest
 struct CollectionDetailView: View {
     let collection: FilmCollection
-    @Environment(\.managedObjectContext) private var context
-    @EnvironmentObject private var authViewModel: AuthenticationViewModel
     @ObservedObject private var filmographies = FilmographyStore.shared
     @State private var details: CDMovie? = nil
     @State private var detailsMovie: Movie? = nil
@@ -312,21 +310,9 @@ struct CollectionDetailView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { adding = movie }
             })
         }
-        .sheet(item: $adding) { movie in
-            ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
-                for chosen in lists {
-                    chosen.addMovie(tmdbID: movie.id, context: context) { _ in }
-                }
-                if !lists.isEmpty {
-                    Haptics.success()
-                    AppAnalytics.log(.filmAdded(.collection))
-                    added.insert(movie.id)
-                }
-            }
-            .environmentObject(authViewModel)
-            .environment(\.managedObjectContext, context)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+        // The same list picker and Compare as adding anywhere else
+        .addToListFlow(movie: $adding, source: .collection) { movie, _ in
+            added.insert(movie.id)
         }
     }
 
