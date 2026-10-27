@@ -599,7 +599,7 @@ router.put("/me/handle", async (req, res) => {
     if (!isValidHandle(handle)) {
         return res.status(400).json({ error: "Usernames are 3 to 20 letters, numbers, underscores or dots." });
     }
-    // Slurs, offensive words and names kept for us (admin, support, marquee...) aren't allowed
+    // Slurs, hate, harassment and names kept for us (admin, support, marquee...) aren't allowed
     const blocked = blockedField({ handle });
     if (blocked) return res.status(400).json(blocked);
     try {

@@ -25,7 +25,7 @@ router.post("/create", async (req, res) => {
         if (visibility !== undefined && !VISIBILITIES.includes(visibility)) {
             return res.status(400).json({ error: `visibility must be one of ${VISIBILITIES.join(", ")}.` });
         }
-        // Slurs and offensive words aren't allowed in a name or description; the app shows the error by the field
+        // Slurs, hate and harassment aren't allowed in a name or description; the app shows the error by the field
         const blocked = blockedField({ list_name: name, list_description: overview });
         if (blocked) return res.status(400).json(blocked);
         // Only followers can see a private profile's lists, so a public one starts followers-only instead
