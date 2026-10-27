@@ -28,48 +28,52 @@ extension CDMovieList {
         self.overview = overview
     }
     
-    /// Saves a TMDb movie on the backend, adds it to the bottom of this list, and mirrors it in Core Data.
-    /// Calls back on the main thread with the new movie, or nil if any step failed.
-    func addMovie(_ networkMovie: Movie, context: NSManagedObjectContext, completion: @escaping (CDMovie?) -> Void = { _ in }) {
-        APIService.shared.createMovie(tmdb_id: networkMovie.id, title: networkMovie.title, release_date: networkMovie.release_date, overview: networkMovie.overview, poster_path: networkMovie.poster_path ?? "", original_language: networkMovie.original_language, popularity: networkMovie.popularity) { result in
+    /// Adds a TMDb film to the bottom of this list on the backend, which saves the film itself from TMDb, and
+    /// mirrors it in Core Data. Only the TMDb id is sent; everything else comes back from the server.
+    /// Calls back on the main thread with the film, or nil if it couldn't be added.
+    func addMovie(tmdbID: Int64, context: NSManagedObjectContext, completion: @escaping (CDMovie?) -> Void = { _ in }) {
+        let listID = id
+        APIService.shared.addFilm(listID: listID, tmdbID: tmdbID) { result in
             switch result {
-            case .success(let movieResponse):
-                let rank = self.movies.count + 1
-                APIService.shared.addMovieToList(list_id: self.id, movie_id: movieResponse.id, rank: rank) { result in
-                    switch result {
-                    case .success:
-                        // A release date the app can't parse would otherwise crash here
-                        guard let tmdbID = Int32(movieResponse.tmdb_id),
-                              let newMovie = try? CDMovie(
-                                id: movieResponse.id,
-                                tmdb_id: tmdbID,
-                                title: movieResponse.title,
-                                release_date: movieResponse.release_date,
-                                overview: movieResponse.overview,
-                                rank: Int32(rank),
-                                poster_path: movieResponse.poster_path,
-                                original_language: movieResponse.original_language,
-                                popularity: movieResponse.popularity,
-                                context: context) else {
-                            print("Couldn't create a local copy of", movieResponse.title)
-                            completion(nil)
-                            return
-                        }
-                        self.addToMovies_(newMovie)
-                        self.date_modified = Date.now
-                        do {
-                            try context.save()
-                        } catch {
-                            print("Error saving context: \(error)")
-                        }
-                        completion(newMovie)
-                    case .failure(let error):
-                        print("Error adding movie to list:", error.localizedDescription)
-                        completion(nil)
-                    }
+            case .success(let added):
+                // A sync while this was saving may have taken the list off the phone
+                guard !self.isDeleted, self.managedObjectContext != nil else {
+                    completion(nil)
+                    return
                 }
+                // Adding a film that's already there gives back the one on the list
+                if let existing = self.movies.first(where: { $0.id == added.movie_id }) {
+                    completion(existing)
+                    return
+                }
+                let movie = added.movie
+                // A release date the app can't parse would otherwise crash here
+                guard let tmdbID = Int32(exactly: movie.tmdb_id),
+                      let newMovie = try? CDMovie(
+                        id: added.movie_id,
+                        tmdb_id: tmdbID,
+                        title: movie.title,
+                        release_date: movie.release_date,
+                        overview: movie.overview,
+                        rank: Int32(added.rank),
+                        poster_path: movie.poster_path,
+                        original_language: movie.original_language,
+                        popularity: movie.popularity,
+                        context: context) else {
+                    print("Couldn't create a local copy of", movie.title)
+                    completion(nil)
+                    return
+                }
+                self.addToMovies_(newMovie)
+                self.date_modified = Date.now
+                do {
+                    try context.save()
+                } catch {
+                    print("Error saving context: \(error)")
+                }
+                completion(newMovie)
             case .failure(let error):
-                print("Error creating movie:", error.localizedDescription)
+                print("Error adding film to list \(listID):", error.localizedDescription)
                 completion(nil)
             }
         }

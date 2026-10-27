@@ -135,7 +135,7 @@ struct FriendActivityView: View {
         .sheet(item: $adding) { movie in
             ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
                 for chosen in lists {
-                    chosen.addMovie(movie, context: context) { _ in }
+                    chosen.addMovie(tmdbID: movie.id, context: context) { _ in }
                 }
                 if !lists.isEmpty {
                     Haptics.success()

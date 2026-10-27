@@ -222,7 +222,7 @@ class ListViewModel: ObservableObject {
     }
     
     func createAndSaveMovie(from networkMovie: Movie) {
-        movieList.addMovie(networkMovie, context: context) { newMovie in
+        movieList.addMovie(tmdbID: networkMovie.id, context: context) { newMovie in
             guard let newMovie else { return }
             AppAnalytics.log(.filmAdded(.search))
             // Look up the new film's genres and ratings
@@ -342,22 +342,14 @@ class ListViewModel: ObservableObject {
     }
 
     /// Adds a film from this list to other lists, at the bottom of each. Calls back with the lists it was
-    /// added to and the new copy in each, in the order given
+    /// added to and the new copy in each, in the order given. The film is already saved, so only its TMDb id goes
     func addCopy(of movie: CDMovie, to lists: [CDMovieList], completion: @escaping ([(list: CDMovieList, movie: CDMovie)]) -> Void) {
-        let film = Movie(
-            id: Int64(movie.tmdb_id),
-            title: movie.title ?? "",
-            release_date: movie.get_date(),
-            overview: movie.overview ?? "",
-            poster_path: movie.poster_path,
-            original_language: movie.original_language ?? "",
-            popularity: movie.popularity
-        )
+        let tmdbID = Int64(movie.tmdb_id)
         var added: [Int: CDMovie] = [:]
         let group = DispatchGroup()
         for (index, list) in lists.enumerated() {
             group.enter()
-            list.addMovie(film, context: context) { newMovie in
+            list.addMovie(tmdbID: tmdbID, context: context) { newMovie in
                 added[index] = newMovie
                 group.leave()
             }

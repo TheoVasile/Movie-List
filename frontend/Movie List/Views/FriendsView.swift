@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import FirebaseAuth
 
 // MARK: - Store
 
@@ -28,6 +29,8 @@ final class SocialStore: ObservableObject {
     private var generation = 0
     private var retryDelay: TimeInterval = 2
     private var retryScheduled = false
+    // Whether this account was found missing on the server and making it was tried, so that's only done once
+    private var triedCreatingAccount = false
 
     /// Whether the profile has loaded at least once. Nothing about the account is shown or asked for before then
     var hasLoaded: Bool { profile != nil }
@@ -64,6 +67,19 @@ final class SocialStore: ObservableObject {
                 self.retryDelay = 2
             case .failure(let error):
                 print("Couldn't load profile:", error)
+                // Signed in, but with no account on the server (e.g. it wasn't made when they first signed up):
+                // make it now, then load again
+                if (error as NSError).code == 404, !self.triedCreatingAccount, let user = Auth.auth().currentUser {
+                    self.triedCreatingAccount = true
+                    let name = user.displayName ?? ""
+                    APIService.shared.createUser(firebase_id: user.uid, email: user.email ?? "no email",
+                                                 name: name.isEmpty ? "no name" : name) { created in
+                        guard generation == self.generation else { return }
+                        if case .failure(let error) = created { print("Couldn't create account:", error) }
+                        self.reloadProfile(completion: completion)
+                    }
+                    return
+                }
                 // A profile that loaded before stays: it's still right, just not the latest
                 if self.profile == nil {
                     self.profileFailed = true
@@ -105,6 +121,7 @@ final class SocialStore: ObservableObject {
         generation += 1
         retryDelay = 2
         retryScheduled = false
+        triedCreatingAccount = false
         profile = nil
         profileFailed = false
         following = []
@@ -1251,7 +1268,7 @@ struct FriendListView: View {
         .sheet(item: $adding) { movie in
             ListPickerSheet(title: movie.title, posterPath: movie.poster_path) { lists in
                 for chosen in lists {
-                    chosen.addMovie(movie, context: context) { _ in }
+                    chosen.addMovie(tmdbID: movie.id, context: context) { _ in }
                 }
                 if !lists.isEmpty {
                     Haptics.success()

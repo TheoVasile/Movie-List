@@ -366,17 +366,18 @@ extension AuthenticationViewModel {
 
         let result = try await Auth.auth().signIn(with: credential)
         let firebaseUser = result.user
-        // Signing in with Google for the first time creates the account
+        // Signing in with Google for the first time creates the account. Returning users already have one; if
+        // theirs is missing, loading the profile makes it
         if result.additionalUserInfo?.isNewUser == true {
           AppAnalytics.log(.signUp(.google))
+          APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
+              if case .failure(let error) = result { print(error.localizedDescription) }
+              // New Google accounts have no username yet, which the app asks for once this has loaded
+              SocialStore.shared.load()
+          }
         } else {
           AppAnalytics.log(.signIn(.google))
-        }
-          
-        APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email", name: firebaseUser.displayName ?? "no name") { result in
-            if case .failure(let error) = result { print(error.localizedDescription) }
-            // New Google accounts have no username yet, which the app asks for once this has loaded
-            SocialStore.shared.load()
+          SocialStore.shared.load()
         }
         print("User \(firebaseUser.uid) signed in with email \(firebaseUser.email ?? "unknown")")
           PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.uid)
@@ -446,17 +447,19 @@ extension AuthenticationViewModel {
         try? await change.commitChanges()
         self.user = Auth.auth().currentUser
       }
-      // Signing in with Apple for the first time creates the account
+      // Signing in with Apple for the first time creates the account. Returning users already have one; if
+      // theirs is missing, loading the profile makes it
       if result.additionalUserInfo?.isNewUser == true {
         AppAnalytics.log(.signUp(.apple))
+        let name = Auth.auth().currentUser?.displayName ?? ""
+        APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email",
+                                     name: name.isEmpty ? "no name" : name) { result in
+          if case .failure(let error) = result { print(error.localizedDescription) }
+          // New Apple accounts have no username yet, which the app asks for once this has loaded
+          SocialStore.shared.load()
+        }
       } else {
         AppAnalytics.log(.signIn(.apple))
-      }
-      let name = Auth.auth().currentUser?.displayName ?? ""
-      APIService.shared.createUser(firebase_id: firebaseUser.uid, email: firebaseUser.email ?? "no email",
-                                   name: name.isEmpty ? "no name" : name) { result in
-        if case .failure(let error) = result { print(error.localizedDescription) }
-        // New Apple accounts have no username yet, which the app asks for once this has loaded
         SocialStore.shared.load()
       }
       PersistenceController.shared.fetchAllCoreDataObjects(firebase_id: firebaseUser.uid)

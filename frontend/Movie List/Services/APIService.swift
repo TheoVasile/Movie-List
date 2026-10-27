@@ -21,7 +21,8 @@ struct ListRequest: Codable {
 
 struct ListResponse: Codable {
     let id: Int64
-    let user_id: String
+    // Not used by the app; optional so the server can stop sending it
+    let user_id: String?
     let name: String
     let overview: String
     let is_ranked: Bool
@@ -29,7 +30,9 @@ struct ListResponse: Codable {
     let date_modified: String
 }
 
-struct MovieRequest: Codable {
+/// A film as the server saved it. Some endpoints send tmdb_id as a string, so either is accepted
+struct MovieResponse: Decodable {
+    let id: Int64
     let tmdb_id: Int64
     let title: String
     let release_date: String
@@ -37,25 +40,44 @@ struct MovieRequest: Codable {
     let poster_path: String
     let original_language: String
     let popularity: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case id, tmdb_id, title, release_date, overview, poster_path, original_language, popularity
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int64.self, forKey: .id)
+        if let number = try? container.decode(Int64.self, forKey: .tmdb_id) {
+            tmdb_id = number
+        } else if let number = Int64(try container.decode(String.self, forKey: .tmdb_id)) {
+            tmdb_id = number
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .tmdb_id, in: container, debugDescription: "Not a TMDb id")
+        }
+        title = try container.decode(String.self, forKey: .title)
+        release_date = try container.decodeIfPresent(String.self, forKey: .release_date) ?? ""
+        overview = try container.decodeIfPresent(String.self, forKey: .overview) ?? ""
+        poster_path = try container.decodeIfPresent(String.self, forKey: .poster_path) ?? ""
+        original_language = try container.decodeIfPresent(String.self, forKey: .original_language) ?? ""
+        popularity = try container.decodeIfPresent(Double.self, forKey: .popularity) ?? 0
+    }
 }
 
-struct MovieResponse: Codable {
-    let id: Int64
-    let tmdb_id: String
-    let title: String
-    let release_date: String
-    let overview: String
-    let poster_path: String
-    let original_language: String
-    let popularity: Double
-    let created_at: String
+/// A film added to a list: its id, where it landed, and the film itself
+struct AddedFilmResponse: Decodable {
+    let movie_id: Int64
+    let rank: Int
+    let movie: MovieResponse
 }
 
-struct UserResponse: Codable {
-    let id: Int64
-    let firebase_id: String
-    let email: String
-    let name: String
+/// The account /auth/create made, or already had. The app goes by the Firebase account, so nothing here is
+/// required; handle_saved says whether the @username picked at sign-up was free
+struct UserResponse: Decodable {
+    let firebase_uid: String?
+    let handle: String?
+    let name: String?
+    let handle_saved: Bool?
 }
 
 struct UserRequest: Codable {
@@ -102,7 +124,8 @@ struct ListMember: Codable, Identifiable, Hashable {
 
 struct ListDetailsResponse: Codable {
     let id: Int64
-    let user_id: String
+    // Not used by the app; optional so the server can stop sending it
+    let user_id: String?
     let name: String
     let overview: String
     let creation_date: String
@@ -250,7 +273,8 @@ struct PollOption: Decodable, Identifiable, Equatable {
     // 1, -1, or 0 when the user hasn't voted on it
     let my_vote: Int
 
-    /// As a Movie, for adding the winner to a list
+    /// As a Movie, for adding the winner to a list. Only the TMDb id is sent when adding it, so the server fills in
+    /// what the poll doesn't have, like the overview
     var movie: Movie {
         Movie(id: tmdb_id, title: title, release_date: release_date ?? "", overview: "", poster_path: poster_path,
               original_language: "", popularity: 0, reason: reason)
@@ -1003,11 +1027,8 @@ class APIService {
     /// Sends a film to people the user follows or who follow them. Calls back with the @handles it went to, and
     /// whether moderation is holding the note for review
     func sendRecommendation(_ movie: Movie, to handles: [String], note: String?, completion: @escaping (Result<(sentTo: [String], noteUnderReview: Bool), Error>) -> Void) {
-        var body: [String: Any] = [
-            "handles": handles, "tmdb_id": movie.id, "title": movie.title, "release_date": movie.release_date,
-            "overview": movie.overview, "original_language": movie.original_language, "popularity": movie.popularity,
-        ]
-        if let poster = movie.poster_path { body["poster_path"] = poster }
+        // The server fills in the film's details from TMDb
+        var body: [String: Any] = ["handles": handles, "tmdb_id": movie.id]
         if let note { body["note"] = note }
         sendJSON("POST", "/users/me/recommendations", body: body) { (result: Result<SentResponse, Error>) in
             completion(result.map { ($0.sent_to, $0.note_status == "flagged") })
@@ -1174,10 +1195,8 @@ class APIService {
 
     /// Suggests a film to the group, which counts as the user's like; calls back with the shortlist
     func suggestPick(groupID: Int64, movie: Movie, completion: @escaping (Result<[GroupPick], Error>) -> Void) {
-        var body: [String: Any] = ["tmdb_id": movie.id, "title": movie.title, "release_date": movie.release_date,
-                                   "overview": movie.overview, "original_language": movie.original_language, "popularity": movie.popularity]
-        if let poster = movie.poster_path { body["poster_path"] = poster }
-        sendJSON("POST", "/users/me/groups/\(groupID)/picks", body: body, completion: completion)
+        // The server fills in the film's details from TMDb
+        sendJSON("POST", "/users/me/groups/\(groupID)/picks", body: ["tmdb_id": movie.id], completion: completion)
     }
 
     /// Takes a suggestion off the shortlist (whoever suggested it, or the group's owner); calls back with the shortlist
@@ -1442,47 +1461,13 @@ class APIService {
         }
     }
 
-    func addMovieToList(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/movies/addToList") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: Any] = [
-            "list_id": list_id,
-            "movie_id": movie_id,
-            "rank": rank
-        ]
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            completion(.failure(error))
-            return
-        }
-
-        send(request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                DispatchQueue.main.async {
-                    completion(.failure(NSError(domain: "Invalid response", code: 0, userInfo: nil)))
-                }
-                return
-            }
-
-            DispatchQueue.main.async {
-                completion(.success(()))
-            }
-        }
+    /// Adds a film to the end of a list the user owns or edits; the server looks the film up on TMDb, so only its
+    /// id is sent. Adding one that's already there gives back its place. Fails with code 404 when the list
+    /// can't be edited
+    func addFilm(listID: Int64, tmdbID: Int64, completion: @escaping (Result<AddedFilmResponse, Error>) -> Void) {
+        sendJSON("POST", "/lists/\(listID)/films", body: ["tmdb_id": tmdbID], completion: completion)
     }
-    
+
     /// Genres, US age rating, TMDb user score and length for up to 50 films, keyed by TMDb id. Calls back on the main thread
     func fetchMovieInfo(tmdbIDs: [Int64], completion: @escaping (Result<[Int64: MovieInfo], Error>) -> Void) {
         struct FilmInfo: Decodable {
@@ -1811,51 +1796,6 @@ class APIService {
                 completion(.failure(NSError(domain: "Delete failed", code: 0, userInfo: nil)))
             }
 
-        }
-        
-    }
-    
-    func createMovie(tmdb_id: Int64, title: String, release_date: String, overview: String, poster_path: String, original_language: String, popularity: Double, completion: @escaping (Result<MovieResponse, Error>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/movies/create") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let body = MovieRequest(tmdb_id: tmdb_id, title: title, release_date: release_date, overview: overview, poster_path: poster_path, original_language: original_language, popularity: popularity)
-
-        do {
-            request.httpBody = try JSONEncoder().encode(body)
-        } catch {
-            print("❌ Encoding error:", error)
-            return
-        }
-        
-        send(request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-                return
-            }
-
-            guard let data = data else {
-                DispatchQueue.main.async {
-                    completion(.failure(NSError(domain: "No Data", code: 0, userInfo: nil)))
-                }
-                return
-            }
-
-            do {
-                let movieResponse = try JSONDecoder().decode(MovieResponse.self, from: data)
-                DispatchQueue.main.async {
-                    completion(.success(movieResponse))
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-            }
         }
         
     }
