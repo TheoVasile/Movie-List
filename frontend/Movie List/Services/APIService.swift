@@ -1513,6 +1513,11 @@ class APIService {
         sendJSON("GET", "/movies/\(kind.rawValue)/\(id)", completion: completion)
     }
 
+    /// More Like This: films like a film or show (negative id), best match first, without the ones in the user's lists
+    func fetchSimilarFilms(tmdbID: Int64, completion: @escaping (Result<[Movie], Error>) -> Void) {
+        sendJSON("GET", "/movies/\(tmdbID)/similar", completion: completion)
+    }
+
     // MARK: TV episodes. showID is the app's (negative) TV id
 
     func fetchShow(_ showID: Int64, completion: @escaping (Result<TVShow, Error>) -> Void) {

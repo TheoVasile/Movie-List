@@ -33,6 +33,7 @@ struct MovieDetailView: View {
     @State private var info: MovieInfo? = nil
     @State private var providers: WatchProviders? = nil
     @State private var recommending = false
+    @State private var showingMoreLikeThis = false
     @ObservedObject private var social = SocialStore.shared
     @ObservedObject private var noteReview = NoteReview.shared
 
@@ -285,6 +286,40 @@ struct MovieDetailView: View {
         }
     }
 
+    // Opens films like this one to add to a list; each of those has its own More Like This
+    private var moreLikeThisButton: some View {
+        Button {
+            Haptics.tap()
+            showingMoreLikeThis = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles.rectangle.stack")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.accentGradient)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("More Like This")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(Theme.textPrimary)
+                    Text(movie.isTV ? "Shows like this one to add to your lists" : "Films like this one to add to your lists")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .padding(14)
+            .cardStyle()
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
+        .sheet(isPresented: $showingMoreLikeThis) {
+            MoreLikeThisView(source: Movie(movie))
+                .presentationDragIndicator(.visible)
+        }
+    }
+
     private var hasActions: Bool {
         onCompare != nil || onSetRank != nil || onToggleWatched != nil || onAddToLists != nil
     }
@@ -430,6 +465,11 @@ struct MovieDetailView: View {
             if hasActions {
                 actionTiles
                     .appearAnimation(delay: 0.26)
+            }
+
+            if movie.tmdb_id != 0 {
+                moreLikeThisButton
+                    .appearAnimation(delay: 0.27)
             }
 
             // Only for the user's own films, which are the ones that can be marked watched

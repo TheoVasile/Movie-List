@@ -44,7 +44,7 @@ Marquee helps you keep track of the films and TV series you want to watch and ha
 
 - Create ranked and unranked lists, a watchlist, and collections, and place films in your rankings
 - Mark films and TV episodes as watched, keep a viewing diary, and write notes on films that the people who follow you can see
-- Discover new films by swiping through suggestions, including optional AI-powered picks
+- Discover new films by swiping through suggestions, including optional AI-powered picks, and find more films like one you pick
 - Follow other people, see what the people you follow are watching and ranking, and compare your taste with theirs
 - Recommend films to friends, share lists, and invite friends to edit a list with you
 - Plan a movie night with friends in a group, suggest films, react to picks and vote in polls
