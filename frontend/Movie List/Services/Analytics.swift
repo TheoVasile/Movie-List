@@ -28,7 +28,7 @@ enum AppAnalytics {
     enum SignUpMethod: String { case email, google, apple }
     enum FilmSource: String {
         case search, discover, otherList = "other_list", friend, recommendation, collection
-        case movieNight = "movie_night", checkIn = "check_in"
+        case movieNight = "movie_night", checkIn = "check_in", moreLikeThis = "more_like_this"
     }
     enum RankMethod: String { case compare, setRank = "set_rank", drag }
     enum WatchSource: String { case list, diary, checkIn = "check_in" }
@@ -49,6 +49,7 @@ enum AppAnalytics {
         case discoverSwipe(DiscoverReaction, ai: Bool)
         case recommendationSent(recipients: Int)
         case theatreCheckInOpened
+        case moreLikeThisOpened
         case reportSubmitted(contentType: String, reason: String)
         case shareList(ShareFormat)
         // Once per device, alongside the first list_created and film_ranked, for the sign-up funnel
@@ -78,6 +79,7 @@ enum AppAnalytics {
             case .discoverSwipe: return "discover_swipe"
             case .recommendationSent: return "recommendation_sent"
             case .theatreCheckInOpened: return "theatre_checkin_opened"
+            case .moreLikeThisOpened: return "more_like_this_opened"
             case .reportSubmitted: return "report_submitted"
             case .shareList: return "share_list"
             case .firstListCreated: return "first_list_created"
@@ -125,7 +127,7 @@ enum AppAnalytics {
             // A fixed step or link kind, never the link itself
             case .onboardingStep(let step): return ["step": step]
             case .linkOpened(let kind): return ["kind": kind]
-            case .termsAccepted, .theatreCheckInOpened, .firstListCreated, .firstRanking, .inviteSent, .inviteAccepted: return nil
+            case .termsAccepted, .theatreCheckInOpened, .moreLikeThisOpened, .firstListCreated, .firstRanking, .inviteSent, .inviteAccepted: return nil
             }
         }
     }

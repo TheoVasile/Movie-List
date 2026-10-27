@@ -201,8 +201,24 @@ struct PersistenceController {
 
     /// A temporary copy of a TMDb film for the film info screen. It has no rank and isn't in any list
     static func preview(of movie: Movie) -> CDMovie {
-        let context = scratchContext
-        context.reset()
+        scratchContext.reset()
+        return preview(of: movie, in: scratchContext)
+    }
+
+    // More Like This opens film info on top of film info, again and again, so its copies go in a context that's
+    // never reset: resetting would break the info screens still open underneath. Nothing made here is saved either
+    private static let stackedContext: NSManagedObjectContext = {
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = shared.container.persistentStoreCoordinator
+        return context
+    }()
+
+    /// A temporary copy of a TMDb film for film info opened from film info, leaving the screens below it alone
+    static func stackedPreview(of movie: Movie) -> CDMovie {
+        preview(of: movie, in: stackedContext)
+    }
+
+    private static func preview(of movie: Movie, in context: NSManagedObjectContext) -> CDMovie {
         let release = (try? CDMovie(id: 0, tmdb_id: Int32(movie.id), title: movie.title, release_date: movie.release_date,
                                     overview: movie.overview, rank: 0, poster_path: movie.poster_path ?? "",
                                     original_language: movie.original_language, popularity: movie.popularity, context: context))

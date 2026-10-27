@@ -16,6 +16,7 @@ const { streamingPreferences } = require("../services/streamingAlerts");
 const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../services/tmdbMedia");
 const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
 const { directedFilms } = require("../services/directorFilmography");
+const { similarFilms } = require("../services/similarFilms");
 
 const router = express.Router();
 // The list's owner, or someone they invited to edit it
@@ -856,6 +857,24 @@ router.get("/tv/:id/season/:season", async (req, res) => {
     } catch (error) {
         if (error.response?.status === 404) return res.status(404).json({ error: "Season not found." });
         console.error("Error fetching season:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// More Like This: films like one film or show (negative id), best match first, leaving out the ones already in the
+// user's lists, e.g. /771/similar -> [discover movie...]. TMDb's pages are cached for a day, since they rarely change
+router.get("/:id/similar", async (req, res) => {
+    const id = mediaId(req.params.id);
+    if (id === null) return res.status(400).json({ error: "A film id is required." });
+    try {
+        const listed = await fetchListedTmdbIds(req.user.uid);
+        res.json(await similarFilms(id, {
+            get: (path, params) => tmdbGet(path, params, DAY),
+            listed,
+            toMovie: toDiscoverMovie,
+        }));
+    } catch (error) {
+        console.error("Error fetching similar films:", error.message);
         res.status(500).json({ error: "Internal server error" });
     }
 });
