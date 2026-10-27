@@ -11,7 +11,11 @@
         { "text": "f.u.c.k", "word": "fuck" },
         { "text": "n1gg3r", "word": "nigger" },
         { "text": "sh1t", "word": "shit" },
-        { "text": "fuck_you", "word": "fuck" }
+        { "text": "fuck_you", "word": "fuck" },
+        { "text": "n i g g e r", "word": "nigger" },
+        { "text": "f4g", "word": "fag" },
+        { "text": "sp1c", "word": "spic" },
+        { "text": "k.y.s", "word": "kys" }
     ],
     "confusables": [
         { "text": "ｆｕｃｋ", "word": "fuck", "about": "full-width letters" },
@@ -27,8 +31,9 @@
     "reserved": ["admin", "administrator", "marquee", "marquee_app", "support", "help", "official", "staff", "moderator", "mod", "blendedbits", "root", "system", "null", "undefined", "api", "www", "security", "legal", "privacy", "terms", "admin_2", "marquee.official", "admin99"],
     "notReserved": ["theo.v", "badminton", "supportive", "helpful", "modern", "rooted", "nullify"],
     "policy": {
-        "low": "shit",
-        "medium": "fuck",
-        "high": "nigger"
+        "about": "Profanity and sexual words are allowed everywhere; slurs, hate and harassment are blocked in names and flagged in notes, evasions included",
+        "allowed": ["shit", "fuck", "fuck_you", "f u c k", "cunt", "bitch", "pussy", "whore", "sex", "shithead"],
+        "slurs": ["nigger", "n1gg3r", "n i g g e r", "nіgger", "f4g", "you spic", "sp1c", "kys", "k.y.s", "kill yourself"],
+        "slur": "nigger"
     }
 }

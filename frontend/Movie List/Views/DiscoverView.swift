@@ -42,12 +42,6 @@ struct DiscoverView: View {
     @State private var draftKind = DiscoverKind.all
     // Streaming services in the user's country, loaded when the filters open
     @State private var services: [StreamingService] = []
-    // Quick Add sends films added with Add to List straight to one list, without asking which list or where they rank
-    @AppStorage("discoverQuickAdd") private var quickAddOn = false
-    @AppStorage("discoverQuickAddListID") private var quickAddListID = 0
-    // Whether Quick Add leaves films at the bottom or lets the AI place them
-    @AppStorage("discoverQuickAddUsesAI") private var quickAddUsesAI = false
-    @State private var choosingQuickAddList = false
     @State private var showReactions = false
 
     private let swipeThreshold: CGFloat = 110
@@ -105,22 +99,11 @@ struct DiscoverView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $choosingQuickAddList) {
-            ListPickerSheet(title: "Films you add from Discover", posterPath: nil, singleChoice: true) { lists in
-                guard let list = lists.first else { return }
-                quickAddListID = Int(list.id)
-                quickAddOn = true
-                showToast("Quick Add to \(list.name ?? "your list") is on")
-            }
-            .environmentObject(authViewModel)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
         .sheet(item: $fullDetails) { preview in
-            // Add to Lists closes the info screen and asks which lists, even with Quick Add on
+            // Add to Lists closes the info screen and asks which lists
             MovieDetailView(movie: preview, onAddToLists: {
                 fullDetails = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { addTopMovie(forceAsk: true) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { addTopMovie() }
             })
         }
         .sheet(isPresented: $showReactions) {
@@ -280,8 +263,7 @@ private extension DiscoverView {
         showToast(useAI ? "AI Picks on" : "Classic recommendations from TMDb")
     }
 
-    // Everything else Discover offers, in one menu: where recommendations come from, adding films, and what it
-    // has learned
+    // Everything else Discover offers, in one menu: where recommendations come from and what it has learned
     var optionsMenu: some View {
         Menu {
             // Under-18s only ever get Classic, so the choice isn't shown to them
@@ -292,44 +274,6 @@ private extension DiscoverView {
                         Label("Classic", systemImage: "film").tag(false)
                     }
                     .pickerStyle(.inline)
-                }
-            }
-            Section("Adding Films") {
-                // Also on a long press of Add, and Add to Lists on the film's full details
-                if quickAddList != nil {
-                    Button {
-                        addTopMovie(forceAsk: true)
-                    } label: {
-                        Label("Choose Lists for This Film…", systemImage: "list.bullet")
-                    }
-                    .disabled(viewModel.topMovie == nil || isSwiping)
-                }
-                Menu {
-                    Picker("When You Add a Film", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
-                        Label("Ask Each Time", systemImage: "list.bullet").tag(false)
-                        Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
-                    }
-                    .pickerStyle(.inline)
-                    if let list = quickAddList {
-                        if ListRanking.isRanked(list.id) {
-                            Picker(selection: Binding(get: { canUseAI && quickAddUsesAI }, set: { quickAddUsesAI = $0 })) {
-                                Label("At the Bottom", systemImage: "arrow.down.to.line").tag(false)
-                                Label("Where AI Places It", systemImage: "sparkles").tag(true)
-                            } label: {
-                                Label("Placement", systemImage: "list.number")
-                            }
-                            .pickerStyle(.menu)
-                            .disabled(!canUseAI)
-                        }
-                        Button {
-                            choosingQuickAddList = true
-                        } label: {
-                            Label("Change List…", systemImage: "arrow.left.arrow.right")
-                        }
-                    }
-                } label: {
-                    Label("Quick Add", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
-                    Text(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Ask Each Time")
                 }
             }
             Section(profileDescription) {
@@ -745,40 +689,17 @@ private extension DiscoverView {
         .accessibilityHint("Brings back the last card you liked, disliked or skipped")
     }
 
-    // Quick Adds in one tap when a Quick Add list is set, otherwise asks which lists. A small bolt marks Quick Add
+    // Asks which lists the film goes in
     var addButton: some View {
         Button {
             addTopMovie()
         } label: {
             Image(systemName: "plus")
-                .overlay(alignment: .topTrailing) {
-                    if quickAddList != nil {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(Theme.accent)
-                            .offset(x: 7, y: -5)
-                    }
-                }
         }
         // Waits for a card, and for the last one to finish flying away
         .disabled(viewModel.topMovie == nil || isSwiping)
-        // With Quick Add on, touch and hold still lets one film go somewhere else. Also in the ••• menu
-        .contextMenu {
-            if let list = quickAddList {
-                Button {
-                    addTopMovie(forceAsk: true)
-                } label: {
-                    Label("Choose Lists for This Film…", systemImage: "list.bullet")
-                }
-                Button {
-                    setQuickAdd(false)
-                } label: {
-                    Label("Stop Quick Adding to \(list.name ?? "List")", systemImage: "bolt.slash")
-                }
-            }
-        }
-        .accessibilityLabel(quickAddList.map { "Quick Add to \($0.name ?? "your list")" } ?? "Add to a list")
-        .accessibilityHint(quickAddList == nil ? "Also tells Discover you like it" : "Touch and hold to choose lists. Also tells Discover you like it")
+        .accessibilityLabel("Add to a list")
+        .accessibilityHint("Also tells Discover you like it")
     }
 
     func circleButton(icon: String, size: CGFloat, style: AnyShapeStyle, caption: String? = nil, action: @escaping () -> Void) -> some View {
@@ -872,26 +793,9 @@ private extension DiscoverView {
         }
     }
 
-    // The list Quick Add sends films to, while it's on and the list still exists
-    var quickAddList: CDMovieList? {
-        guard quickAddOn else { return nil }
-        return movieLists.first { Int($0.id) == quickAddListID }
-    }
-
-    // Turning Quick Add on asks for its list the first time
-    func setQuickAdd(_ on: Bool) {
-        if !on {
-            quickAddOn = false
-        } else if movieLists.contains(where: { Int($0.id) == quickAddListID }) {
-            quickAddOn = true
-        } else {
-            choosingQuickAddList = true
-        }
-    }
-
-    // Lifts the card up and away and asks which list it goes in, unless Quick Add is on. Adding counts as a like.
+    // Lifts the card up and away and asks which list it goes in. Adding counts as a like.
     // Cancelling brings the card back.
-    func addTopMovie(forceAsk: Bool = false) {
+    func addTopMovie() {
         guard !isSwiping, let movie = viewModel.topMovie else { return }
         isSwiping = true
         Haptics.select()
@@ -899,42 +803,9 @@ private extension DiscoverView {
         withAnimation(.easeIn(duration: 0.22)) {
             dragOffset = CGSize(width: 0, height: -900)
         }
-        if !forceAsk, let list = quickAddList {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                pendingMovie = nil
-                quickAdd(movie, to: list)
-            }
-            return
-        }
-        // The Quick Add list was deleted, so go back to asking
-        if !forceAsk && quickAddOn { quickAddOn = false }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             showListPicker = true
         }
-    }
-
-    // Adds the film to the Quick Add list without the list picker or Compare: at the bottom,
-    // or wherever the AI places it when that's chosen
-    func quickAdd(_ movie: Movie, to list: CDMovieList) {
-        withAnimation(Theme.spring) {
-            viewModel.add(movie, to: [list], context: context) { added in
-                if let only = added.first {
-                    let name = only.list.name ?? "your list"
-                    if canUseAI && quickAddUsesAI && ListRanking.isRanked(list.id) && only.list.movies.count > 1 {
-                        ListViewModel(movieList: only.list, context: context).smartPlace(only.movie) { message in
-                            showToast("\(message) in \(name)")
-                        }
-                    } else {
-                        showToast("Added to \(name) at #\(only.movie.rank)")
-                    }
-                } else {
-                    showToast("Couldn't add \(movie.title). Try again.")
-                }
-            }
-            dragOffset = .zero
-            showDetails = false
-        }
-        isSwiping = false
     }
 
     func addToSelectedLists(_ lists: [CDMovieList]) {
