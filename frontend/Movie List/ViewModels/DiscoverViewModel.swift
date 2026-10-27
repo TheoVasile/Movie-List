@@ -433,6 +433,13 @@ class DiscoverViewModel: ObservableObject {
     // Bumped whenever the deck starts over, so films from a load started before then are ignored
     private var loadGeneration = 0
 
+    /// Quick Add was removed from Discover. Forgets its settings from earlier builds
+    static func forgetQuickAdd() {
+        for key in ["discoverQuickAdd", "discoverQuickAddListID", "discoverQuickAddUsesAI"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
     init() {
         passedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? [], limit: Self.passedLimit)
         dislikedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.dislikedKey) as? [Int] ?? [], limit: Self.dislikedLimit)

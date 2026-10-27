@@ -2,7 +2,7 @@ const { DataSet, RegExpMatcher, englishDataset, englishRecommendedTransformers, 
 const terms = require("../moderation/terms.json");
 const allowlist = require("../moderation/allowlist.json");
 
-// Finds slurs and offensive words in text people write: names, @usernames, list names, notes and messages. Film
+// Finds slurs and other listed words in text people write: names, @usernames, list names, notes and messages. Film
 // titles, overviews and anything else from TMDb are never checked. The words are data (moderation/terms.json and
 // moderation/allowlist.json), on top of the obscenity package's English list, which also sees through leetspeak
 // (sh1t), look-alike letters, repeated letters and words hidden inside others (Scunthorpe)
@@ -10,17 +10,30 @@ const allowlist = require("../moderation/allowlist.json");
 const SEVERITIES = ["low", "medium", "high"];
 const atLeast = (severity, minimum) => SEVERITIES.indexOf(severity) >= SEVERITIES.indexOf(minimum);
 
-// What each kind of text does with a match at or above its severity. Names everyone sees are blocked on save,
-// with a message the app shows by the field. Free text is saved but flagged: hidden from everyone but its author
-// until someone reviews it. Only @usernames are checked against the reserved names
+// The lowest severity each kind of text acts on: the whole policy, in one place. Only slurs, hate and harassment
+// ("high" in moderation/terms.json) are acted on, everywhere. Profanity and sexual words ("low" and "medium") are
+// allowed, even in @usernames; terms.json keeps their severities so this can be retuned without relisting words
+const THRESHOLDS = {
+    handle: "high",
+    display_name: "high",
+    list_name: "high",
+    list_description: "high",
+    group_name: "high",
+    note: "high",
+    recommendation_note: "high",
+};
+
+// What each kind of text does with a match. Names everyone sees are blocked on save, with a message the app shows
+// by the field. Free text is saved but flagged: hidden from everyone but its author until someone reviews it. Only
+// @usernames are checked against the reserved names
 const FIELDS = {
-    handle: { action: "block", severity: "low", reserved: true, message: "That username isn't allowed. Try another one." },
-    display_name: { action: "block", severity: "medium", message: "That name isn't allowed. Try another one." },
-    list_name: { action: "block", severity: "medium", message: "That list name isn't allowed. Try another one." },
-    list_description: { action: "block", severity: "medium", message: "That description isn't allowed. Try rewording it." },
-    group_name: { action: "block", severity: "medium", message: "That group name isn't allowed. Try another one." },
-    note: { action: "flag", severity: "high" },
-    recommendation_note: { action: "flag", severity: "high" },
+    handle: { action: "block", reserved: true, message: "That username isn't allowed. Try another one." },
+    display_name: { action: "block", message: "That name isn't allowed. Try another one." },
+    list_name: { action: "block", message: "That list name isn't allowed. Try another one." },
+    list_description: { action: "block", message: "That description isn't allowed. Try rewording it." },
+    group_name: { action: "block", message: "That group name isn't allowed. Try another one." },
+    note: { action: "flag" },
+    recommendation_note: { action: "flag" },
 };
 const RESERVED_MESSAGE = "That username is reserved. Try another one.";
 
@@ -41,7 +54,9 @@ function buildMatcher(extraTerms, allowed) {
         ...englishRecommendedTransformers,
     });
     const ours = new Map(extraTerms.map((term) => [term.word, term]));
-    // Each matched word's category and severity
+    // Each matched word's category and severity. obscenity's dataset only names the word it matched, with no category,
+    // so ours come from terms.json; a word it adds in a later version that isn't listed there gets datasetDefault,
+    // which is never acted on until someone lists it as a slur
     const describe = (word) => {
         const info = terms.dataset[word] ?? ours.get(word) ?? terms.datasetDefault;
         return { word, category: info.category, severity: info.severity };
@@ -97,7 +112,7 @@ function check(field, text) {
     if (policy.reserved && isReservedHandle(text)) {
         return { action: "block", category: "reserved", reason: "impersonation", words: [], message: RESERVED_MESSAGE };
     }
-    const hits = findTerms(text).filter((hit) => atLeast(hit.severity, policy.severity));
+    const hits = findTerms(text).filter((hit) => atLeast(hit.severity, THRESHOLDS[field]));
     if (!hits.length) return { action: "ok" };
     const worst = hits.reduce((a, b) => (SEVERITIES.indexOf(b.severity) > SEVERITIES.indexOf(a.severity) ? b : a));
     return {
@@ -125,4 +140,4 @@ function reviewStatus(field, text) {
     return result.action === "flag" ? { status: "flagged", reason: result.reason } : { status: "ok" };
 }
 
-module.exports = { FIELDS, findTerms, isReservedHandle, check, blockedField, reviewStatus, addOverlay };
+module.exports = { FIELDS, THRESHOLDS, findTerms, isReservedHandle, check, blockedField, reviewStatus, addOverlay };
