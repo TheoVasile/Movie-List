@@ -14,6 +14,7 @@
 		FEB4C3E214BAC4DAB0DA6648 /* DiscoverReactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */; };
 		50D932EF1D418A6BC2B2ABB1 /* RecommendFilmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */; };
 		FF89BCFCD41C9BFC876BC376 /* FriendActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA05728CC1710E3CCE770DC9 /* FriendActivityView.swift */; };
+		E7A0D5C12F00000000000002 /* ExpandableText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A0D5C12F00000000000001 /* ExpandableText.swift */; };
 		FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000003 /* MovieDetailView.swift */; };
 		5D088339E18215A3DB4B0E7C /* EpisodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1886A9B87641D3ECB3F2172C /* EpisodesView.swift */; };
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
@@ -142,6 +143,7 @@
 		D90F1F5C4CE68D1DB927F4DE /* DiscoverReactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverReactionsView.swift; sourceTree = "<group>"; };
 		A96C33DF167EB40653FBBC56 /* RecommendFilmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendFilmSheet.swift; sourceTree = "<group>"; };
 		EA05728CC1710E3CCE770DC9 /* FriendActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendActivityView.swift; sourceTree = "<group>"; };
+		E7A0D5C12F00000000000001 /* ExpandableText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandableText.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000003 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
 		1886A9B87641D3ECB3F2172C /* EpisodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodesView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
@@ -347,6 +349,7 @@
 				FAE62ED32970D5C5000654E1 /* AddMovieView.swift */,
 				FAFF24F52BE687A000C4F78D /* MovieRow.swift */,
 				FAD23A742D52011600EACB94 /* MovieCard.swift */,
+				E7A0D5C12F00000000000001 /* ExpandableText.swift */,
 				FA7E5A012F00000000000003 /* MovieDetailView.swift */,
 				1886A9B87641D3ECB3F2172C /* EpisodesView.swift */,
 				FA7E5A012F0000000000000C /* DiscoverView.swift */,
@@ -631,6 +634,7 @@
 				FA6F64C929F88B6E00B418DB /* NetworkService.swift in Sources */,
 				FAE62ED02970CF5A000654E1 /* List.swift in Sources */,
 				FAE62ECE2970BBE9000654E1 /* Extensions.swift in Sources */,
+				E7A0D5C12F00000000000002 /* ExpandableText.swift in Sources */,
 				FA7E5A012F00000000000004 /* MovieDetailView.swift in Sources */,
 				5D088339E18215A3DB4B0E7C /* EpisodesView.swift in Sources */,
 				FA7E5A012F00000000000002 /* Theme.swift in Sources */,

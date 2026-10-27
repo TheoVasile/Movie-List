@@ -26,7 +26,6 @@ struct MovieDetailView: View {
     @State private var placementApproved = false
 
     @State private var revealed = false
-    @State private var overviewExpanded = false
     @State private var editingNote = false
     @State private var friendTakes: [FriendTake] = []
     @State private var imdbID: String? = nil
@@ -243,25 +242,9 @@ struct MovieDetailView: View {
         .frame(height: 380)
     }
 
+    // Clamped to four lines, with More / Show less when it's actually cut off
     private func overviewSection(_ overview: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(overview)
-                .font(.body)
-                .foregroundColor(Theme.textSecondary)
-                .lineSpacing(4)
-                .lineLimit(overviewExpanded ? nil : 4)
-                .fixedSize(horizontal: false, vertical: true)
-            // Only offered when the overview is long enough to have been cut short
-            if overview.count > 220 {
-                Button(overviewExpanded ? "Less" : "More") {
-                    Haptics.tap()
-                    withAnimation(Theme.spring) { overviewExpanded.toggle() }
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(Theme.accent)
-                .buttonStyle(.plain)
-            }
-        }
+        ExpandableText(text: overview, lineLimit: 4)
     }
 
     // Sends the film to friends, like the trailer button beside it
