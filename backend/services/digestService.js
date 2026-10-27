@@ -13,7 +13,9 @@ const filmLabel = (row) => (yearOf(row.release_date) ? `${row.title} (${yearOf(r
 /// What the people a user follows did recently (the last day by default, for the digest; the in-app feed asks for
 /// longer): films they watched, rewatched and added to a list, newest first, with whether each film is in one of
 /// the user's own lists (and if so whether it's their watchlist), and the film's details for opening it
-async function fetchFriendActivity(user_id, { days = 1, limit = 500 } = {}) {
+/// perFriend (optional) caps how many of each friend's most recent events are returned, so one prolific friend
+/// can't use up the whole limit and push everyone else out
+async function fetchFriendActivity(user_id, { days = 1, limit = 500, perFriend = null } = {}) {
     const since = `${Math.min(Math.max(Math.round(days * 24), 1), 24 * 60)} hours`;
     const result = await pool.query(
         `WITH friends AS (
@@ -46,16 +48,19 @@ async function fetchFriendActivity(user_id, { days = 1, limit = 500 } = {}) {
              WHERE l.user_id IN (SELECT id FROM friends) AND lm.added_at > NOW() - $2::interval
                AND l.visibility <> 'private'
                AND (l.user_id, date_trunc('second', lm.added_at)) NOT IN (SELECT user_id, at FROM bulk_added)
+         ), numbered AS (
+             SELECT *, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY at DESC) AS nth FROM events
          )
          SELECT e.kind, e.rank, e.list_name, e.at, fr.name AS friend, fr.handle, fr.avatar_version, m.title, m.release_date,
                 m.tmdb_id, m.poster_path, m.overview, m.original_language, m.popularity,
                 (SELECT ml.name FROM lists ml JOIN list_movies mlm ON mlm.list_id = ml.id
                  WHERE ml.user_id = $1 AND mlm.movie_id = e.movie_id
                  ORDER BY (ml.name ILIKE '%watch%') DESC LIMIT 1) AS my_list
-         FROM events e JOIN friends fr ON fr.id = e.user_id JOIN movies m ON m.id = e.movie_id
+         FROM numbered e JOIN friends fr ON fr.id = e.user_id JOIN movies m ON m.id = e.movie_id
+         WHERE $4::int IS NULL OR e.nth <= $4::int
          ORDER BY e.at DESC
          LIMIT $3`,
-        [user_id, since, limit]
+        [user_id, since, limit, perFriend]
     );
     return result.rows;
 }

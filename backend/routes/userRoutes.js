@@ -711,11 +711,12 @@ router.get("/search", async (req, res) => {
 });
 
 // What the people the user follows watched, rewatched and added to their lists lately, newest first, e.g.
-// ?days=14 (1 to 30). Each entry has the friend, the film (with what the app needs to open it) and when
+// ?days=14 (1 to 30). Each entry has the friend, the film (with what the app needs to open it) and when. At most
+// 60 of each friend's latest are included so one busy friend can't crowd everyone else out (the app groups them)
 router.get("/me/activity", async (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 30);
     try {
-        const rows = await fetchFriendActivity(req.user.uid, { days, limit: 200 });
+        const rows = await fetchFriendActivity(req.user.uid, { days, limit: 200, perFriend: 60 });
         res.json(rows.filter((row) => row.handle).map((row) => ({
             kind: row.kind,
             rank: row.rank,
