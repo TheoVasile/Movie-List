@@ -45,7 +45,7 @@ enum AppAnalytics {
         case filmRanked(RankMethod)
         case filmWatched(WatchSource)
         case aiPickUsed(AIFeature)
-        // A Discover card liked, disliked or skipped, and whether AI Picks was choosing the cards
+        // A Discover card added to a list, marked Not for Me or skipped, and whether AI Picks was choosing the cards
         case discoverSwipe(DiscoverReaction, ai: Bool)
         case recommendationSent(recipients: Int)
         case theatreCheckInOpened
@@ -105,7 +105,7 @@ enum AppAnalytics {
             case .discoverSwipe(let reaction, let ai):
                 let direction: String
                 switch reaction {
-                case .liked: direction = "like"
+                case .liked: direction = "add"
                 case .disliked: direction = "dislike"
                 case .skipped: direction = "skip"
                 }

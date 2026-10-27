@@ -219,17 +219,66 @@ struct DiscoverFilters: Codable, Equatable {
 
 /// How the user responded to a Discover card
 enum DiscoverReaction {
-    // Swiped right or tapped the heart. Adding a film to a list from Discover counts as a like too
+    // Added it to a list from Discover: swiped right, or tapped Add. Likes from earlier builds, which had a
+    // like button, are kept as likes too
     case liked
-    // Tapped Skip: "haven't seen it" or "not sure", which says nothing about their taste
+    // Swiped left or tapped Skip: "haven't seen it" or "not sure", which says nothing about their taste
     case skipped
-    // Swiped left or tapped ✕
+    // Tapped Not for Me
     case disliked
 }
 
-/// What Discover has learned from the user's likes and dislikes. Kept on this device only, as TMDb film ids,
-/// a score per genre (liking a film raises its genres' scores, disliking it lowers them; skips are never
-/// recorded) and the titles of recent likes and dislikes, which AI Discover uses when the user's lists are empty
+/// Discover's Quick Add: swiping right (or Add) sends the film straight to one chosen list, instead of asking which
+/// lists each time. Asked about the first time Discover opens. Settings belong to the account
+enum QuickAdd {
+    static let onKey = "discoverQuickAdd"
+    static let listIDKey = "discoverQuickAddListID"
+    static let placementKey = "discoverQuickAddPlacement"
+    // Whether the user has chosen between Quick Add and asking each time. Builds that removed Quick Add cleared
+    // its settings, so everyone who used it then is asked again
+    static let askedKey = "discoverQuickAddAsked"
+
+    /// Where a Quick Added film goes in a ranked list. Unranked lists just put it at the end
+    enum Placement: String, CaseIterable, Identifiable {
+        case bottom, ai, compare
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .bottom: return "At the Bottom"
+            case .ai: return "Where AI Places It"
+            case .compare: return "Compare to Place It"
+            }
+        }
+
+        var explanation: String {
+            switch self {
+            case .bottom: return "Fastest. Rank it later from the list"
+            case .ai: return "AI picks its spot from the films around it"
+            case .compare: return "A few quick head-to-heads after each add"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .bottom: return "arrow.down.to.line"
+            case .ai: return "sparkles"
+            case .compare: return "arrow.left.arrow.right"
+            }
+        }
+    }
+
+    /// The list to suggest the first time: one that looks like a watchlist, if there is one
+    static func suggestedList(in lists: [CDMovieList]) -> CDMovieList? {
+        let names = ["watchlist", "watch list", "to watch", "to-watch", "want to watch"]
+        return lists.first { list in names.contains { (list.name ?? "").localizedCaseInsensitiveContains($0) } }
+    }
+}
+
+/// What Discover has learned from the user's likes (films added from Discover) and dislikes (Not for Me). Kept
+/// on this device only, as TMDb film ids, a score per genre (liking a film raises its genres' scores, disliking it
+/// lowers them; skips are never recorded) and the titles of recent likes and dislikes, which AI Discover uses when the user's lists are empty
 struct TasteProfile: Codable {
     struct RecentFilm: Codable, Equatable {
         let title: String
@@ -410,8 +459,23 @@ class DiscoverViewModel: ObservableObject {
     // The genres the lists Discover is based on have most of, top first. Used as Automatic's genres until the
     // swipes have taught it some
     @Published private(set) var listGenres: [Int] = []
-    // Recent likes, dislikes and skips, newest last, so they can be undone. Adding to a list isn't undone here
-    @Published private(set) var undoHistory: [(movie: Movie, reaction: DiscoverReaction, profile: TasteProfile)] = []
+    /// One card added, disliked or skipped, with what's needed to take it back
+    struct UndoStep {
+        let id = UUID()
+        let movie: Movie
+        let reaction: DiscoverReaction
+        // The taste profile from before, put back on undo
+        let profile: TasteProfile
+        // For an add: whether the film was already liked, so undo leaves that older like alone, and the copy it
+        // got in each list, which undo takes back out
+        var wasLiked = false
+        var added: [(list: CDMovieList, movie: CDMovie)] = []
+    }
+
+    // Recent adds, dislikes and skips, newest last, so they can be undone
+    @Published private(set) var undoHistory: [UndoStep] = []
+    // Adds still waiting on the server. Undo waits for them, so it never takes back a film that hasn't landed yet
+    @Published private(set) var addsInFlight = 0
     private static let undoLimit = 20
     // How many skipped, disliked and liked films are remembered, most recent kept
     static let passedLimit = 2000
@@ -432,13 +496,6 @@ class DiscoverViewModel: ObservableObject {
     private static let savedDeckLimit = 30
     // Bumped whenever the deck starts over, so films from a load started before then are ignored
     private var loadGeneration = 0
-
-    /// Quick Add was removed from Discover. Forgets its settings from earlier builds
-    static func forgetQuickAdd() {
-        for key in ["discoverQuickAdd", "discoverQuickAddListID", "discoverQuickAddUsesAI"] {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
 
     init() {
         passedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.passedKey) as? [Int] ?? [], limit: Self.passedLimit)
@@ -529,7 +586,7 @@ class DiscoverViewModel: ObservableObject {
         refillIfNeeded()
     }
 
-    /// Swiped left or ✕: Classic avoids the film's genres once they add up, and the AI steers away from films like it
+    /// Not for Me: Classic avoids the film's genres once they add up, and the AI steers away from films like it
     func dislike(_ movie: Movie) {
         remember(movie, .disliked)
         deck.removeAll { $0.id == movie.id }
@@ -541,16 +598,8 @@ class DiscoverViewModel: ObservableObject {
         refillIfNeeded()
     }
 
-    /// Swiped right or the heart: tells Discover the user likes this film without adding it to a list. The AI
-    /// gets it as a liked film and Classic bases its next batches on it
-    func like(_ movie: Movie) {
-        remember(movie, .liked)
-        deck.removeAll { $0.id == movie.id }
-        markLiked(movie)
-        logSwipe(.liked)
-        refillIfNeeded()
-    }
-
+    // Adding a film from Discover is how the user likes it: the AI gets it as a liked film, and Classic leans
+    // towards its genres and bases its next batches on it
     private func markLiked(_ movie: Movie) {
         likedIDs.insert(movie.id)
         UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
@@ -562,18 +611,23 @@ class DiscoverViewModel: ObservableObject {
         AppAnalytics.log(.discoverSwipe(reaction, ai: usesAI))
     }
 
-    /// Adds the film to every chosen list at once. It counts as one like, however many lists it goes in, and
-    /// none if it was already liked. Removes the card straight away and calls back with the lists it was added
-    /// to and the new copy in each, in the order given; if every add fails, the card and the like are taken back
+    /// Adds the film to every chosen list at once, however it was added from Discover: a swipe right, Add, or Add
+    /// to Lists on its full details. It counts as one like, however many lists it goes in, and none if it was
+    /// already liked. Removes the card straight away and calls back with the lists it was added to and the new copy
+    /// in each, in the order given; if every add fails, the card and the like are taken back
     func add(_ movie: Movie, to lists: [CDMovieList], context: NSManagedObjectContext, completion: @escaping ([(list: CDMovieList, movie: CDMovie)]) -> Void) {
-        // Undo goes back through likes, dislikes and skips; once a film is added, the ones before it can't be undone
-        undoHistory = []
         deck.removeAll { $0.id == movie.id }
         listedIDs.insert(movie.id)
         let alreadyLiked = likedIDs.contains(movie.id)
         let profileBefore = profile
+        var step = UndoStep(movie: movie, reaction: .liked, profile: profileBefore, wasLiked: alreadyLiked)
+        undoHistory.append(step)
+        if undoHistory.count > Self.undoLimit { undoHistory.removeFirst() }
+        addsInFlight += 1
         if !alreadyLiked { markLiked(movie) }
         refillIfNeeded()
+        // Lists the film was already in keep it on undo; only the copies made here are taken back out
+        let alreadyIn = Set(lists.filter { list in list.movies.contains { Int64($0.tmdb_id) == movie.id } }.map(\.id))
 
         var added: [Int: CDMovie] = [:]
         let group = DispatchGroup()
@@ -585,16 +639,24 @@ class DiscoverViewModel: ObservableObject {
             }
         }
         group.notify(queue: .main) {
-            if added.isEmpty {
+            self.addsInFlight -= 1
+            let done = lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } }
+            if done.isEmpty {
+                self.undoHistory.removeAll { $0.id == step.id }
                 withAnimation(Theme.spring) {
                     self.listedIDs.remove(movie.id)
                     self.deck.insert(movie, at: 0)
                 }
                 if !alreadyLiked { self.forgetLike(movie, profile: profileBefore) }
             } else {
+                if let index = self.undoHistory.firstIndex(where: { $0.id == step.id }) {
+                    step.added = done.filter { !alreadyIn.contains($0.list.id) }
+                    self.undoHistory[index] = step
+                }
                 AppAnalytics.log(.filmAdded(.discover))
+                self.logSwipe(.liked)
             }
-            completion(lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } })
+            completion(done)
         }
     }
 
@@ -640,28 +702,53 @@ class DiscoverViewModel: ObservableObject {
     }
 
     private func remember(_ movie: Movie, _ reaction: DiscoverReaction) {
-        undoHistory.append((movie, reaction, profile))
+        undoHistory.append(UndoStep(movie: movie, reaction: reaction, profile: profile))
         if undoHistory.count > Self.undoLimit { undoHistory.removeFirst() }
     }
 
-    var canUndo: Bool { !undoHistory.isEmpty }
+    var canUndo: Bool { !undoHistory.isEmpty && addsInFlight == 0 }
 
-    /// Brings back the last liked, disliked or skipped card, on top, as if it was never swiped
-    func undo() {
-        guard let last = undoHistory.popLast() else { return }
+    /// Brings back the last added, disliked or skipped card, on top, as if it was never swiped. An add is also
+    /// taken back out of the lists it went into; calls back with the names of any lists that couldn't let it go
+    func undo(couldNotRemove: @escaping ([String]) -> Void = { _ in }) {
+        guard addsInFlight == 0, let last = undoHistory.popLast() else { return }
         passedIDs.remove(last.movie.id)
         dislikedIDs.remove(last.movie.id)
-        likedIDs.remove(last.movie.id)
+        // Adding a film liked before leaves that older like in place
+        let keepsLike = last.reaction == .liked && last.wasLiked
+        if !keepsLike { likedIDs.remove(last.movie.id) }
         UserDefaults.standard.set(passedIDs.stored, forKey: Self.passedKey)
         UserDefaults.standard.set(dislikedIDs.stored, forKey: Self.dislikedKey)
         UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
-        if last.reaction != .skipped { DiscoverReactions.shared.remove(last.movie.id) }
+        if last.reaction != .skipped && !keepsLike { DiscoverReactions.shared.remove(last.movie.id) }
+        if last.reaction == .liked {
+            listedIDs.remove(last.movie.id)
+            removeCopies(last.added, couldNotRemove: couldNotRemove)
+        }
         profile = last.profile
         if let data = try? JSONEncoder().encode(profile) {
             UserDefaults.standard.set(data, forKey: Self.profileKey)
         }
         deck.removeAll { $0.id == last.movie.id }
         deck.insert(last.movie, at: 0)
+    }
+
+    // Takes an undone add back out of each list it went into. The lists sync once it's gone, which leaves the card
+    // in place, since the film is no longer listed
+    private func removeCopies(_ copies: [(list: CDMovieList, movie: CDMovie)], couldNotRemove: @escaping ([String]) -> Void) {
+        var failed: [String] = []
+        let group = DispatchGroup()
+        for copy in copies {
+            guard let context = copy.list.managedObjectContext, !copy.movie.isDeleted else { continue }
+            group.enter()
+            ListViewModel(movieList: copy.list, context: context).removeMovie(copy.movie) { removed in
+                if !removed { failed.append(copy.list.name ?? "your list") }
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            if !failed.isEmpty { couldNotRemove(failed) }
+        }
     }
 
     /// Limits Discover by language, streaming service or list (empty to show everything). Starts the deck over

@@ -186,36 +186,43 @@ class ListViewModel: ObservableObject {
     
     func deleteMovie(at offsets: IndexSet) {
         for index in offsets {
-            let poppedMovie = movies[index]
-            APIService.shared.removeMovieFromList(list_id: movieList.id, movie_id: poppedMovie.id) { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success:
-                        if let managedObjectContext = poppedMovie.managedObjectContext {
-                            if self.recommendedMovie == poppedMovie {
-                                self.recommendedMovie = nil
-                            }
-                            managedObjectContext.delete(poppedMovie)
-                            withAnimation(Theme.spring) {
-                                // The deleted object can linger in the relationship until save, so remove it by identity
-                                self.movies = Array(self.movieList.movies)
-                                    .filter { $0 != poppedMovie }
-                                    .sorted(by: { $0.rank < $1.rank })
-                                for (i, m) in self.movies.enumerated() {
-                                    m.rank = Int32(i+1)
-                                }
-                            }
-                            self.movieList.movies = Set(self.movies)
-                            do {
-                                try managedObjectContext.save()
-                                try self.context.save()
-                            } catch {
-                                print("Error saving Core Data:", error)
+            removeMovie(movies[index])
+        }
+    }
+
+    /// Takes one film off the list on the server, then here, closing the gap it leaves. Calls back on the main
+    /// thread with whether it was removed
+    func removeMovie(_ poppedMovie: CDMovie, completion: @escaping (Bool) -> Void = { _ in }) {
+        APIService.shared.removeMovieFromList(list_id: movieList.id, movie_id: poppedMovie.id) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    if let managedObjectContext = poppedMovie.managedObjectContext {
+                        if self.recommendedMovie == poppedMovie {
+                            self.recommendedMovie = nil
+                        }
+                        managedObjectContext.delete(poppedMovie)
+                        withAnimation(Theme.spring) {
+                            // The deleted object can linger in the relationship until save, so remove it by identity
+                            self.movies = Array(self.movieList.movies)
+                                .filter { $0 != poppedMovie }
+                                .sorted(by: { $0.rank < $1.rank })
+                            for (i, m) in self.movies.enumerated() {
+                                m.rank = Int32(i+1)
                             }
                         }
-                    case .failure(let error):
-                        print("Error deleting:", error)
+                        self.movieList.movies = Set(self.movies)
+                        do {
+                            try managedObjectContext.save()
+                            try self.context.save()
+                        } catch {
+                            print("Error saving Core Data:", error)
+                        }
                     }
+                    completion(true)
+                case .failure(let error):
+                    print("Error deleting:", error)
+                    completion(false)
                 }
             }
         }

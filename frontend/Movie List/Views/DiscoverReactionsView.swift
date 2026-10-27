@@ -9,8 +9,8 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Films the user liked (swiped right, the heart, or added from Discover) or disliked (swiped left or ✕) in
-/// Discover, newest first. Kept on this device, like the rest of what Discover learns
+/// Films the user liked (added to a list from Discover, or liked with the heart in earlier builds) or disliked (Not
+/// for Me) in Discover, newest first. Kept on this device, like the rest of what Discover learns
 final class DiscoverReactions: ObservableObject {
     static let shared = DiscoverReactions()
 
@@ -112,8 +112,8 @@ struct DiscoverReactionsView: View {
             .listRowSeparator(.hidden)
             if entries.isEmpty {
                 Text(showingLiked
-                     ? "Swipe a Discover card right, or tap the heart, to like a film without adding it to a list. Discover will recommend more like it."
-                     : "Films you swipe left on, or ✕, in Discover show up here, and Discover shows fewer like them.")
+                     ? "Films you add to a list from Discover, by swiping right or tapping Add, show up here, and Discover recommends more like them."
+                     : "Films you mark Not for Me in Discover show up here, and Discover shows fewer like them.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -131,7 +131,7 @@ struct DiscoverReactionsView: View {
                     }
                 } footer: {
                     Text(showingLiked
-                         ? "Discover recommends more films like these. Use ⋮ or swipe left on one to unlike it."
+                         ? "Discover recommends more films like these. Use ⋮ or swipe left on one to unlike it; it stays in your lists."
                          : "Discover shows fewer films like these. Use ⋮ or swipe left on one to let it come back.")
                         .font(.caption)
                         .foregroundColor(Theme.textTertiary)

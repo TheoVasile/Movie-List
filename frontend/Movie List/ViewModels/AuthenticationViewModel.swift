@@ -290,10 +290,11 @@ extension AuthenticationViewModel {
     // AI and personalization
     Personalization.aiAllowedKey, Personalization.useAIKey, Personalization.aiConsentAskedKey,
     Personalization.ageRangeKey, Personalization.birthdayKey, Personalization.pronounsKey, "personalization.gender",
-    // Discover: taste profile, reactions, deck and filters
+    // Discover: taste profile, reactions, deck, filters and Quick Add
     DiscoverViewModel.profileKey, DiscoverViewModel.likedKey, DiscoverViewModel.dislikedKey,
     "discover.passedMovieIDs", "discover.genreFilter", "discover.filters", "discover.kind", "discover.savedDeck",
     "discover.likedFilms", "discover.dislikedFilms",
+    QuickAdd.onKey, QuickAdd.listIDKey, QuickAdd.placementKey, QuickAdd.askedKey,
     // Lists and their sharing, and cached film details
     "unrankedLists", "listVisibility", "aiPlacedFilms", "listSharing",
     "movieInfoCache", "genreCache", "imdbIDs", "filmographies",

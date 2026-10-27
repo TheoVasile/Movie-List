@@ -43,6 +43,18 @@ struct DiscoverView: View {
     // Streaming services in the user's country, loaded when the filters open
     @State private var services: [StreamingService] = []
     @State private var showReactions = false
+    // Quick Add sends films swiped right, or added with Add, straight to one list, without asking which lists
+    @AppStorage(QuickAdd.onKey) private var quickAddOn = false
+    @AppStorage(QuickAdd.listIDKey) private var quickAddListID = 0
+    // Where Quick Add puts the film in a ranked list: at the bottom, where the AI places it, or with Compare
+    @AppStorage(QuickAdd.placementKey) private var quickAddPlacement = QuickAdd.Placement.bottom
+    @AppStorage(QuickAdd.askedKey) private var quickAddAsked = false
+    @State private var choosingQuickAddList = false
+    // The first-visit prompt, and the list picked in it (nil for choosing each time). Until a row is tapped, the
+    // suggested list is picked
+    @State private var showQuickAddWelcome = false
+    @State private var welcomePick: Int64? = nil
+    @State private var welcomeTouched = false
 
     private let swipeThreshold: CGFloat = 110
 
@@ -80,11 +92,11 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Undo, Add and the ••• menu in one item, so they never collapse into an overflow menu
+                // Undo and the ••• menu in one item, so they never collapse into an overflow menu. Add lives under
+                // the card with Not for Me and Skip, so it isn't repeated here
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         undoButton
-                        addButton
                         optionsMenu
                     }
                     .fixedSize()
@@ -99,12 +111,30 @@ struct DiscoverView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $choosingQuickAddList) {
+            ListPickerSheet(title: "Films you swipe right on", posterPath: nil, singleChoice: true) { lists in
+                guard let list = lists.first else { return }
+                quickAddListID = Int(list.id)
+                quickAddOn = true
+                quickAddAsked = true
+                showToast("Quick Add to \(list.name ?? "your list") is on")
+            }
+            .environmentObject(authViewModel)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(item: $fullDetails) { preview in
-            // Add to Lists closes the info screen and asks which lists
+            // Add to Lists closes the info screen and asks which lists, even with Quick Add on
             MovieDetailView(movie: preview, onAddToLists: {
                 fullDetails = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { addTopMovie() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { addTopMovie(forceAsk: true) }
             })
+        }
+        // Has to be answered: there's no swiping it away, since swiping right needs to know where films go
+        .sheet(isPresented: $showQuickAddWelcome) {
+            quickAddWelcome
+                .presentationDetents([.large])
+                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $showReactions) {
             NavigationStack {
@@ -131,7 +161,13 @@ struct DiscoverView: View {
         .onChange(of: showingAIPicks) { _ in
             withAnimation(Theme.spring) { viewModel.sourceChanged() }
         }
-        .onAppear(perform: syncWithLists)
+        .onAppear {
+            syncWithLists()
+            askAboutQuickAddIfNeeded()
+        }
+        // The Quick Add prompt waits for the AI question to be answered first
+        .onChange(of: aiConsentAsked) { _ in askAboutQuickAddIfNeeded() }
+        .onChange(of: aiAllowed) { _ in askAboutQuickAddIfNeeded() }
         .onChange(of: listedIDs) { _ in syncWithLists() }
         .onChange(of: viewModel.filters.listIDs) { _ in syncWithLists() }
     }
@@ -263,7 +299,8 @@ private extension DiscoverView {
         showToast(useAI ? "AI Picks on" : "Classic recommendations from TMDb")
     }
 
-    // Everything else Discover offers, in one menu: where recommendations come from and what it has learned
+    // Everything else Discover offers, in one menu: where recommendations come from, where added films go, and
+    // what it has learned
     var optionsMenu: some View {
         Menu {
             // Under-18s only ever get Classic, so the choice isn't shown to them
@@ -274,6 +311,49 @@ private extension DiscoverView {
                         Label("Classic", systemImage: "film").tag(false)
                     }
                     .pickerStyle(.inline)
+                }
+            }
+            Section("Adding Films") {
+                Menu {
+                    Picker("When You Swipe Right", selection: Binding(get: { quickAddList != nil }, set: setQuickAdd)) {
+                        Label("Ask Each Time", systemImage: "list.bullet").tag(false)
+                        Label(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Quick Add…", systemImage: "bolt").tag(true)
+                    }
+                    .pickerStyle(.inline)
+                    Button {
+                        choosingQuickAddList = true
+                    } label: {
+                        Label(quickAddList == nil ? "Choose Quick Add List…" : "Change List…", systemImage: "arrow.left.arrow.right")
+                    }
+                } label: {
+                    Label("Quick Add", systemImage: quickAddList == nil ? "plus" : "bolt.fill")
+                    Text(quickAddList.map { "Quick Add to \($0.name ?? "List")" } ?? "Ask Each Time")
+                }
+                // Only ranked lists have an order to place the film in
+                if let list = quickAddList, ListRanking.isRanked(list.id) {
+                    Menu {
+                        ForEach(QuickAdd.Placement.allCases) { option in
+                            Button {
+                                quickAddPlacement = option
+                            } label: {
+                                Label(option.title, systemImage: placement == option ? "checkmark" : option.icon)
+                                Text(option == .ai && !canUseAI ? "Allow AI features in Settings to use this" : option.explanation)
+                            }
+                            .disabled(option == .ai && !canUseAI)
+                        }
+                    } label: {
+                        Label("Placement", systemImage: "list.number")
+                        Text(placement.title)
+                    }
+                }
+                // Also on a long press of Add, and Add to Lists on the film's full details
+                if quickAddList != nil {
+                    Button {
+                        addTopMovie(forceAsk: true)
+                    } label: {
+                        Label("Choose Lists for This Film…", systemImage: "list.bullet")
+                    }
+                    .disabled(viewModel.topMovie == nil || isSwiping)
                 }
             }
             Section(profileDescription) {
@@ -297,15 +377,16 @@ private extension DiscoverView {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
-        .disabled(isSwiping)
+        .disabled(isSwiping || ranking != nil)
         .accessibilityLabel("Discover Options")
         .accessibilityHint(sourceDescription)
     }
 
+    // Counts films added from Discover and marked Not for Me. Skips teach it nothing
     var profileDescription: String {
-        let swipes = viewModel.profile.swipeCount
-        guard swipes > 0 else { return "Like or dislike films to teach Discover your taste" }
-        return "Learned from \(swipes) \(swipes == 1 ? "swipe" : "swipes")"
+        let films = viewModel.profile.swipeCount
+        guard films > 0 else { return "Add films or mark them Not for Me to teach Discover your taste" }
+        return "Learned from \(films) \(films == 1 ? "film" : "films")"
     }
 
     // Which genres Discover is showing: the ones picked by the user, or what their swipes have taught it.
@@ -601,13 +682,13 @@ private extension DiscoverView {
         min(abs(dragOffset.width) / swipeThreshold, 1)
     }
 
-    // Fade in as the card is dragged, so it's clear which way likes and which way dislikes
+    // Fade in as the card is dragged, so it's clear which way adds (and to which list) and which way skips
     var swipeStamps: some View {
         ZStack {
-            stamp("LIKE", icon: "heart.fill", color: Theme.accent, rotation: -14)
+            stamp(quickAddList.map { ($0.name ?? "List").uppercased() } ?? "ADD", icon: "plus", color: Theme.accent, rotation: -14)
                 .opacity(Double(max(dragOffset.width, 0) / swipeThreshold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            stamp("NOPE", icon: "xmark", color: Theme.accentSecondary, rotation: 14)
+            stamp("SKIP", icon: "forward.fill", color: Theme.textSecondary, rotation: 14)
                 .opacity(Double(max(-dragOffset.width, 0) / swipeThreshold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
@@ -620,10 +701,14 @@ private extension DiscoverView {
         Label(text, systemImage: icon)
             .font(.system(size: 30, weight: .black, design: .rounded))
             .tracking(2)
+            .lineLimit(1)
+            // A long list name shrinks rather than running off the card
+            .minimumScaleFactor(0.4)
             .foregroundColor(color)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(color, lineWidth: 4))
+            .frame(maxWidth: 230, alignment: .leading)
             .rotationEffect(.degrees(rotation))
     }
 
@@ -638,9 +723,9 @@ private extension DiscoverView {
                 // A quick flick counts even if the card hasn't travelled far
                 let projected = value.predictedEndTranslation.width
                 if value.translation.width > swipeThreshold || projected > swipeThreshold * 3 {
-                    react(.liked)
+                    addTopMovie()
                 } else if value.translation.width < -swipeThreshold || projected < -swipeThreshold * 3 {
-                    react(.disliked)
+                    react(.skipped)
                 } else {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) {
                         dragOffset = .zero
@@ -649,57 +734,70 @@ private extension DiscoverView {
             }
     }
 
-    // The same as the swipes, so nothing is gesture-only: ✕ dislikes like a swipe left, the heart likes like a
-    // swipe right, and Skip in between just moves on. Undo and Add are in the navigation bar
+    // Everything the card does, as buttons, so nothing is gesture-only: Not for Me (button only), Skip like a swipe
+    // left, and Add like a swipe right. Undo is in the navigation bar
     var actionButtons: some View {
         HStack(alignment: .top, spacing: 26) {
-            circleButton(icon: "xmark", size: 64, style: AnyShapeStyle(Theme.accentSecondary), caption: "Nope") {
+            circleButton(icon: "hand.thumbsdown.fill", size: 56, style: AnyShapeStyle(Theme.accentSecondary), caption: "Not for Me") {
                 react(.disliked)
             }
-            .accessibilityLabel("Dislike")
-            .accessibilityHint("Same as swiping left. Discover shows fewer films like this")
+            .accessibilityLabel("Not for Me")
+            .accessibilityHint("Discover shows fewer films like this")
             circleButton(icon: "forward.fill", size: 48, style: AnyShapeStyle(Theme.textSecondary), caption: "Skip") {
                 react(.skipped)
             }
             .accessibilityLabel("Skip")
-            .accessibilityHint("Haven't seen it or not sure. Moves on without changing your taste profile")
-            circleButton(icon: "heart.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), caption: "Like") {
-                react(.liked)
-            }
-            .accessibilityLabel("Like")
-            .accessibilityHint("Same as swiping right. Discover finds more films like this")
+            .accessibilityHint("Same as swiping left. Haven't seen it or not sure: moves on without changing your taste profile")
+            addButton
         }
         .disabled(isSwiping)
     }
 
-    // Brings back the last card liked, disliked or skipped
+    // Brings back the last card added, marked Not for Me or skipped. An added film is taken back out of its lists
     var undoButton: some View {
         Button {
             Haptics.tap()
+            let lists = viewModel.undoHistory.last?.added.map { $0.list.name ?? "your list" } ?? []
             withAnimation(Theme.spring) {
-                viewModel.undo()
+                viewModel.undo { failed in
+                    showToast("Couldn't take it out of \(failed.joined(separator: ", ")). Try again from the list.")
+                }
                 dragOffset = .zero
                 showDetails = false
             }
+            if !lists.isEmpty { showToast("Taking it back out of \(lists.joined(separator: ", "))") }
         } label: {
             Image(systemName: "arrow.uturn.backward")
         }
-        .disabled(!viewModel.canUndo || isSwiping)
+        .disabled(!viewModel.canUndo || isSwiping || ranking != nil)
         .accessibilityLabel("Undo")
-        .accessibilityHint("Brings back the last card you liked, disliked or skipped")
+        .accessibilityHint("Brings back the last card you added, skipped or marked Not for Me. An added film is taken back out of its lists")
     }
 
-    // Asks which lists the film goes in
+    // The same as a swipe right: Quick Adds to its list when one is set, otherwise asks which lists. Touch and hold
+    // to choose lists for just this film, which is also in the ••• menu
     var addButton: some View {
-        Button {
+        circleButton(icon: "plus", size: 64, style: AnyShapeStyle(Theme.accentGradient), caption: quickAddList?.name ?? "Add") {
             addTopMovie()
-        } label: {
-            Image(systemName: "plus")
         }
-        // Waits for a card, and for the last one to finish flying away
-        .disabled(viewModel.topMovie == nil || isSwiping)
-        .accessibilityLabel("Add to a list")
-        .accessibilityHint("Also tells Discover you like it")
+        .contextMenu {
+            if let list = quickAddList {
+                Button {
+                    addTopMovie(forceAsk: true)
+                } label: {
+                    Label("Choose Lists for This Film…", systemImage: "list.bullet")
+                }
+                Button {
+                    setQuickAdd(false)
+                } label: {
+                    Label("Stop Quick Adding to \(list.name ?? "List")", systemImage: "bolt.slash")
+                }
+            }
+        }
+        .accessibilityLabel(quickAddList.map { "Add to \($0.name ?? "your list")" } ?? "Add to a list")
+        .accessibilityHint(quickAddList == nil
+                           ? "Same as swiping right. Also tells Discover you like it"
+                           : "Same as swiping right. Touch and hold to choose lists. Also tells Discover you like it")
     }
 
     func circleButton(icon: String, size: CGFloat, style: AnyShapeStyle, caption: String? = nil, action: @escaping () -> Void) -> some View {
@@ -714,9 +812,12 @@ private extension DiscoverView {
                     .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
                     .shadow(color: Theme.shadow.opacity(0.4), radius: 12, y: 6)
                 if let caption {
+                    // A Quick Add list's name can be long, so it's kept to one line under its button
                     Text(caption)
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: 84)
                 }
             }
         }
@@ -759,21 +860,18 @@ private extension DiscoverView {
 
 // MARK: - Swipe actions
 private extension DiscoverView {
-    // Flies the top card away and records how the user felt about it: off to the right for a like, the left
-    // for a dislike, and down for a skip, which teaches Discover nothing
+    // Flies the top card away: off to the left for a skip, which teaches Discover nothing, and down for Not for
+    // Me. Adding (to the right) goes through addTopMovie
     func react(_ reaction: DiscoverReaction) {
+        guard reaction != .liked else { return addTopMovie() }
         guard !isSwiping, let movie = viewModel.topMovie else { return }
         isSwiping = true
         let offset: CGSize
-        switch reaction {
-        case .liked:
-            Haptics.success()
-            offset = CGSize(width: 700, height: dragOffset.height)
-        case .disliked:
-            Haptics.tap()
-            offset = CGSize(width: -700, height: dragOffset.height)
-        case .skipped:
+        if reaction == .skipped {
             Haptics.select()
+            offset = CGSize(width: -700, height: dragOffset.height)
+        } else {
+            Haptics.tap()
             offset = CGSize(width: 0, height: 900)
         }
         withAnimation(.easeIn(duration: 0.22)) {
@@ -781,11 +879,7 @@ private extension DiscoverView {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
             withAnimation(Theme.spring) {
-                switch reaction {
-                case .liked: viewModel.like(movie)
-                case .disliked: viewModel.dislike(movie)
-                case .skipped: viewModel.skip(movie)
-                }
+                if reaction == .skipped { viewModel.skip(movie) } else { viewModel.dislike(movie) }
                 dragOffset = .zero
                 showDetails = false
             }
@@ -793,19 +887,71 @@ private extension DiscoverView {
         }
     }
 
-    // Lifts the card up and away and asks which list it goes in. Adding counts as a like.
-    // Cancelling brings the card back.
-    func addTopMovie() {
+    // Swipe right or Add: flies the card off to the right and adds it, straight to the Quick Add list when one is
+    // set, otherwise to the lists picked in the list picker, where cancelling brings the card back. Adding is how
+    // Discover learns the user likes a film
+    func addTopMovie(forceAsk: Bool = false) {
         guard !isSwiping, let movie = viewModel.topMovie else { return }
         isSwiping = true
-        Haptics.select()
+        Haptics.success()
         pendingMovie = movie
         withAnimation(.easeIn(duration: 0.22)) {
-            dragOffset = CGSize(width: 0, height: -900)
+            dragOffset = CGSize(width: 700, height: dragOffset.height)
         }
+        if !forceAsk, let list = quickAddList {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                pendingMovie = nil
+                quickAdd(movie, to: list)
+            }
+            return
+        }
+        // The Quick Add list was deleted, so go back to asking
+        if !forceAsk && quickAddOn { quickAddOn = false }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             showListPicker = true
         }
+    }
+
+    // Where Quick Add places films right now. AI placement falls back to the bottom while AI isn't allowed
+    var placement: QuickAdd.Placement {
+        quickAddPlacement == .ai && !canUseAI ? .bottom : quickAddPlacement
+    }
+
+    // Adds the film to the Quick Add list without the list picker, then places it in a ranked list as the
+    // Placement setting says: left at the bottom, placed by the AI, or ranked with Compare
+    func quickAdd(_ movie: Movie, to list: CDMovieList) {
+        withAnimation(Theme.spring) {
+            viewModel.add(movie, to: [list], context: context) { added in
+                guard let only = added.first else {
+                    showToast("Couldn't add \(movie.title). Try again.")
+                    return
+                }
+                let name = only.list.name ?? "your list"
+                guard ListRanking.isRanked(only.list.id) else {
+                    showToast("Added to \(name)")
+                    return
+                }
+                // The only film in the list has nowhere else to go
+                guard only.list.movies.count > 1 else {
+                    showToast("Added to \(name) at #\(only.movie.rank)")
+                    return
+                }
+                switch placement {
+                case .bottom:
+                    showToast("Added to \(name) at #\(only.movie.rank)")
+                case .ai:
+                    showToast("Added to \(name). AI is placing it…")
+                    ListViewModel(movieList: only.list, context: context).smartPlace(only.movie) { message in
+                        showToast("\(message) in \(name)")
+                    }
+                case .compare:
+                    startRanking(only.movie, in: only.list)
+                }
+            }
+            dragOffset = .zero
+            showDetails = false
+        }
+        isSwiping = false
     }
 
     func addToSelectedLists(_ lists: [CDMovieList]) {
@@ -947,6 +1093,157 @@ private extension DiscoverView {
         let ids = seedPool.map(\.id)
         viewModel.updateListGenres(for: ids)
         MovieInfoCache.shared.fetchMissing(ids, onBatch: { viewModel.updateListGenres(for: ids) }, completion: { viewModel.updateListGenres(for: ids) })
+    }
+}
+
+// MARK: - Quick Add
+private extension DiscoverView {
+    // The list Quick Add sends films to, while it's on and the list still exists
+    var quickAddList: CDMovieList? {
+        guard quickAddOn else { return nil }
+        return movieLists.first { Int($0.id) == quickAddListID }
+    }
+
+    // Turning Quick Add on asks for its list the first time
+    func setQuickAdd(_ on: Bool) {
+        quickAddAsked = true
+        if !on {
+            quickAddOn = false
+        } else if movieLists.contains(where: { Int($0.id) == quickAddListID }) {
+            quickAddOn = true
+        } else {
+            choosingQuickAddList = true
+        }
+    }
+
+    // The first time Discover opens, once the AI question (if any) is out of the way, asks where swiped films go.
+    // Waits a moment so it doesn't try to open while the AI sheet is still closing
+    func askAboutQuickAddIfNeeded() {
+        guard !quickAddAsked, !askForAIConsent.wrappedValue else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard !quickAddAsked, !askForAIConsent.wrappedValue else { return }
+            showQuickAddWelcome = true
+        }
+    }
+
+    var suggestedQuickAddList: CDMovieList? {
+        QuickAdd.suggestedList(in: Array(movieLists))
+    }
+
+    // The list picked in the prompt, or nil for choosing each time. The lists can still be arriving from the
+    // server when it opens, so until a row is tapped it follows the suggestion
+    var welcomeChoice: CDMovieList? {
+        let id = welcomeTouched ? welcomePick : suggestedQuickAddList?.id
+        return id.flatMap { id in movieLists.first { $0.id == id } }
+    }
+
+    // Lists in the prompt, the suggested one first, then the most recently added to
+    var welcomeLists: [CDMovieList] {
+        let suggested = suggestedQuickAddList
+        let rest = movieLists.filter { $0 != suggested }
+            .sorted { ($0.date_modified ?? .distantPast) > ($1.date_modified ?? .distantPast) }
+        return (suggested.map { [$0] } ?? []) + rest
+    }
+
+    var quickAddWelcome: some View {
+        VStack(spacing: 18) {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Image(systemName: "hand.point.right.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(Theme.accentGradient)
+                        .padding(.top, 12)
+                        .accessibilityHidden(true)
+                    Text("Swipe Right to Add")
+                        .font(.title2.bold())
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Swiping a card right, or tapping Add, puts the film in a list, and Discover recommends more like it. Swipe left or tap Skip to move on without it counting against the film. Tap Not for Me to see fewer like it.")
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Text("WHERE SHOULD ADDED FILMS GO?")
+                        .font(.caption.weight(.heavy))
+                        .tracking(2)
+                        .foregroundStyle(Theme.accentGradient)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 6)
+                    ForEach(welcomeLists, id: \.id) { list in
+                        welcomeOption(title: list.name ?? "No Name",
+                                      subtitle: list == suggestedQuickAddList ? "Suggested · straight to this list" : "Straight to this list",
+                                      icon: "bolt.fill",
+                                      selected: welcomeChoice == list) {
+                            welcomePick = list.id
+                        }
+                    }
+                    welcomeOption(title: "Choose a List Each Time",
+                                  subtitle: "Pick lists for every film you add",
+                                  icon: "list.bullet",
+                                  selected: welcomeChoice == nil) {
+                        welcomePick = nil
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+            VStack(spacing: 8) {
+                Button {
+                    Haptics.success()
+                    if let list = welcomeChoice {
+                        quickAddListID = Int(list.id)
+                        quickAddOn = true
+                    } else {
+                        quickAddOn = false
+                    }
+                    quickAddAsked = true
+                    showQuickAddWelcome = false
+                } label: {
+                    Text(welcomeChoice.map { "Quick Add to \($0.name ?? "List")" } ?? "Choose Each Time")
+                        .lineLimit(1)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Text("You can change this any time in ••• under Adding Films.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textTertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+        }
+        .padding(.top, 12)
+        .background(Theme.background.ignoresSafeArea())
+    }
+
+    func welcomeOption(title: String, subtitle: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            welcomeTouched = true
+            action()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.headline)
+                    .foregroundStyle(Theme.accentGradient)
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.textTertiary))
+            }
+            .padding(14)
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(selected ? Theme.accent : Theme.stroke, lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

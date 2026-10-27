@@ -17,6 +17,8 @@ struct ListPickerSheet: View {
     var isAlreadyIn: (CDMovieList) -> Bool = { _ in false }
     // A list to leave out entirely, such as the one the film is being added from
     var excluding: CDMovieList? = nil
+    // Picks exactly one list, such as the one Discover's Quick Add sends films to
+    var singleChoice = false
     let onAdd: ([CDMovieList]) -> Void
 
     @Environment(\.managedObjectContext) private var context
@@ -85,7 +87,7 @@ struct ListPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Choose Lists")
+            .navigationTitle(singleChoice ? "Choose a List" : "Choose Lists")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -96,6 +98,9 @@ struct ListPickerSheet: View {
     }
 
     private var buttonTitle: String {
+        if singleChoice {
+            return selected.first.map { "Use \($0.name ?? "List")" } ?? "Choose a List"
+        }
         return selected.isEmpty ? "Choose Lists" : selected.count == 1 ? "Add to \(selected[0].name ?? "List")" : "Add to \(selected.count) Lists"
     }
 
@@ -104,7 +109,7 @@ struct ListPickerSheet: View {
             PosterImage(path: posterPath, cornerRadius: 10, size: .small)
                 .frame(width: 54, height: 81)
             VStack(alignment: .leading, spacing: 4) {
-                Text("ADD TO LISTS")
+                Text(singleChoice ? "QUICK ADD TO" : "ADD TO LISTS")
                     .font(.caption.weight(.heavy))
                     .tracking(2)
                     .foregroundStyle(Theme.accentGradient)
@@ -121,6 +126,8 @@ struct ListPickerSheet: View {
         Haptics.tap()
         if let index = selected.firstIndex(of: list) {
             selected.remove(at: index)
+        } else if singleChoice {
+            selected = [list]
         } else {
             selected.append(list)
         }
@@ -243,7 +250,7 @@ struct ListPickerSheet: View {
                 Haptics.success()
                 AppAnalytics.log(.listCreated(ranked: true))
                 withAnimation(Theme.spring) {
-                    selected.append(list)
+                    if singleChoice { selected = [list] } else { selected.append(list) }
                     showNewListField = false
                     newListName = ""
                 }
