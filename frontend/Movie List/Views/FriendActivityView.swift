@@ -61,8 +61,30 @@ struct FriendActivity: Decodable, Identifiable {
     }
 }
 
+/// One person's run of the same thing on one day, e.g. everything @alex added to Watchlist today, newest first.
+/// Keeps one busy friend from filling the feed; a run of one shows as a normal row
+struct FriendActivityGroup: Identifiable {
+    let id: String
+    let items: [FriendActivity]
+
+    var latest: FriendActivity { items[0] }
+
+    /// "added 12 films to Watchlist", "ranked 3 films in Favourites", "watched 5 films"
+    var action: String {
+        let films = "\(items.count) films"
+        switch latest.kind {
+        case "watched": return "watched \(films)"
+        case "rewatched": return "rewatched \(films)"
+        default:
+            let list = latest.list_name ?? "a list"
+            return items.allSatisfy({ $0.rank != nil }) ? "ranked \(films) in \(list)" : "added \(films) to \(list)"
+        }
+    }
+}
+
 /// What the people the user follows have been watching and ranking over the last two weeks, newest first and
-/// grouped by day. Tapping one opens the film, where it can be added to lists; tapping a person opens their profile
+/// grouped by day. Within a day, each person's films with the same action (and list) collapse into one row that
+/// can be expanded, ordered by their most recent. Tapping one opens the film, where it can be added to lists; tapping a person opens their profile
 struct FriendActivityView: View {
     @Environment(\.managedObjectContext) private var context
     @EnvironmentObject private var authViewModel: AuthenticationViewModel
@@ -74,19 +96,39 @@ struct FriendActivityView: View {
     @State private var adding: Movie? = nil
     @State private var openPerson: UserSummary? = nil
     @State private var reporting: ReportTarget? = nil
+    // Groups the user opened with "Show all"
+    @State private var expanded: Set<String> = []
 
-    // Days, newest first, each with its activity
-    private var days: [(day: Date, items: [FriendActivity])] {
+    // How many posters a collapsed group previews
+    private let previewCount = 5
+
+    // Days, newest first, each with its activity grouped by person, action and list, the most recent group first
+    private var days: [(day: Date, groups: [FriendActivityGroup])] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: activity) { calendar.startOfDay(for: $0.date ?? .distantPast) }
-        return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
+        let byDay = Dictionary(grouping: activity) { calendar.startOfDay(for: $0.date ?? .distantPast) }
+        return byDay.keys.sorted(by: >).map { day in
+            let items = (byDay[day] ?? []).sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            var order: [String] = []
+            var runs: [String: [FriendActivity]] = [:]
+            for item in items {
+                let key = "\(Int(day.timeIntervalSince1970))|\(item.handle)|\(item.kind)|\(item.list_name ?? "")"
+                if runs[key] == nil { order.append(key) }
+                runs[key, default: []].append(item)
+            }
+            return (day, order.map { FriendActivityGroup(id: $0, items: runs[$0] ?? []) })
+        }
     }
 
     var body: some View {
         List {
-            if activity.isEmpty {
-                Text(!hasLoaded ? "Loading…"
-                     : failed ? "Couldn't load activity. Pull down to try again."
+            if !hasLoaded {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            } else if activity.isEmpty {
+                Text(failed ? "Couldn't load activity. Pull down to try again."
                      : "Nothing from the people you follow in the last two weeks. When they watch or rank films, it'll show up here.")
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
@@ -98,8 +140,17 @@ struct FriendActivityView: View {
             }
             ForEach(days, id: \.day) { day in
                 Section {
-                    ForEach(day.items) { item in
-                        row(item)
+                    ForEach(day.groups) { group in
+                        if group.items.count == 1 {
+                            row(group.latest)
+                        } else {
+                            groupRow(group)
+                            if expanded.contains(group.id) {
+                                ForEach(group.items) { item in
+                                    row(item, nested: true)
+                                }
+                            }
+                        }
                     }
                 } header: {
                     Text(dayTitle(day.day))
@@ -136,29 +187,122 @@ struct FriendActivityView: View {
         .addToListFlow(movie: $adding, source: .friend)
     }
 
-    private func row(_ item: FriendActivity) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Button {
-                Haptics.tap()
-                openPerson = UserSummary(handle: item.handle, display_name: item.handle, following: true,
-                                         list_count: nil, film_count: nil, avatar_version: item.avatar_version)
-            } label: {
-                Avatar(name: item.handle, size: 38, handle: item.handle, version: item.avatar_version)
+    private func avatarButton(_ item: FriendActivity) -> some View {
+        Button {
+            Haptics.tap()
+            openPerson = UserSummary(handle: item.handle, display_name: item.handle, following: true,
+                                     list_count: nil, film_count: nil, avatar_version: item.avatar_version)
+        } label: {
+            Avatar(name: item.handle, size: 38, handle: item.handle, version: item.avatar_version)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("@\(item.handle)'s profile")
+    }
+
+    private func openFilm(_ item: FriendActivity) {
+        Haptics.tap()
+        detailsMovie = item.movie
+        details = PersistenceController.preview(of: item.movie)
+    }
+
+    /// A person's run of films collapsed into one row: what they did, a strip of posters (each opens its film) and
+    /// a Show all / Show less toggle that lists every film underneath
+    private func groupRow(_ group: FriendActivityGroup) -> some View {
+        let item = group.latest
+        let isExpanded = expanded.contains(group.id)
+        return HStack(alignment: .top, spacing: 12) {
+            avatarButton(item)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: item.icon)
+                        .foregroundStyle(Theme.accentGradient)
+                        .accessibilityHidden(true)
+                    (Text("@\(item.handle) ").fontWeight(.semibold) + Text(group.action).foregroundColor(Theme.textSecondary))
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                .font(.subheadline)
+                if !isExpanded {
+                    HStack(spacing: 6) {
+                        ForEach(group.items.prefix(previewCount)) { film in
+                            Button {
+                                openFilm(film)
+                            } label: {
+                                PosterImage(path: film.poster_path, cornerRadius: 5, size: .small)
+                                    .frame(width: 38, height: 57)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(film.title)
+                        }
+                        if group.items.count > previewCount {
+                            Text("+\(group.items.count - previewCount)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(Theme.textSecondary)
+                                .padding(.leading, 2)
+                        }
+                    }
+                }
+                HStack(spacing: 4) {
+                    Button {
+                        Haptics.tap()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            if isExpanded { expanded.remove(group.id) } else { expanded.insert(group.id) }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(isExpanded ? "Show less" : "Show all \(group.items.count)")
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.caption2.weight(.bold))
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accentGradient)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(isExpanded ? "Show fewer of @\(item.handle)'s films" : "Show all \(group.items.count) of @\(item.handle)'s films")
+                    if let date = item.date {
+                        Text("· \(date.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                }
+                .lineLimit(1)
             }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("@\(item.handle)'s profile")
+            Spacer(minLength: 0)
+            Menu {
+                reportButton(item)
+            } label: {
+                MoreActionsLabel()
+            }
+            .accessibilityLabel("Options for @\(item.handle)'s activity")
+        }
+        .listRowBackground(Color.clear)
+        .contextMenu {
+            reportButton(item)
+        }
+    }
+
+    /// One film. Nested rows sit under their expanded group, indented past the avatar
+    private func row(_ item: FriendActivity, nested: Bool = false) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            if nested {
+                Color.clear.frame(width: 38, height: 1)
+            } else {
+                avatarButton(item)
+            }
             Button {
-                Haptics.tap()
-                detailsMovie = item.movie
-                details = PersistenceController.preview(of: item.movie)
+                openFilm(item)
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        (Text("@\(item.handle) ").fontWeight(.semibold) + Text(item.action).foregroundColor(Theme.textSecondary))
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textPrimary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
+                        if !nested {
+                            (Text("@\(item.handle) ").fontWeight(.semibold) + Text(item.action).foregroundColor(Theme.textSecondary))
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textPrimary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Image(systemName: item.icon)
                                 .foregroundStyle(Theme.accentGradient)
@@ -171,6 +315,10 @@ struct FriendActivityView: View {
                         }
                         .font(.subheadline)
                         HStack(spacing: 4) {
+                            // Under a group the rank is the only part of the action that differs per film
+                            if nested, let rank = item.rank {
+                                Text("#\(rank) ·")
+                            }
                             if let date = item.date {
                                 Text(date.formatted(date: .omitted, time: .shortened))
                             }
