@@ -18,8 +18,9 @@ struct MovieDetailView: View {
     var onCompare: (() -> Void)? = nil
     var onSetRank: (() -> Void)? = nil
     var onToggleWatched: (() -> Void)? = nil
-    // Saves the user's note; calls back with whether it was saved. Notes are only offered when this is set
-    var onSaveNote: ((String, @escaping (Bool) -> Void) -> Void)? = nil
+    // Saves the user's note; calls back with nil once it's saved, or a message to show. Notes are only offered
+    // when this is set
+    var onSaveNote: ((String, @escaping (String?) -> Void) -> Void)? = nil
     // Set while the film's spot was suggested by Smart Placement and not yet approved
     var onApprovePlacement: (() -> Void)? = nil
     @State private var placementApproved = false
@@ -33,6 +34,7 @@ struct MovieDetailView: View {
     @State private var providers: WatchProviders? = nil
     @State private var recommending = false
     @ObservedObject private var social = SocialStore.shared
+    @ObservedObject private var noteReview = NoteReview.shared
 
     private static let imdbCacheKey = "imdbIDs"
 
@@ -182,6 +184,12 @@ struct MovieDetailView: View {
                     .foregroundColor(movie.note == nil ? Theme.textTertiary : Theme.textSecondary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
+                // Moderation is holding the note: only the user sees it until it's reviewed
+                if movie.note != nil && noteReview.isUnderReview(movie.id) {
+                    Label("Under review. Only you can see this note for now.", systemImage: "eye.slash")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Theme.accentSecondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
@@ -604,12 +612,13 @@ struct ProviderLogo: View {
 private struct NoteEditor: View {
     let title: String
     let initialText: String
-    let onSave: (String, @escaping (Bool) -> Void) -> Void
+    let onSave: (String, @escaping (String?) -> Void) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var isSaving = false
-    @State private var saveFailed = false
+    // Why the last save failed, shown under the note
+    @State private var errorMessage: String? = nil
     @FocusState private var focused: Bool
 
     private static let maxLength = 5000
@@ -619,6 +628,7 @@ private struct NoteEditor: View {
             VStack(alignment: .leading, spacing: 8) {
                 TextEditor(text: $text)
                     .focused($focused)
+                    .disabled(isSaving)
                     .scrollContentBackground(.hidden)
                     .padding(10)
                     .background(Theme.surface)
@@ -641,6 +651,11 @@ private struct NoteEditor: View {
                 }
                 .font(.caption)
                 .foregroundColor(Theme.textTertiary)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundColor(Theme.accentSecondary)
+                }
             }
             .padding(16)
             .background(Theme.background.ignoresSafeArea())
@@ -649,6 +664,7 @@ private struct NoteEditor: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
@@ -660,28 +676,26 @@ private struct NoteEditor: View {
                     }
                 }
             }
-            .alert("Couldn't save your note", isPresented: $saveFailed) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Check your connection and try again. Your note is still here.")
-            }
         }
+        .interactiveDismissDisabled(isSaving)
         .presentationDetents([.medium, .large])
         .onAppear {
             text = initialText
             focused = true
         }
+        .onChange(of: text) { _ in errorMessage = nil }
     }
 
     private func save() {
         isSaving = true
-        onSave(text) { saved in
+        errorMessage = nil
+        onSave(text) { message in
             isSaving = false
-            if saved {
+            if let message {
+                errorMessage = message
+            } else {
                 Haptics.success()
                 dismiss()
-            } else {
-                saveFailed = true
             }
         }
     }

@@ -98,6 +98,7 @@ struct UserSettingsView : View {
                             .submitLabel(.done)
                             .onSubmit(saveName)
                             .loading(!social.hasLoaded)
+                            .disabled(savingName)
                         if nameChanged {
                             Button(savingName ? "Saving…" : "Save", action: saveName)
                                 .font(.body.weight(.semibold))
@@ -575,7 +576,8 @@ extension UserSettingsView {
         Task {
             nameMessage = await authenticationViewModel.updateName(name)
             savingName = false
-            name = savedName
+            // A name that wasn't allowed stays, with the reason under it, so it can be fixed
+            if nameMessage == nil { name = savedName }
         }
     }
 

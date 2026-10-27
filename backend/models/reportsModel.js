@@ -30,10 +30,35 @@ async function createReport(user_id, handle, report) {
     return { id: result.rows[0].id, duplicate: false, reported_id };
 }
 
+/// Files a report with no reporter, for something automatic moderation flagged (services/moderation.js), and tells
+/// whoever runs Marquee about it. content is { content_type, content_id, reason, details }. Something that already
+/// has an open report from moderation isn't reported again. Never throws, so saving what was flagged still works
+async function reportFlagged(reported_id, content) {
+    try {
+        const open = await pool.query(
+            `SELECT id FROM reports
+             WHERE reporter_id IS NULL AND reported_user_id = $1 AND content_type = $2 AND content_id IS NOT DISTINCT FROM $3
+               AND status = 'open'
+             LIMIT 1`,
+            [reported_id, content.content_type, content.content_id]
+        );
+        if (open.rows.length) return;
+        const result = await pool.query(
+            `INSERT INTO reports (reporter_id, reported_user_id, content_type, content_id, reason, details)
+             VALUES (NULL, $1, $2, $3, $4, $5) RETURNING id`,
+            [reported_id, content.content_type, content.content_id, content.reason, content.details?.slice(0, MAX_DETAILS) ?? null]
+        );
+        const user = await pool.query("SELECT COALESCE(handle, username) AS handle FROM users WHERE firebase_uid = $1", [reported_id]);
+        await notifyOperator({ ...content, id: result.rows[0].id, handle: user.rows[0]?.handle ?? reported_id, automatic: true });
+    } catch (error) {
+        console.error("Error reporting flagged content:", error);
+    }
+}
+
 /// Tells whoever runs Marquee about a new report: always in the server log, and also to REPORTS_WEBHOOK_URL
 /// (e.g. a Slack or Discord webhook) when it's set. Never throws, so a failed alert doesn't fail the report
 async function notifyOperator(report) {
-    const summary = `New report #${report.id}: @${report.handle} (${report.content_type}${report.content_id ? ` ${report.content_id}` : ""}) for ${report.reason}${report.details ? ` - "${report.details}"` : ""}`;
+    const summary = `New ${report.automatic ? "automatic " : ""}report #${report.id}: @${report.handle} (${report.content_type}${report.content_id ? ` ${report.content_id}` : ""}) for ${report.reason}${report.details ? ` - "${report.details}"` : ""}`;
     console.log(summary);
     const webhook = process.env.REPORTS_WEBHOOK_URL;
     if (!webhook) return;
@@ -49,14 +74,14 @@ async function notifyOperator(report) {
     }
 }
 
-/// The open reports, oldest first, for whoever reviews them
+/// The open reports, oldest first, for whoever reviews them. reporter_handle is null for ones moderation filed
 async function fetchOpenReports() {
     const result = await pool.query(
         `SELECT r.id, r.content_type, r.content_id, r.reason, r.details, r.status,
                 to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
                 reporter.handle AS reporter_handle, reported.handle AS reported_handle
          FROM reports r
-         JOIN users reporter ON reporter.firebase_uid = r.reporter_id
+         LEFT JOIN users reporter ON reporter.firebase_uid = r.reporter_id
          JOIN users reported ON reported.firebase_uid = r.reported_user_id
          WHERE r.status = 'open'
          ORDER BY r.created_at`
@@ -64,4 +89,4 @@ async function fetchOpenReports() {
     return result.rows;
 }
 
-module.exports = { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, notifyOperator, fetchOpenReports };
+module.exports = { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, reportFlagged, notifyOperator, fetchOpenReports };

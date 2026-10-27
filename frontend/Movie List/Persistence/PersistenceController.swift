@@ -42,6 +42,7 @@ struct PersistenceController {
         let context = container.viewContext
         AIPlacement.replaceAll(from: responses)
         ListSharing.shared.replaceAll(from: responses)
+        NoteReview.shared.replaceAll(from: responses)
         let existing = (try? context.fetch(CDMovieList.fetchRequest())) ?? []
         var listsByID: [Int64: CDMovieList] = [:]
         for list in existing {

@@ -1008,7 +1008,8 @@ router.delete("/watch/:id", async (req, res) => {
 });
 
 // Saves the signed-in user's note on a film, e.g. { "movie_id": 12, "note": "Rewatch with Sam" }.
-// An empty note deletes it
+// An empty note deletes it. status is "flagged" when moderation is holding the note for review (only the user sees
+// it until then), otherwise "ok"
 router.put("/note", async (req, res) => {
     try {
         const movieId = Number(req.body.movie_id);
@@ -1019,8 +1020,8 @@ router.put("/note", async (req, res) => {
         if (note.length > 5000) {
             return res.status(400).json({ error: "A note can be at most 5000 characters." });
         }
-        await setMovieNote(req.user.uid, movieId, note);
-        res.status(200).json({ movie_id: movieId, note: note.trim() ? note : null });
+        const status = await setMovieNote(req.user.uid, movieId, note);
+        res.status(200).json({ movie_id: movieId, note: note.trim() ? note : null, status });
     } catch (error) {
         // 23503: the film doesn't exist
         if (error.code === "23503") {

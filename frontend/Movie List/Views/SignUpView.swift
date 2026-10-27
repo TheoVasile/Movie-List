@@ -17,6 +17,8 @@ struct SignUpView: View {
     @State private var handle: String = ""
     // nil while unchecked or checking; false when someone else has it
     @State private var handleAvailable: Bool? = nil
+    // Why the server doesn't allow the username (offensive or reserved), when it doesn't
+    @State private var handleProblem: String? = nil
     @State private var isCreating = false
     @EnvironmentObject var authenticationViewModel: AuthenticationViewModel
     @Environment(\.dismiss) var dismiss
@@ -37,6 +39,7 @@ struct SignUpView: View {
     private var handleNote: (text: String, isProblem: Bool) {
         if cleanedHandle.isEmpty { return ("How people find you. 3 to 20 letters, numbers, underscores or dots.", false) }
         if !handleIsValid { return ("3 to 20 letters, numbers, underscores or dots.", true) }
+        if let handleProblem { return (handleProblem, true) }
         switch handleAvailable {
         case .some(false): return ("@\(cleanedHandle) is taken.", true)
         case .some(true): return ("@\(cleanedHandle) is yours if you want it.", false)
@@ -51,13 +54,16 @@ struct SignUpView: View {
     /// Checks the username shortly after typing stops
     private func checkHandle() {
         handleAvailable = nil
+        handleProblem = nil
         let wanted = cleanedHandle
         guard handleIsValid else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             guard wanted == cleanedHandle else { return }
-            APIService.shared.isHandleAvailable(wanted) { available in
+            APIService.shared.isHandleAvailable(wanted) { available, problem in
+                guard wanted == cleanedHandle else { return }
                 // Couldn't check: let them try, and they'll be asked again if it was taken
-                if wanted == cleanedHandle { handleAvailable = available ?? true }
+                handleAvailable = available ?? true
+                handleProblem = problem
             }
         }
     }

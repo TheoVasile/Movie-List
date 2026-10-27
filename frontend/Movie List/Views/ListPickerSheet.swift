@@ -30,7 +30,8 @@ struct ListPickerSheet: View {
     @State private var showNewListField = false
     @State private var newListName = ""
     @State private var isCreatingList = false
-    @State private var createListFailed = false
+    // Why the new list couldn't be made, e.g. a name that isn't allowed
+    @State private var createListError: String? = nil
     @FocusState private var newListFocused: Bool
 
     // The list a film was most recently added to comes first, since it's the likeliest pick again
@@ -180,8 +181,8 @@ struct ListPickerSheet: View {
                 .padding(14)
                 .background(Theme.surfaceRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                if createListFailed {
-                    Label("Couldn't create the list. Try again.", systemImage: "exclamationmark.circle.fill")
+                if let createListError {
+                    Label(createListError, systemImage: "exclamationmark.circle.fill")
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(Theme.accentSecondary)
                         .transition(.opacity)
@@ -235,7 +236,7 @@ struct ListPickerSheet: View {
         let name = trimmedNewListName
         guard !name.isEmpty, !isCreatingList, let userID = authViewModel.user?.uid else { return }
         isCreatingList = true
-        withAnimation { createListFailed = false }
+        withAnimation { createListError = nil }
         APIService.shared.createList(userID: userID, name: name, overview: "", isRanked: true) { result in
             isCreatingList = false
             switch result {
@@ -256,7 +257,7 @@ struct ListPickerSheet: View {
             case .failure(let error):
                 print("Error creating list:", error.localizedDescription)
                 Haptics.tap()
-                withAnimation { createListFailed = true }
+                withAnimation { createListError = error.serverMessage ?? "Couldn't create the list. Try again." }
             }
         }
     }

@@ -34,6 +34,9 @@ struct ExcelImportView: View {
         var added = 0
         var alreadyInList = 0
         var skipped: [String] = []
+        // Set when moderation didn't allow the sheet's name for the new list
+        var renamedTo: String? = nil
+        var notesUnderReview = 0
     }
 
     @State private var step: Step = .chooseFile
@@ -305,6 +308,16 @@ private extension ExcelImportView {
         if alreadyInList > 0 {
             message += " \(alreadyInList) \(alreadyInList == 1 ? "was" : "were") already in the list."
         }
+        // What moderation changed: names that weren't allowed, and notes only the user sees until they're reviewed
+        for result in results {
+            if let renamedTo = result.renamedTo {
+                message += " The name \"\(result.name)\" isn't allowed, so that list is called \"\(renamedTo)\". You can rename it from the list's ••• menu."
+            }
+        }
+        let notesUnderReview = results.reduce(0) { $0 + $1.notesUnderReview }
+        if notesUnderReview > 0 {
+            message += " \(notesUnderReview) \(notesUnderReview == 1 ? "note is" : "notes are") under review, so only you can see \(notesUnderReview == 1 ? "it" : "them") for now."
+        }
 
         return VStack(spacing: 0) {
             ScrollView {
@@ -434,6 +447,8 @@ private extension ExcelImportView {
                         result.added += response.added
                         result.alreadyInList += response.already_in_list
                         result.skipped += response.skipped
+                        if let renamed = response.renamed_to { result.renamedTo = renamed }
+                        result.notesUnderReview += response.notes_under_review ?? 0
                         progress.done += batch.count
                     } catch {
                         print("Excel import failed:", error.localizedDescription)

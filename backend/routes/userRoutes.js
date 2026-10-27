@@ -13,6 +13,7 @@ const admin = require("../config/firebase");
 const pool = require("../config/db");
 const { TERMS_VERSION } = require("../config/terms");
 const { REPORT_REASONS, REPORT_CONTENT_TYPES, MAX_DETAILS, createReport, notifyOperator, fetchOpenReports } = require("../models/reportsModel");
+const { blockedField } = require("../services/moderation");
 const { setPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, blockUser, unblockUser, fetchBlocked, HandleTakenError } = require("../models/socialModel");
 
 const router = express.Router();
@@ -193,6 +194,8 @@ router.post("/me/groups", async (req, res) => {
     if (!name || !handles.length) {
         return res.status(400).json({ error: "A group needs a name and at least one person." });
     }
+    const blocked = blockedField({ group_name: name });
+    if (blocked) return res.status(400).json(blocked);
     try {
         const id = await createGroup(req.user.uid, name, handles);
         if (!id) return res.status(403).json({ error: "You can only add people you follow." });
@@ -398,6 +401,8 @@ router.put("/me/name", async (req, res) => {
     if (!name || name.length > 40) {
         return res.status(400).json({ error: "Names are 1 to 40 characters." });
     }
+    const blocked = blockedField({ display_name: name });
+    if (blocked) return res.status(400).json(blocked);
     try {
         const saved = await setDisplayName(req.user.uid, name);
         if (!saved) return res.status(404).json({ error: "Account not found." });
@@ -573,6 +578,9 @@ router.put("/me/handle", async (req, res) => {
     if (!isValidHandle(handle)) {
         return res.status(400).json({ error: "Usernames are 3 to 20 letters, numbers, underscores or dots." });
     }
+    // Slurs, hate, harassment and names kept for us (admin, support, marquee...) aren't allowed
+    const blocked = blockedField({ handle });
+    if (blocked) return res.status(400).json(blocked);
     try {
         await setHandle(req.user.uid, handle);
         res.json({ handle });
@@ -751,7 +759,7 @@ router.get("/me/recommendations", async (req, res) => {
 
 // Sends a film to people who follow the user or whom the user follows, e.g. { "handles": ["sam"], "tmdb_id": 329865,
 // "title": "Arrival", "poster_path", "release_date", "overview", "original_language", "popularity", "note": "..." }.
-// Replies with the @handles it went to
+// Replies with the @handles it went to, and note_status "flagged" when moderation is holding the note for review
 router.post("/me/recommendations", async (req, res) => {
     const body = req.body ?? {};
     const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
@@ -775,7 +783,7 @@ router.post("/me/recommendations", async (req, res) => {
         return res.status(400).json({ error: "A tmdb_id and title are required." });
     }
     try {
-        const sentTo = await sendRecommendation(req.user.uid, handles, film, note);
+        const { sentTo, status } = await sendRecommendation(req.user.uid, handles, film, note);
         if (!sentTo.length) return res.status(403).json({ error: "You can only send films to people you follow or who follow you." });
         const me = await getProfile(req.user.uid);
         const from = me?.handle ? `@${me.handle}` : me?.display_name ?? "Someone";
@@ -783,11 +791,12 @@ router.post("/me/recommendations", async (req, res) => {
         for (const recipient of sentTo) {
             notifyUser(recipient.firebase_uid, "recommendation", {
                 title: `${from} thinks you should see this`,
-                body: `${film.title}${year ? ` (${year})` : ""}${note ? `: "${note}"` : ""}`,
+                // A note held for review isn't shown to them, so it isn't in the push either
+                body: `${film.title}${year ? ` (${year})` : ""}${note && status === "ok" ? `: "${note}"` : ""}`,
                 data: { tmdb_id: String(film.tmdb_id) },
             });
         }
-        res.status(201).json({ sent_to: sentTo.map((recipient) => recipient.handle) });
+        res.status(201).json({ sent_to: sentTo.map((recipient) => recipient.handle), note_status: note ? status : null });
     } catch (error) {
         console.error("Error sending recommendation:", error);
         res.status(500).json({ error: "Internal server error" });
