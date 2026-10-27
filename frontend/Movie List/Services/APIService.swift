@@ -154,7 +154,6 @@ struct AIDiscoverRequest: Encodable {
         let year: String
     }
     let liked: [Film]
-    let passed: [Film]
     let disliked: [Film]
     let favorite_genres: [String]
     let avoided_genres: [String]

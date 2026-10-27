@@ -30,6 +30,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(AppAnalytics.isEnabled)
     Personalization.migrateGenderToPronouns()
     Personalization.migrateAIConsent()
+    DiscoverViewModel.forgetQuickAdd()
 
     NotificationManager.shared.configure(application)
     // Region events relaunch the app in the background, so the location manager has to be ready at launch
