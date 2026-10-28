@@ -95,6 +95,8 @@ You control much of who sees what:
 - Each list can be public, visible to your followers only, or private to you. Lists on a private profile are not shown publicly
 - Your notes on films, your watched films, your list placings and your activity can be seen by people who follow you and may appear in their friend activity feed, taste comparison and Year in Review
 - Lists you invite friends to edit, movie night groups and polls are visible to their members
+- Public lists, and profiles that are not private, have a web page that **anyone with the link can view, including people who do not have a Marquee account**, for example when you or someone else shares the link. Lists marked Followers or Private and private profiles never have one
+- Anyone holding a movie night group's invite link can see the group's name and join it until the link expires or is turned off
 - Recommendations you send, including any note you add, are delivered to the people you send them to
 
 Please think before you share. Once someone else has seen or saved your content, we cannot always take it back.
@@ -133,7 +135,7 @@ Please only report things in good faith; misusing reporting is itself a breach o
 
 ### Shared lists and groups
 
-When you invite friends to edit a list, they can add, remove and re-rank films in it. The list owner can remove editors, and editors can leave. In movie night groups, members can suggest films, react and vote. You are responsible for whom you invite.
+When you invite friends to edit a list, they can add, remove and re-rank films in it. The list owner can remove editors, and editors can leave. In movie night groups, members can suggest films, react and vote. Anyone in a group can share an invite link to it, and **anyone holding that link can join the group** until it expires (after 30 days) or someone in the group turns it off (revokes it) in the App. Only share invite links with people you want in the group. You are responsible for whom you invite.
 
 ## 9. AI Features
 

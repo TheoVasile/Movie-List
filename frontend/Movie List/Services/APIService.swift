@@ -1135,6 +1135,47 @@ class APIService {
         }
     }
 
+    // MARK: Links and invites
+
+    /// A list's public link, for sharing it
+    func fetchListLink(listID: Int64, completion: @escaping (Result<ListLink, Error>) -> Void) {
+        sendJSON("GET", "/lists/\(listID)/link", completion: completion)
+    }
+
+    /// The list a shared link (/l/<id>) points to, if the user can see it. 404 otherwise
+    func openListLink(publicID: String, completion: @escaping (Result<LinkedList, Error>) -> Void) {
+        sendJSON("GET", "/lists/public/\(publicID)", completion: completion)
+    }
+
+    /// A film by TMDb id, for a shared film link when the film isn't in the user's lists
+    func fetchFilm(tmdbID: Int64, completion: @escaping (Result<LinkedFilm, Error>) -> Void) {
+        sendJSON("GET", "/movies/film/\(tmdbID)", completion: completion)
+    }
+
+    /// The group's working invite link, made if there isn't one
+    func groupInviteLink(groupID: Int64, completion: @escaping (Result<GroupInvite, Error>) -> Void) {
+        sendJSON("POST", "/groups/\(groupID)/invites", completion: completion)
+    }
+
+    private struct RevokedResponse: Decodable { let revoked: Bool }
+
+    /// Turns an invite link off for good
+    func revokeGroupInvite(groupID: Int64, token: String, completion: @escaping (Bool) -> Void) {
+        sendJSON("DELETE", "/groups/\(groupID)/invites/\(token)") { (result: Result<RevokedResponse, Error>) in
+            completion((try? result.get().revoked) == true)
+        }
+    }
+
+    /// What an invite link leads to. Fails with 404 when it has expired or been turned off
+    func groupInvitePreview(token: String, completion: @escaping (Result<GroupInvitePreview, Error>) -> Void) {
+        sendJSON("GET", "/invites/\(token)", completion: completion)
+    }
+
+    /// Joins the group an invite link is for; joining again does nothing
+    func acceptGroupInvite(token: String, completion: @escaping (Result<GroupInviteAcceptance, Error>) -> Void) {
+        sendJSON("POST", "/invites/\(token)/accept", completion: completion)
+    }
+
     func fetchFriendLists(_ handle: String, completion: @escaping (Result<FriendLists, Error>) -> Void) {
         sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/lists", completion: completion)
     }

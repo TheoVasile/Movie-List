@@ -84,6 +84,18 @@ struct Movie_ListApp: App {
             .tint(Theme.accent)
             // Light or dark is set on the window, so pop-ups and sheets follow it too
             .onAppear { AppearanceSettings.shared.apply() }
+            // Marquee links (universal links like https://<domain>/l/<id>, and marquee:// or cinelist:// from the
+            // widgets) wait in LinkRouter until the app is signed in and ready, so they work from the welcome
+            // screen too: a group invite is kept through sign-up and joined right after
+            .onOpenURL { url in
+                // The return from Firebase's reCAPTCHA page while verifying a phone number, and Google sign-in
+                if Auth.auth().canHandle(url) { return }
+                if LinkRouter.shared.handle(url) { return }
+                _ = GIDSignIn.sharedInstance.handle(url)
+            }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { LinkRouter.shared.handle(url) }
+            }
         }
     }
 }

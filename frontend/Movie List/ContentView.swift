@@ -43,8 +43,33 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     enum Tab { case lists, discover, profile }
-    // A film opened from a Home Screen widget
+    // A film opened from a Home Screen widget or a shared link
     @State private var linkedMovie: CDMovie? = nil
+    // Opened from shared links (see LinkRouter): a person's profile, a list (the user's own, or someone else's
+    // read-only), and a group invite to join. linkLoading covers the screen while one is fetched
+    @ObservedObject private var links = LinkRouter.shared
+    @State private var linkedPerson: UserSummary? = nil
+    @State private var linkedList: LinkedListSheet? = nil
+    @State private var joinInvite: JoinInvite? = nil
+    @State private var linkLoading = false
+    @State private var linkError: String? = nil
+
+    struct LinkedListSheet: Identifiable {
+        let id = UUID()
+        let own: CDMovieList?
+        let other: FriendLists.List?
+    }
+
+    struct JoinInvite: Identifiable {
+        let token: String
+        var id: String { token }
+    }
+
+    /// Whether links can be opened: signed in, with an @username and the current terms accepted
+    private var readyForLinks: Bool {
+        guard social.hasLoaded, let profile = social.profile else { return false }
+        return profile.handle != nil && !profile.needsTermsAcceptance
+    }
     // The theatre the user just left, from a check-in notification, while they say what they saw there
     @State private var theatreVisit: TheatreVisit? = nil
 
@@ -156,12 +181,62 @@ struct ContentView: View {
         .sheet(item: $linkedMovie) { movie in
             MovieDetailView(movie: movie)
         }
+        .sheet(item: $linkedPerson) { person in
+            NavigationStack {
+                FriendProfileView(person: person)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") { linkedPerson = nil }
+                        }
+                    }
+            }
+            .environmentObject(viewModel)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
+        .sheet(item: $linkedList) { sheet in
+            NavigationStack {
+                Group {
+                    if let own = sheet.own {
+                        ListView(movieList: own, context: PersistenceController.shared.container.viewContext)
+                    } else if let other = sheet.other {
+                        FriendListView(list: other, owner: other.owner_handle.map { "@\($0)" } ?? "")
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Done") { linkedList = nil }
+                    }
+                }
+            }
+            .environmentObject(viewModel)
+            .environmentObject(network)
+            .environmentObject(db)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        }
+        // However it closes, the saved invite has been seen, so it isn't shown again at the next launch
+        .sheet(item: $joinInvite, onDismiss: { LinkRouter.shared.finishInvite() }) { invite in
+            JoinGroupSheet(token: invite.token) { groupID in
+                // Opens the group once this sheet has closed
+                tab = .profile
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { notifications.openGroupID = groupID }
+            }
+        }
+        .overlay {
+            if linkLoading { LinkLoadingOverlay() }
+        }
+        .alert("Couldn't open that link", isPresented: Binding(get: { linkError != nil }, set: { if !$0 { linkError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(linkError ?? "")
+        }
+        .onAppear(perform: openPendingLink)
+        .onChange(of: links.pending) { _ in openPendingLink() }
+        .onChange(of: readyForLinks) { _ in openPendingLink() }
         .sheet(item: $theatreVisit) { visit in
             TheatreCheckInSheet(theatre: visit.theatre)
                 .environmentObject(viewModel)
                 .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
         }
-        .onOpenURL(perform: openLink)
         .onChange(of: notifications.destination) { destination in
             switch destination {
             case .profile:
@@ -172,7 +247,7 @@ struct ContentView: View {
             case .lists:
                 tab = .lists
             case .film(let tmdbID):
-                if let url = URL(string: "cinelist://film/\(tmdbID)") { openLink(url) }
+                open(.film(tmdbID: tmdbID))
             case .theatreVisit(let theatre):
                 theatreVisit = TheatreVisit(theatre: theatre)
             case nil:
@@ -182,15 +257,77 @@ struct ContentView: View {
         }
     }
 
-    /// Handles cinelist://film/<TMDb id> from the widgets (or marquee://film/<TMDb id>) by opening that film's info screen
-    private func openLink(_ url: URL) {
-        // The return from Firebase's reCAPTCHA page while verifying a phone number
-        if Auth.auth().canHandle(url) { return }
-        guard url.scheme == "cinelist" || url.scheme == "marquee", url.host == "film", let tmdbID = Int32(url.lastPathComponent) else { return }
-        let request = CDMovie.fetchRequest()
-        request.predicate = NSPredicate(format: "tmdb_id == %d", tmdbID)
-        request.fetchLimit = 1
-        linkedMovie = try? PersistenceController.shared.container.viewContext.fetch(request).first
+    /// Opens the link waiting in LinkRouter, once the app is ready for it
+    private func openPendingLink() {
+        guard readyForLinks, !linkLoading, let link = links.take() else { return }
+        open(link)
+    }
+
+    /// Opens what a link points to: a film's info, a person's profile, a list, or a group invite
+    private func open(_ link: DeepLink) {
+        switch link {
+        case .film(let tmdbID):
+            let request = CDMovie.fetchRequest()
+            request.predicate = NSPredicate(format: "tmdb_id == %d", Int32(clamping: tmdbID))
+            request.fetchLimit = 1
+            if let saved = try? PersistenceController.shared.container.viewContext.fetch(request).first {
+                linkedMovie = saved
+                return
+            }
+            // Not in the user's lists: fetched, and shown from a copy that isn't saved
+            linkLoading = true
+            APIService.shared.fetchFilm(tmdbID: tmdbID) { result in
+                linkLoading = false
+                switch result {
+                case .success(let film): linkedMovie = PersistenceController.preview(of: film.movie)
+                case .failure: linkError = "That film couldn't be found. Check your connection and try again."
+                }
+            }
+        case .profile(let handle), .personalInvite(let handle):
+            if handle == social.profile?.handle {
+                tab = .profile
+                return
+            }
+            linkLoading = true
+            APIService.shared.fetchFriendLists(handle) { result in
+                linkLoading = false
+                switch result {
+                case .success(let person):
+                    linkedPerson = UserSummary(handle: person.handle, display_name: person.display_name, following: person.following,
+                                               list_count: nil, film_count: nil, avatar_version: person.avatar_version)
+                case .failure:
+                    linkError = "@\(handle) couldn't be found."
+                }
+            }
+        case .list(let publicID):
+            linkLoading = true
+            APIService.shared.openListLink(publicID: publicID) { result in
+                linkLoading = false
+                switch result {
+                case .success(let linked) where linked.mine:
+                    let request = CDMovieList.fetch(predicate: NSPredicate(format: "id == %lld", linked.id))
+                    request.fetchLimit = 1
+                    if let own = try? PersistenceController.shared.container.viewContext.fetch(request).first {
+                        tab = .lists
+                        linkedList = LinkedListSheet(own: own, other: nil)
+                    } else {
+                        linkError = "That list hasn't reached this iPhone yet. Try again in a moment."
+                    }
+                case .success(let linked):
+                    if let list = linked.list {
+                        linkedList = LinkedListSheet(own: nil, other: list)
+                    } else {
+                        linkError = "That list is private or no longer exists."
+                    }
+                case .failure(let error):
+                    linkError = (error as NSError).code == 404
+                        ? "That list is private or no longer exists."
+                        : "Check your connection and try again."
+                }
+            }
+        case .groupInvite(let token):
+            joinInvite = JoinInvite(token: token)
+        }
     }
 }
 

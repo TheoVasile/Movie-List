@@ -196,7 +196,8 @@ struct YearInReviewView: View {
             let renderer = ImageRenderer(content: card)
             renderer.scale = 3
             if let image = renderer.uiImage {
-                shareItem = ShareItem(items: [image], kind: .yearInReview)
+                // The image and the user's link, so friends can find them
+                shareItem = ShareItem(items: [image] + (ShareLinks.myLink.map { [$0] } ?? []), kind: .yearInReview)
             }
         }
     }
@@ -242,9 +243,13 @@ struct YearSlideView: View {
                     .tracking(1.2)
                     .foregroundColor(Theme.textTertiary)
                 Spacer()
-                Label("Marquee", systemImage: "film.stack")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(Theme.textTertiary)
+                if forSharing {
+                    ShareCardFooter()
+                } else {
+                    Label("Marquee", systemImage: "film.stack")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(Theme.textTertiary)
+                }
             }
         }
         .padding(24)
