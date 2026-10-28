@@ -370,6 +370,20 @@ const createTables = async () => {
                 count INT NOT NULL DEFAULT 0
             );
 
+            -- Films the user liked, disliked (Not for Me) or skipped in Discover, one row per film, so their taste
+            -- profile follows them across devices and shapes recommendations on the server. Deleted by Reset Taste
+            -- Profile, and with the account
+            CREATE TABLE IF NOT EXISTS discover_reactions (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                tmdb_id INT NOT NULL,
+                reaction VARCHAR(10) NOT NULL CHECK (reaction IN ('like', 'dislike', 'skip')),
+                source VARCHAR(40),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, tmdb_id)
+            );
+            CREATE INDEX IF NOT EXISTS discover_reactions_user ON discover_reactions (user_id, updated_at DESC);
+
             -- TMDb answers shared by every server and kept across restarts, so the same search or film isn't
             -- fetched again for a while. Expired rows are deleted every so often (services/tmdbCache.js)
             CREATE TABLE IF NOT EXISTS tmdb_cache (
@@ -378,6 +392,14 @@ const createTables = async () => {
                 expires_at TIMESTAMPTZ NOT NULL
             );
             CREATE INDEX IF NOT EXISTS tmdb_cache_expires ON tmdb_cache (expires_at);
+
+            -- Film-count milestones the user has reached (10, 50, 100...), so each celebration plays once per user, ever
+            CREATE TABLE IF NOT EXISTS user_milestones (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                milestone TEXT NOT NULL,
+                achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, milestone)
+            );
 
             -- Indexes for the busiest lookups that no primary key or unique constraint already starts with
             CREATE INDEX IF NOT EXISTS lists_user ON lists (user_id);

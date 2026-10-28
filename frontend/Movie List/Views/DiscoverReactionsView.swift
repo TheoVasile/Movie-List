@@ -63,6 +63,7 @@ final class DiscoverReactions: ObservableObject {
     /// Takes back a like or dislike: Discover forgets what it learned from it and may show the film again
     func forget(_ entry: Entry, liked isLiked: Bool) {
         remove(entry.id)
+        DiscoverReactionSync.shared.remove(entry.id)
         let defaults = UserDefaults.standard
         let key = isLiked ? DiscoverViewModel.likedKey : DiscoverViewModel.dislikedKey
         let ids = (defaults.array(forKey: key) as? [Int] ?? []).filter { $0 != Int(entry.id) }

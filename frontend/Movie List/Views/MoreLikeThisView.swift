@@ -185,6 +185,17 @@ struct MoreLikeThisView: View {
         }
     }
 
+    /// When the server hasn't personalised the order itself, nudges films in genres the user likes in Discover up
+    /// a little. TMDb's order still counts most
+    private func orderedByTaste(_ films: [Movie]) -> [Movie] {
+        let profile = UserDefaults.standard.data(forKey: DiscoverViewModel.profileKey)
+            .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
+        return films.enumerated()
+            .map { (movie: $0.element, score: 0.3 * profile.affinity(for: $0.element) - Double($0.offset) * 0.1) }
+            .sorted { $0.score > $1.score }
+            .map(\.movie)
+    }
+
     private func load() {
         isLoading = true
         loadFailed = false
@@ -196,7 +207,8 @@ struct MoreLikeThisView: View {
                 // and the ones marked Not for Me, which are only kept on this device
                 let listed = Set(movieLists.flatMap { $0.movies.map { Int64($0.tmdb_id) } })
                 let disliked = Set((UserDefaults.standard.array(forKey: DiscoverViewModel.dislikedKey) as? [Int] ?? []).map(Int64.init))
-                films = similar.filter { !listed.contains($0.id) && !disliked.contains($0.id) && $0.id != source.id }
+                let kept = similar.filter { !listed.contains($0.id) && !disliked.contains($0.id) && $0.id != source.id }
+                films = kept.contains { $0.score != nil } ? kept : orderedByTaste(kept)
             case .failure:
                 loadFailed = true
             }

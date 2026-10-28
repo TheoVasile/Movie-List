@@ -72,6 +72,8 @@ extension CDMovieList {
                     print("Error saving context: \(error)")
                 }
                 completion(newMovie)
+                // A new film may have reached a milestone (10, 50, 100... films)
+                Milestones.shared.check()
             case .failure(let error):
                 print("Error adding film to list \(listID):", error.localizedDescription)
                 completion(nil)

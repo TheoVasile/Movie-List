@@ -319,6 +319,8 @@ private extension LetterboxdImportView {
                     print("Failed to save imported lists", error)
                 }
                 Haptics.success()
+                // A big import can pass several milestones at once; only the highest is celebrated
+                Milestones.shared.check()
                 AppAnalytics.log(.importCompleted(.letterboxd, films: imported.reduce(0) { $0 + $1.movies.count }))
                 withAnimation(Theme.spring) {
                     step = .finished(imported)

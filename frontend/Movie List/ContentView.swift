@@ -110,11 +110,15 @@ struct ContentView: View {
             // The server keeps whether AI is allowed, for friends' Movie Nights. Sent at launch too, so it's
             // right for settings chosen before the server kept it
             Personalization.syncAIAllowed()
+            // Sends Discover reactions left waiting while offline, and brings in the account's, in the background
+            DiscoverReactionSync.shared.sync()
         }
         // Coming back to the app is a good moment to try again, e.g. once the network is back
         .onChange(of: scenePhase) { phase in
             if phase == .active { ReviewPrompter.recordSession() }
             if phase == .active && social.profileFailed { social.retry() }
+            // A milestone that couldn't be recorded while offline
+            if phase == .active { Milestones.shared.check() }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if social.profileFailed {

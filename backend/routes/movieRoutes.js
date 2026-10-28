@@ -17,6 +17,12 @@ const { isTV, tmdbPath, showAsFilm, filmGenres, tvGenres } = require("../service
 const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
 const { directedFilms } = require("../services/directorFilmography");
 const { similarFilms } = require("../services/similarFilms");
+const { buildDiscover, toDiscoverMovie } = require("../services/discoverFeed");
+const { parseSeeds, rerankByTaste } = require("../services/discoverRanker");
+const { tasteVectorWithin, invalidateTaste, featuresFor, filmVector } = require("../services/tasteVector");
+const reactionsModel = require("../models/reactionsModel");
+const { fetchReactionMap, fetchReactedFilms, fetchFriendPicks } = reactionsModel;
+const { createReactionsRouter } = require("./discoverReactionsRoutes");
 
 const router = express.Router();
 // The list's owner, or someone they invited to edit it
@@ -111,25 +117,6 @@ router.get("/search", async (req, res) => {
     }
 });
 
-// Keeps only films a swipe card can show and the app can save, in the shape the app's Movie model decodes
-function toDiscoverMovie(movie) {
-    if (movie.adult || !movie.poster_path || !/^\d{4}-\d{2}-\d{2}$/.test(movie.release_date ?? "")) {
-        return null;
-    }
-    return {
-        id: movie.id,
-        title: movie.title,
-        release_date: movie.release_date,
-        overview: movie.overview ?? "",
-        poster_path: movie.poster_path,
-        original_language: movie.original_language ?? "",
-        popularity: movie.popularity ?? 0,
-        vote_average: movie.vote_average ?? 0,
-        genre_ids: movie.genre_ids ?? [],
-        media_type: movie.media_type === "tv" ? "tv" : "movie",
-    };
-}
-
 // Comma-separated TMDb ids from a query parameter, e.g. "28,35"
 function parseIds(value, limit) {
     return String(value ?? "")
@@ -154,80 +141,79 @@ function mediaId(value) {
     return Number.isInteger(id) && id !== 0 ? id : null;
 }
 
-// Films for the Discover tab: TMDb recommendations for the given films (seeds: the user's top-ranked
-// and recently liked films) plus well-rated films in their favourite genres (genres), interleaved so
-// no single source dominates, followed by this week's trending films. avoid_genres keeps disliked
-// genres out of the genre feed. only_genres=1 means the user picked these genres themselves: then every
-// film returned has at least one of them. kind=tv gives TV shows instead (negative ids, see services/tmdbMedia.js)
-// and kind=all both; seeds can be shows. The app filters out films already in a list and orders by taste
+// Films for the Discover tab, best first, already ranked by the server (services/discoverFeed.js): TMDb's
+// recommendations for the seed films, scored by how many seeds recommend each film and how strongly; well-rated
+// films matching the user's taste (services/tasteVector.js) or chosen genres; friends' recommendations near the
+// front (first page only); and an explore pick (trending) about every 7th place. Re-ranked for variety (MMR).
+//   seeds: comma-separated ids, each with an optional weight, e.g. "550:1,680:0.6,-1399" (shows are negative;
+//          weight 0...2, 1 when left out, as older builds send). With no seeds, the user's top films are used
+//   genres, avoid_genres, only_genres=1 (every film has one of genres), kind=movie|tv|all, page, languages,
+//   providers, region (filters), exclude_ids (comma-separated ids never to return, e.g. already shown)
+// Films in the user's lists, films they liked or disliked in Discover and films they skipped in the last 30 days
+// are left out (before the discover_reactions table exists, only listed ones). Each film has the usual fields plus
+// score (number), source ("seed" | "taste" | "explore" | "friend" | "trending") and, for friends' picks,
+// recommended_by: { handle, display_name }
 router.get("/discover", async (req, res) => {
     try {
-        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), 500);
         const kind = ["movie", "tv", "all"].includes(req.query.kind) ? req.query.kind : "movie";
         const types = kind === "all" ? ["movie", "tv"] : [kind];
-        const seeds = parseMediaIds(req.query.seeds, 8).filter((id) => types.includes(isTV(id) ? "tv" : "movie"));
+        const seeds = parseSeeds(req.query.seeds).filter((seed) => types.includes(isTV(seed.id) ? "tv" : "movie"));
         const onlyGenres = req.query.only_genres === "1";
         const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
         const avoidGenres = parseIds(req.query.avoid_genres, 3);
-        const params = { language: "en-US", page };
         // Optional: only films in these original languages, and/or streaming on these services in region
         const filters = parseFilters(req.query);
-        // Genres are film genres; shows are asked for in the closest TV genres
         const genresFor = (type, ids) => (type === "tv" ? tvGenres(ids) : ids);
-        // TMDb results as films, shows included. Each page is cached for an hour, since many people share seeds,
-        // genres and trending
-        const fetchResults = (type, path, extra = {}) => tmdbGet(path, { ...params, ...extra }, HOUR)
-            .then((data) => (data.results ?? []).map((item) => (type === "tv" ? showAsFilm(item) : item)));
+        // Each TMDb page is cached for an hour, since many people share seeds, genres and trending
+        const get = (path, params) => tmdbGet(path, params, HOUR);
 
-        // Films in any of the favourite genres ("|" means or), skipping obscure titles
-        const genreFeeds = genres.length
-            ? types.map((type) => fetchResults(type, `discover/${type}`, {
-                with_genres: genresFor(type, genres).join("|"),
-                without_genres: genresFor(type, avoidGenres).join(","),
-                sort_by: "popularity.desc",
-                "vote_count.gte": type === "tv" ? 100 : 200,
-                include_adult: false,
-            }))
-            : [];
+        const [listed, reactions, taste, friendRows] = await Promise.all([
+            fetchListedTmdbIds(req.user.uid),
+            fetchReactionMap(req.user.uid).catch(() => new Map()),
+            // A new taste vector can take a few seconds to build; past that the feed goes without it this time
+            tasteVectorWithin(req.user.uid, 6000),
+            page === 1 ? fetchFriendPicks(req.user.uid).catch(() => []) : [],
+        ]);
+        const exclude = new Set([...listed, ...reactions.keys(), ...parseMediaIds(req.query.exclude_ids, 2000)]);
 
         // With filters, recommendations alone rarely have enough matches, so TMDb is also asked directly for films
         // that fit: one feed per language (or one for the services alone), in the chosen genres
-        const filteredFeeds = hasFilters(filters)
-            ? types.flatMap((type) => (filters.languages.length ? filters.languages.slice(0, 3) : [null]).map((language) => fetchResults(type, `discover/${type}`, {
+        const extraFeeds = hasFilters(filters)
+            ? types.flatMap((type) => (filters.languages.length ? filters.languages.slice(0, 3) : [null]).map((language) => get(`discover/${type}`, {
+                language: "en-US",
+                page,
                 ...(language ? { with_original_language: language } : {}),
                 ...(filters.providers.length ? { with_watch_providers: filters.providers.join("|"), watch_region: filters.region, with_watch_monetization_types: "flatrate|free|ads" } : {}),
                 ...(genres.length && onlyGenres ? { with_genres: genresFor(type, genres).join("|") } : {}),
-                sort_by: "popularity.desc",
-                "vote_count.gte": type === "tv" ? 50 : 100,
+                sort_by: "vote_count.desc",
+                "vote_count.gte": 100,
                 include_adult: false,
-            })))
+            }).then((data) => (data.results ?? []).map((item) => (type === "tv" ? showAsFilm(item) : item)))))
             : [];
 
-        // allSettled so one seed TMDb doesn't know about can't fail the whole request
-        const outcomes = await Promise.allSettled([
-            ...types.map((type) => fetchResults(type, `trending/${type}/week`)),
-            // The app sends different seeds for every batch, so each seed's best (first page) recommendations are used
-            ...seeds.map((id) => fetchResults(isTV(id) ? "tv" : "movie", `${tmdbPath(id)}/recommendations`, { page: 1 })),
-            ...genreFeeds,
-            ...filteredFeeds,
-        ]);
-        const resultsOf = (outcome) => (outcome.status === "fulfilled" ? outcome.value : []);
-        const interleave = (lists) => {
-            const merged = [];
-            for (let i = 0; i < Math.max(0, ...lists.map((list) => list.length)); i++) {
-                lists.forEach((list) => list[i] && merged.push(list[i]));
-            }
-            return merged;
-        };
-        const trending = interleave(outcomes.slice(0, types.length).map(resultsOf));
-        const interleaved = interleave(outcomes.slice(types.length).map(resultsOf));
-
-        const seen = new Set(seeds);
         const wanted = new Set(genres);
-        const movies = [...interleaved, ...trending]
-            .map(toDiscoverMovie)
-            .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
-            .filter((movie) => !onlyGenres || movie.genre_ids.some((id) => wanted.has(id)));
+        const friendFeatures = await featuresFor(friendRows.map((row) => row.tmdb_id).filter((id) => types.includes(isTV(id) ? "tv" : "movie")));
+        const friends = friendRows
+            .filter((row) => !exclude.has(row.tmdb_id) && friendFeatures.has(row.tmdb_id))
+            .map((row) => {
+                const features = friendFeatures.get(row.tmdb_id);
+                const movie = toDiscoverMovie({
+                    ...row,
+                    id: row.tmdb_id,
+                    release_date: String(row.release_date ?? "").slice(0, 10),
+                    genre_ids: features.genres,
+                    vote_average: features.vote_average,
+                    media_type: isTV(row.tmdb_id) ? "tv" : "movie",
+                });
+                return movie && { ...movie, recommended_by: { handle: row.handle, display_name: row.display_name ?? row.handle } };
+            })
+            .filter((movie) => movie && (!onlyGenres || !wanted.size || movie.genre_ids.some((id) => wanted.has(id))));
+
+        const movies = await buildDiscover({
+            seeds, types, page, genres, avoidGenres, onlyGenres, exclude, taste, friends, extraFeeds,
+            get, features: featuresFor, toMovie: toDiscoverMovie,
+        });
 
         if (!hasFilters(filters)) {
             return res.json(movies);
@@ -240,6 +226,9 @@ router.get("/discover", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
+// Discover reactions (likes, dislikes and skips), kept on the server: see routes/discoverReactionsRoutes.js
+router.use("/discover/reactions", createReactionsRouter(reactionsModel, invalidateTaste));
 
 // Films in theatres in one country, most popular first, for theatre check-ins ("What did you see?"), e.g.
 // ?region=CA -> [discover movie...]. Cached per region for an hour, since TMDb's now-playing list changes slowly
@@ -291,6 +280,22 @@ async function findOnTmdb(title, year) {
         results = (await search({})).filter((movie) => Math.abs(Number(String(movie.release_date).slice(0, 4)) - year) <= 1);
     }
     return results[0] ?? null;
+}
+
+/// Adds films liked or disliked in Discover (saved on the server, with titles where known) to the AI's signals,
+/// after the ones the app sent and without repeating any, up to 500 each
+function mergeReactedFilms(signals, reacted) {
+    const key = (film) => `${String(film.title).toLowerCase()}|${film.year}`;
+    for (const [field, films] of [["liked", reacted.liked], ["disliked", reacted.disliked]]) {
+        const seen = new Set(signals[field].map(key));
+        for (const film of films) {
+            if (!film.title || signals[field].length >= 500) continue;
+            const clean = { title: cleanText(film.title), year: cleanText(film.year, 4) };
+            if (seen.has(key(clean))) continue;
+            seen.add(key(clean));
+            signals[field].push(clean);
+        }
+    }
 }
 
 const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": "They/Them" };
@@ -565,7 +570,25 @@ router.post("/ai-discover", async (req, res) => {
         const count = Math.min(Math.max(parseInt(body.count, 10) || 20, 1), 30);
         const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
-        const [allLists, listedIds] = await Promise.all([fetchListsForTaste(req.user.uid), fetchListedTmdbIds(req.user.uid)]);
+        const [allLists, listedIds, reacted, reactions] = await Promise.all([
+            fetchListsForTaste(req.user.uid),
+            fetchListedTmdbIds(req.user.uid),
+            fetchReactedFilms(req.user.uid).catch(() => ({ liked: [], disliked: [] })),
+            fetchReactionMap(req.user.uid).catch(() => new Map()),
+        ]);
+        // Likes and dislikes saved on the server join the ones the app sent (older builds only send these), and
+        // nothing the user reacted to is suggested again
+        const untitled = [...reacted.liked, ...reacted.disliked].filter((film) => !film.title).slice(0, 60);
+        if (untitled.length) {
+            // Films never saved to a list (e.g. dislikes) are named from TMDb, cached
+            const named = await featuresFor(untitled.map((film) => film.tmdb_id)).catch(() => new Map());
+            for (const film of untitled) {
+                const features = named.get(film.tmdb_id);
+                if (features) Object.assign(film, { title: features.title, year: String(features.year ?? "") });
+            }
+        }
+        mergeReactedFilms(signals, reacted);
+        for (const tmdbId of reactions.keys()) exclude.add(tmdbId);
         const chosenLists = allLists.filter((list) => fromLists.includes(list.id));
         const lists = chosenLists.length ? chosenLists : allLists;
         if (chosenLists.length) signals.basedOnLists = chosenLists.map((list) => list.name);
@@ -862,17 +885,27 @@ router.get("/tv/:id/season/:season", async (req, res) => {
 });
 
 // More Like This: films like one film or show (negative id), best match first, leaving out the ones already in the
-// user's lists, e.g. /771/similar -> [discover movie...]. TMDb's pages are cached for a day, since they rarely change
+// user's lists and the ones they marked Not for Me in Discover, and re-ranked a little by their taste, e.g. /771/similar -> [discover movie...]. TMDb's pages are cached for a day, since they rarely change
 router.get("/:id/similar", async (req, res) => {
     const id = mediaId(req.params.id);
     if (id === null) return res.status(400).json({ error: "A film id is required." });
     try {
-        const listed = await fetchListedTmdbIds(req.user.uid);
-        res.json(await similarFilms(id, {
+        const [listed, reactions, taste] = await Promise.all([
+            fetchListedTmdbIds(req.user.uid),
+            fetchReactionMap(req.user.uid).catch(() => new Map()),
+            tasteVectorWithin(req.user.uid, 4000),
+        ]);
+        // Films marked Not for Me in Discover are left out like listed ones
+        for (const [tmdbId, reaction] of reactions) if (reaction === "dislike") listed.add(tmdbId);
+        const films = await similarFilms(id, {
             get: (path, params) => tmdbGet(path, params, DAY),
             listed,
             toMovie: toDiscoverMovie,
-        }));
+        });
+        if (!taste?.likes?.size) return res.json(films);
+        // Then nudged by taste, keeping TMDb's order as the main signal
+        const features = await featuresFor(films.map((film) => film.id)).catch(() => new Map());
+        res.json(rerankByTaste(films, taste, (film) => filmVector(features.get(film.id) ?? { genres: film.genre_ids })));
     } catch (error) {
         console.error("Error fetching similar films:", error.message);
         res.status(500).json({ error: "Internal server error" });

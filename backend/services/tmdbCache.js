@@ -80,6 +80,57 @@ async function cached(key, maxAge, load, onHit = () => {}) {
     return promise;
 }
 
+/// cached() for many keys at once, with one database read for all of them and one write for everything loaded, so
+/// describing a hundred films doesn't take a hundred database connections. load(key) gives a missing key's value (a
+/// failed load leaves the key out); at most `concurrency` loads run at once. Returns a Map key -> value
+async function cachedMany(keys, maxAge, load, concurrency = 10) {
+    const found = new Map();
+    let missing = [];
+    for (const key of new Set(keys)) {
+        const hit = fromMemory(key);
+        if (hit !== undefined) found.set(key, hit);
+        else missing.push(key);
+    }
+    if (missing.length) {
+        try {
+            const rows = (await pool.query("SELECT key, body, expires_at FROM tmdb_cache WHERE key = ANY($1) AND expires_at > NOW()", [missing])).rows;
+            for (const row of rows) {
+                remember(row.key, row.body, row.expires_at.getTime());
+                found.set(row.key, row.body);
+            }
+            missing = missing.filter((key) => !found.has(key));
+        } catch (error) {
+            console.error("Couldn't read the TMDb cache:", error.message);
+        }
+    }
+    const loaded = [];
+    let next = 0;
+    const worker = async () => {
+        while (next < missing.length) {
+            const key = missing[next++];
+            try {
+                const value = await load(key);
+                remember(key, value, Date.now() + maxAge);
+                found.set(key, value);
+                loaded.push(key);
+            } catch (error) {
+                // Left out, and tried again next time
+            }
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker));
+    if (loaded.length) {
+        pool.query(
+            `INSERT INTO tmdb_cache (key, body, expires_at)
+             SELECT * FROM unnest($1::text[], $2::jsonb[], $3::timestamptz[])
+             ON CONFLICT (key) DO UPDATE SET body = EXCLUDED.body, expires_at = EXCLUDED.expires_at`,
+            [loaded, loaded.map((key) => JSON.stringify(found.get(key))), loaded.map(() => new Date(Date.now() + maxAge))]
+        ).catch((error) => console.error("Couldn't save to the TMDb cache:", error.message));
+        sweepExpired();
+    }
+    return found;
+}
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /// TMDb's answer (response.data) for a path such as "movie/771", with the API key added. When TMDb says there are
@@ -109,4 +160,4 @@ async function tmdbGet(path, params = {}, maxAge = 0) {
     return cached(`get:${path}?${query}`, maxAge, () => fetchTmdb(path, params));
 }
 
-module.exports = { cached, tmdbGet, fetchTmdb, MINUTE, HOUR, DAY };
+module.exports = { cached, cachedMany, tmdbGet, fetchTmdb, MINUTE, HOUR, DAY };
