@@ -115,6 +115,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .active { ReviewPrompter.recordSession() }
             if phase == .active && social.profileFailed { social.retry() }
+            // A milestone that couldn't be recorded while offline
+            if phase == .active { Milestones.shared.check() }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if social.profileFailed {
