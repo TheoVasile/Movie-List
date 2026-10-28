@@ -245,6 +245,7 @@ We keep your information for as long as your account exists, because we need it 
 - Daily AI usage counts are deleted after a few days, and with your account
 - Discover reactions are kept until you reset them (Discover, then **•••**, then **Reset Taste Profile**) or delete your account
 - Group invite links are kept until their group, or the account that made them, is deleted
+- Which film-count milestones you have reached is kept until you delete your account
 - Usage analytics are kept by Google Analytics for 14 months and then deleted automatically
 - Crash reports are kept by Firebase Crashlytics for 90 days and then deleted automatically
 - Server logs are kept by our hosting providers for a limited time, usually no more than a few weeks
@@ -256,7 +257,7 @@ When you delete your account, we delete your information as described in Section
 
 You can permanently delete your account at any time in Settings by tapping **Delete Account**. For your security, you first confirm it is you by entering your password or signing in with Google or Apple again, and our servers only accept a deletion request made shortly after that. Your account is then deleted in a single step on our servers:
 
-- Your account, profile, photo, birthday, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, Discover reactions, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
+- Your account, profile, photo, birthday, phone number, lists, rankings, watched history, diary, episode progress, notes, follows, follow requests, blocks, recommendations you have sent and received, Discover reactions, film-count milestones, group invite links you created, lists you follow, reports you have made and reports about your account, notification tokens, alert records and settings are deleted from our database
 - Movie night groups you own are deleted, and you are removed from groups and shared lists you belong to, along with your votes and reactions in them
 - Your sign-in account with Google Firebase is deleted at the same time. If that fails, nothing is deleted and you can try again
 - If you signed in with Apple, the App also asks Apple to revoke Marquee's access to your Apple ID before your account is deleted, so Marquee no longer appears in your Apple ID's list of apps using Sign in with Apple

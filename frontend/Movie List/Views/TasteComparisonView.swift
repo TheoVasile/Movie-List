@@ -302,8 +302,8 @@ struct TasteComparisonView: View {
     // Opens the shareable Taste Match card
     private var tasteMatchLink: some View {
         NavigationLink {
-            // TODO(integration): ShareLinks.inviteURL(handle:) / profileURL — pass @friend.handle's profile link here
-            TasteMatchView(handle: friend.handle, shareURL: nil)
+            // The user's own invite link, so whoever gets the card can see their own match with them
+            TasteMatchView(handle: friend.handle, shareURL: ShareLinks.myInvite)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "heart.circle.fill")
