@@ -5,7 +5,9 @@ const express = require("express");
 //   POST   /bulk            { reactions: [{ tmdb_id, reaction, at? }] } (at most 2000; the newest reaction to a film
 //                            wins) -> { ok: true, saved }. For moving a device's history to the server once
 //   GET    /                -> { reactions: [{ tmdb_id, reaction, updated_at }] }, newest first
-//   DELETE /                deletes them all (Reset Taste Profile); ?tmdb_id= deletes one (Undo) -> { ok: true, deleted }
+//   DELETE /                deletes them all (Reset Taste Profile); ?tmdb_id= deletes one (Undo); ?reaction=skip
+//                            deletes every skip (Show Skipped Again) -> { ok: true, deleted }
+// Skips keep a film out of Discover for 30 days; likes and dislikes for good
 // TV shows have negative ids. The model (models/reactionsModel.js) and onChange (called with the user's id after a
 // change, to forget their cached taste) are passed in, so tests can use stand-ins
 
@@ -76,8 +78,13 @@ function createReactionsRouter(model, onChange = () => {}) {
             tmdbId = tmdbIdOf(String(req.query.tmdb_id));
             if (tmdbId === null) return res.status(400).json({ error: "tmdb_id must be a film id." });
         }
+        let reaction = null;
+        if (req.query.reaction !== undefined) {
+            reaction = String(req.query.reaction);
+            if (!valid(reaction)) return res.status(400).json({ error: "reaction must be like, dislike or skip." });
+        }
         try {
-            const deleted = await model.deleteReactions(req.user.uid, tmdbId);
+            const deleted = await model.deleteReactions(req.user.uid, tmdbId, reaction);
             onChange(req.user.uid);
             res.json({ ok: true, deleted });
         } catch (error) {

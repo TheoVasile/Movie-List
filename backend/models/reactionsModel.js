@@ -7,6 +7,8 @@ const { notBlocked } = require("./listModel");
 
 const REACTIONS = ["like", "dislike", "skip"];
 const MAX_BULK = 2000;
+// A skip ("haven't seen it", "not sure") keeps a film out of Discover for this long; likes and dislikes for good
+const SKIP_DAYS = 30;
 
 /// Saves the user's reaction to a film, replacing any earlier one
 async function upsertReaction(user_id, tmdb_id, reaction, source = null) {
@@ -57,9 +59,14 @@ async function fetchReactions(user_id) {
     return result.rows;
 }
 
-/// The user's reactions as a Map tmdb_id -> reaction
+/// The user's reactions that still keep a film out of recommendations, as a Map tmdb_id -> reaction: every like
+/// and dislike, and skips from the last SKIP_DAYS days
 async function fetchReactionMap(user_id) {
-    const result = await pool.query("SELECT tmdb_id, reaction FROM discover_reactions WHERE user_id = $1", [user_id]);
+    const result = await pool.query(
+        `SELECT tmdb_id, reaction FROM discover_reactions
+         WHERE user_id = $1 AND (reaction <> 'skip' OR updated_at > CURRENT_TIMESTAMP - make_interval(days => $2))`,
+        [user_id, SKIP_DAYS]
+    );
     return new Map(result.rows.map((row) => [Number(row.tmdb_id), row.reaction]));
 }
 
@@ -79,17 +86,36 @@ async function fetchReactedFilms(user_id, limit = 300) {
     return { liked: films("like"), disliked: films("dislike") };
 }
 
-/// Deletes all the user's reactions (Reset Taste Profile), or one film's (Undo). Returns how many were deleted
-async function deleteReactions(user_id, tmdb_id = null) {
-    const result = tmdb_id === null
-        ? await pool.query("DELETE FROM discover_reactions WHERE user_id = $1", [user_id])
-        : await pool.query("DELETE FROM discover_reactions WHERE user_id = $1 AND tmdb_id = $2", [user_id, tmdb_id]);
+/// Deletes all the user's reactions (Reset Taste Profile), one film's (Undo) or all of one kind (reaction "skip":
+/// Show Skipped Again). Returns how many were deleted
+async function deleteReactions(user_id, tmdb_id = null, reaction = null) {
+    const conditions = ["user_id = $1"];
+    const params = [user_id];
+    if (tmdb_id !== null) {
+        params.push(tmdb_id);
+        conditions.push(`tmdb_id = $${params.length}`);
+    }
+    if (reaction !== null) {
+        params.push(reaction);
+        conditions.push(`reaction = $${params.length}`);
+    }
+    const result = await pool.query(`DELETE FROM discover_reactions WHERE ${conditions.join(" AND ")}`, params);
     return result.rowCount;
 }
 
 /// Films friends sent the user that they haven't watched, listed or disliked in Discover, newest first, once each
 /// with whoever sent it most recently. Leaves out anyone either of them has blocked
 async function fetchFriendPicks(user_id, limit = 20) {
+    try {
+        return await queryFriendPicks(user_id, limit, true);
+    } catch (error) {
+        // Before the discover_reactions table is created (npm run migrate), friends' picks still come, unfiltered
+        if (error.code !== "42P01") throw error;
+        return queryFriendPicks(user_id, limit, false);
+    }
+}
+
+async function queryFriendPicks(user_id, limit, withReactions) {
     const result = await pool.query(
         `SELECT * FROM (
              SELECT DISTINCT ON (r.tmdb_id) r.tmdb_id, r.title, r.poster_path, r.release_date, r.overview,
@@ -100,8 +126,8 @@ async function fetchFriendPicks(user_id, limit = 20) {
                                WHERE l.user_id = $1 AND m.tmdb_id = r.tmdb_id::text)
                AND NOT EXISTS (SELECT 1 FROM watched_movies w JOIN movies m ON m.id = w.movie_id
                                WHERE w.user_id = $1 AND m.tmdb_id = r.tmdb_id::text)
-               AND NOT EXISTS (SELECT 1 FROM discover_reactions d
-                               WHERE d.user_id = $1 AND d.tmdb_id = r.tmdb_id AND d.reaction = 'dislike')
+               ${withReactions ? `AND NOT EXISTS (SELECT 1 FROM discover_reactions d
+                               WHERE d.user_id = $1 AND d.tmdb_id = r.tmdb_id AND d.reaction = 'dislike')` : ""}
              ORDER BY r.tmdb_id, r.created_at DESC
          ) picks
          ORDER BY created_at DESC
@@ -113,5 +139,5 @@ async function fetchFriendPicks(user_id, limit = 20) {
 
 module.exports = {
     upsertReaction, upsertReactions, fetchReactions, fetchReactionMap, fetchReactedFilms, deleteReactions,
-    fetchFriendPicks, REACTIONS, MAX_BULK,
+    fetchFriendPicks, REACTIONS, MAX_BULK, SKIP_DAYS,
 };

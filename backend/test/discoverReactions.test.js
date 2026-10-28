@@ -16,13 +16,15 @@ async function withServer(run) {
             return list.length;
         },
         fetchReactions: async () => [...rows.values()],
-        deleteReactions: async (user, id) => {
-            if (id === null) {
-                const n = rows.size;
-                rows.clear();
-                return n;
+        deleteReactions: async (user, id, reaction = null) => {
+            let n = 0;
+            for (const [key, row] of rows) {
+                if ((id === null || key === id) && (reaction === null || row.reaction === reaction)) {
+                    rows.delete(key);
+                    n++;
+                }
             }
-            return rows.delete(id) ? 1 : 0;
+            return n;
         },
     };
     const app = express();
@@ -74,4 +76,14 @@ test("bulk saves valid entries, caps at 2000 and doesn't trust future times", ()
     assert.ok(new Date(rows.get(4).updated_at) <= new Date());
     const tooMany = Array.from({ length: 2001 }, (_, i) => ({ tmdb_id: i + 1, reaction: "skip" }));
     assert.strictEqual((await call("POST", "/bulk", { reactions: tooMany })).status, 400);
+}));
+
+test("Show Skipped Again deletes only skips", () => withServer(async ({ call, rows }) => {
+    await call("POST", "", { tmdb_id: 1, reaction: "like" });
+    await call("POST", "", { tmdb_id: 2, reaction: "skip" });
+    await call("POST", "", { tmdb_id: -3, reaction: "skip" });
+    await call("POST", "", { tmdb_id: 4, reaction: "dislike" });
+    assert.deepStrictEqual((await call("DELETE", "?reaction=skip")).body, { ok: true, deleted: 2 });
+    assert.deepStrictEqual([...rows.keys()].sort(), [1, 4]);
+    assert.strictEqual((await call("DELETE", "?reaction=meh")).status, 400);
 }));

@@ -149,7 +149,8 @@ function mediaId(value) {
 //          weight 0...2, 1 when left out, as older builds send). With no seeds, the user's top films are used
 //   genres, avoid_genres, only_genres=1 (every film has one of genres), kind=movie|tv|all, page, languages,
 //   providers, region (filters), exclude_ids (comma-separated ids never to return, e.g. already shown)
-// Films in the user's lists and films they reacted to in Discover are left out. Each film has the usual fields plus
+// Films in the user's lists, films they liked or disliked in Discover and films they skipped in the last 30 days
+// are left out (before the discover_reactions table exists, only listed ones). Each film has the usual fields plus
 // score (number), source ("seed" | "taste" | "explore" | "friend" | "trending") and, for friends' picks,
 // recommended_by: { handle, display_name }
 router.get("/discover", async (req, res) => {
