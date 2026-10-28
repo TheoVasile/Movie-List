@@ -33,6 +33,7 @@ struct MovieDetailView: View {
     @State private var providers: WatchProviders? = nil
     @State private var recommending = false
     @State private var showingMoreLikeThis = false
+    @State private var shareItem: ShareItem? = nil
     @ObservedObject private var social = SocialStore.shared
     @ObservedObject private var noteReview = NoteReview.shared
 
@@ -420,12 +421,24 @@ struct MovieDetailView: View {
             }
             .appearAnimation(delay: 0.18)
 
-            HStack(spacing: 8) {
+            // Wraps onto a second line on narrow phones
+            FlowLayout(spacing: 8) {
                 TrailerButton(tmdbID: Int64(movie.tmdb_id), title: movie.title ?? "")
                 // Needs an @username, since that's how friends see who sent it
                 if movie.tmdb_id != 0 && social.profile?.handle != nil {
                     recommendButton
                 }
+                // The film's link, which opens it in Marquee or on the web
+                if movie.tmdb_id != 0 {
+                    CapsuleActionButton(title: "Share", icon: "square.and.arrow.up") {
+                        shareItem = ShareItem(items: [movie.title ?? "A film on Marquee", ShareLinks.film(tmdbID: Int64(movie.tmdb_id))], kind: .film)
+                    }
+                    .accessibilityLabel("Share Film")
+                }
+            }
+            .sheet(item: $shareItem) { item in
+                ShareSheet(item: item)
+                    .presentationDetents([.medium, .large])
             }
 
             // The overview comes straight after the title, so it's readable without scrolling

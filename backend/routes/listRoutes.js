@@ -7,7 +7,9 @@ const { requireListEditor } = requireListOwner;
 const { notifyUser } = require("../services/pushService");
 const pool = require("../config/db");
 const { setListWatched } = require("../models/watchedModel");
-const { isPrivate } = require("../models/socialModel");
+const { isPrivate, fetchListsWithFilms } = require("../models/socialModel");
+const { isPublicId } = require("../models/publicModel");
+const { links } = require("../config/publicLinks");
 const { setListOrder, ensureMovie, appendMovieToList, movieJSON, parseTmdbId } = require("../models/movieModel");
 const { blockedField } = require("../services/moderation");
 
@@ -44,6 +46,45 @@ router.get("/fetch", async (req, res) => {
         res.status(200).json(lists);
     } catch (error) {
         console.error("Error fetching lists:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// A list's public link, for sharing: { url, public_id, shareable }. shareable is false unless anyone can see the
+// list (it's public and its owner's profile isn't private), since otherwise the link only works in the app for
+// people who can already see it
+router.get("/:id/link", requireListEditor((req) => req.params.id), async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT l.public_id, l.visibility = 'public' AND NOT o.is_private AS shareable
+             FROM lists l JOIN users o ON o.firebase_uid = l.user_id WHERE l.id = $1`,
+            [Number(req.params.id)]
+        );
+        const row = result.rows[0];
+        if (!row) return res.status(404).json({ error: "List not found." });
+        res.json({ url: links.list(row.public_id), public_id: row.public_id, shareable: row.shareable });
+    } catch (error) {
+        console.error("Error fetching list link:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Opens a shared list link (/l/<public_id>) in the app. Lists the user owns or edits -> { mine: true, id }, so
+// the app opens its own copy; others they can see -> { mine: false, list } read-only; anything else 404
+router.get("/public/:publicId", async (req, res) => {
+    if (!isPublicId(req.params.publicId)) return res.status(404).json({ error: "List not found." });
+    try {
+        const own = await pool.query(
+            `SELECT l.id FROM lists l WHERE l.public_id = $1 AND (l.user_id = $2
+             OR EXISTS (SELECT 1 FROM list_editors le WHERE le.list_id = l.id AND le.user_id = $2))`,
+            [req.params.publicId, req.user.uid]
+        );
+        if (own.rows[0]) return res.json({ mine: true, id: own.rows[0].id });
+        const [list] = await fetchListsWithFilms(req.user.uid, "l.public_id = $2::uuid", [req.params.publicId]);
+        if (!list) return res.status(404).json({ error: "List not found." });
+        res.json({ mine: false, id: list.id, list });
+    } catch (error) {
+        console.error("Error opening list link:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

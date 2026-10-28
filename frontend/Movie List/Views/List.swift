@@ -785,12 +785,20 @@ private extension ListView {
     func shareImage() {
         Haptics.tap()
         isPreparingShare = true
+        let listID = viewModel.movieList.id
         Task {
             let image = await ListShareImage.render(viewModel.movieList, colorScheme: colorScheme)
+            // The list's link goes with the image, when anyone can open it (a public list on a public profile)
+            let link: URL? = await withCheckedContinuation { continuation in
+                APIService.shared.fetchListLink(listID: listID) { result in
+                    guard case .success(let link) = result, link.shareable else { return continuation.resume(returning: nil) }
+                    continuation.resume(returning: URL(string: link.url))
+                }
+            }
             isPreparingShare = false
             if let image {
                 AppAnalytics.log(.shareList(.image))
-                shareItem = ShareItem(items: [image], kind: .listImage)
+                shareItem = ShareItem(items: [image] + (link.map { [$0] } ?? []), kind: .listImage)
             }
         }
     }

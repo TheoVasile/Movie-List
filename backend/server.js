@@ -5,6 +5,8 @@ const movieRoutes = require("./routes/movieRoutes");
 const letterboxdRoutes = require("./routes/letterboxdRoutes");
 const importRoutes = require("./routes/importRoutes");
 const userRoutes = require("./routes/userRoutes");
+const { createPublicRouter } = require("./routes/publicRoutes");
+const { createInviteRouters, notifyJoinedByPush } = require("./routes/inviteRoutes");
 const createTables = require("./migrations/setupDB");
 const verifyToken = require("./middleware/authMiddleware");
 const { perAddress, perUser } = require("./middleware/rateLimit");
@@ -89,6 +91,10 @@ dailyJob("/internal/streaming-alerts", "streaming alerts", "Alerts aren't set up
 // Tells people when a new season of a show in their lists starts
 dailyJob("/internal/season-alerts", "season alerts", "Alerts aren't set up.", sendSeasonAlerts);
 
+// Shared links' web pages (/l, /u, /f, /i, /join) and the apple-app-site-association file, for anyone with the
+// link: no sign-in, their own request limit
+app.use(createPublicRouter());
+
 app.use("/auth", perAddress, authRoutes);
 // Everything except account setup needs a signed-in user; /auth checks tokens per route
 app.use("/lists", verifyToken, perUser, listRoutes);
@@ -96,6 +102,10 @@ app.use("/movies", verifyToken, perUser, movieRoutes);
 app.use("/letterboxd", verifyToken, perUser, letterboxdRoutes);
 app.use("/import", verifyToken, perUser, importRoutes);
 app.use("/users", verifyToken, perUser, userRoutes);
+// Movie night group invite links
+const inviteRouters = createInviteRouters({ invites: require("./models/publicModel").invites, notifyJoined: notifyJoinedByPush });
+app.use("/groups", verifyToken, perUser, inviteRouters.groups);
+app.use("/invites", verifyToken, perUser, inviteRouters.invites);
 
 // Hosts like Render choose the port; locally it's 3000
 const port = process.env.PORT || 3000;
