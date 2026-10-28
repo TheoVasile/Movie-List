@@ -10,7 +10,8 @@ import SwiftUI
 
 /// "Your Taste vs Your Friend's": the user's lists next to a friend's (the lists that friend lets them see): how
 /// alike their taste is, their stats side by side, genres, the films both have ranked, and top 50 against top 50.
-/// Worked out on this device from data the user can already see
+/// Worked out on this device from data the user can already see; the match ring shows the server's Taste Match score
+/// once it's in, so it agrees with the shareable Taste Match card
 struct TasteComparisonView: View {
     let friend: UserSummary
     let friendLists: [FriendLists.List]
@@ -19,6 +20,8 @@ struct TasteComparisonView: View {
     @ObservedObject private var social = SocialStore.shared
     // Bumped as TMDb info arrives, so genres and scores fill in
     @State private var infoVersion = 0
+    // The server's Taste Match score, which the ring shows once it's in, so it's the same number as the card
+    @State private var serverScore: Double? = nil
 
     private static let topCount = StatsSummary.topCount
 
@@ -37,6 +40,8 @@ struct TasteComparisonView: View {
             VStack(spacing: 18) {
                 matchCard(comparison)
                     .appearAnimation()
+                tasteMatchLink
+                    .appearAnimation(delay: 0.03)
                 sideBySide(comparison)
                     .appearAnimation(delay: 0.05)
                 if !comparison.genres.isEmpty {
@@ -56,7 +61,10 @@ struct TasteComparisonView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Your Taste vs Your Friend's")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: loadInfo)
+        .onAppear {
+            loadInfo()
+            loadServerScore()
+        }
     }
 
     private var friendName: String { "@\(friend.handle)" }
@@ -64,19 +72,20 @@ struct TasteComparisonView: View {
     // MARK: Cards
 
     private func matchCard(_ comparison: Comparison) -> some View {
-        VStack(spacing: 14) {
+        let match = serverScore ?? comparison.match
+        return VStack(spacing: 14) {
             HStack(spacing: 18) {
                 Avatar(name: social.profile?.display_name ?? "You", size: 56, version: social.profile?.avatar_version)
                 ZStack {
                     Circle()
                         .stroke(Theme.textPrimary.opacity(0.12), lineWidth: 6)
                     Circle()
-                        .trim(from: 0, to: comparison.match)
+                        .trim(from: 0, to: match)
                         .stroke(Theme.accentGradient, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                        .animation(.easeOut(duration: 0.8), value: comparison.match)
+                        .animation(.easeOut(duration: 0.8), value: match)
                     VStack(spacing: 0) {
-                        Text("\(Int((comparison.match * 100).rounded()))%")
+                        Text("\(Int((match * 100).rounded()))%")
                             .font(.system(size: 24, weight: .heavy, design: .rounded))
                             .foregroundColor(Theme.textPrimary)
                             .contentTransition(.numericText())
@@ -88,7 +97,7 @@ struct TasteComparisonView: View {
                 .frame(width: 92, height: 92)
                 Avatar(name: friend.display_name, size: 56, handle: friend.handle, version: friend.avatar_version)
             }
-            Text(matchLine(comparison))
+            Text(matchLine(comparison, match: match))
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -99,10 +108,10 @@ struct TasteComparisonView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func matchLine(_ comparison: Comparison) -> String {
+    private func matchLine(_ comparison: Comparison, match: Double) -> String {
         let common = comparison.sharedCount
         let films = common == 1 ? "1 film" : "\(common) films"
-        switch comparison.match {
+        switch match {
         case 0.75...: return "Taste twins. You and \(friendName) have \(films) in common."
         case 0.5..<0.75: return "Plenty in common: \(films) in both your lists, and similar genres."
         case 0.3..<0.5: return "Some overlap: \(films) in both your lists."
@@ -288,6 +297,44 @@ struct TasteComparisonView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // Opens the shareable Taste Match card
+    private var tasteMatchLink: some View {
+        NavigationLink {
+            // TODO(integration): ShareLinks.inviteURL(handle:) / profileURL — pass @friend.handle's profile link here
+            TasteMatchView(handle: friend.handle, shareURL: nil)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Theme.accentGradient)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Taste Match Card")
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                    Text("Share how film-compatible you are")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            .padding(16)
+            .cardStyle(cornerRadius: 18)
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.98))
+    }
+
+    private func loadServerScore() {
+        APIService.shared.fetchTasteMatch(friend.handle) { result in
+            if case .success(let match) = result, match.enough, let score = match.score {
+                serverScore = Double(score) / 100
+            }
+        }
     }
 
     private func loadInfo() {

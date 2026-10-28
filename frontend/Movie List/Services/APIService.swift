@@ -282,6 +282,39 @@ struct PollOption: Decodable, Identifiable, Equatable {
 }
 
 /// A year of the user's diary, for Year in Review
+/// How film-compatible the user is with someone, worked out on the server from the user's ranked lists and the
+/// ones that person lets them see. When there's too little to go on, enough is false and needs says who has to rank
+/// more: "you", "them" or "overlap"
+struct TasteMatch: Decodable {
+    struct Person: Decodable {
+        let handle: String?
+        let display_name: String
+        let avatar_version: Double?
+    }
+
+    /// A film both have ranked, with each one's place in their list
+    struct Film: Decodable, Identifiable {
+        var id: Int64 { tmdb_id }
+        let tmdb_id: Int64
+        let title: String
+        let poster_path: String?
+        let release_date: String
+        let my_rank: Int
+        let their_rank: Int
+    }
+
+    let me: Person
+    let them: Person
+    let enough: Bool
+    let needs: String?
+    let score: Int?
+    let tier: String?
+    let shared_count: Int?
+    let both_love: [Film]?
+    let fight_over: [Film]?
+    let top_genre: String?
+}
+
 struct YearReview: Decodable {
     struct Film: Decodable, Identifiable, Hashable {
         var id: Int64 { tmdb_id }
@@ -878,6 +911,11 @@ class APIService {
     /// The user's Year in Review for a year
     func fetchYearReview(year: Int, completion: @escaping (Result<YearReview, Error>) -> Void) {
         sendJSON("GET", "/users/me/year-review", query: [URLQueryItem(name: "year", value: String(year))], completion: completion)
+    }
+
+    /// The user's Taste Match with @handle
+    func fetchTasteMatch(_ handle: String, completion: @escaping (Result<TasteMatch, Error>) -> Void) {
+        sendJSON("GET", "/users/\(handle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? handle)/taste-match", completion: completion)
     }
 
     /// The user's streaming services and country, and whether they want "now streaming" alerts

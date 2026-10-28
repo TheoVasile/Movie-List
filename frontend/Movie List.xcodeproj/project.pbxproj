@@ -37,6 +37,7 @@
 		A51CCABB8FA38DA6665A41A7 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */; };
 		58DDE1349E4375155252EE23 /* MoreLikeThisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */; };
 		23F1C2E26AB26898C19C8181 /* TasteComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */; };
+		7A3E5C1D9B2F4A6E8C0D1E2F /* TasteMatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */; };
 		B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F372852096382634FBAE62AC /* YearInReviewView.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
 		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
@@ -166,6 +167,7 @@
 		DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreLikeThisView.swift; sourceTree = "<group>"; };
 		DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasteComparisonView.swift; sourceTree = "<group>"; };
+		7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasteMatchView.swift; sourceTree = "<group>"; };
 		F372852096382634FBAE62AC /* YearInReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearInReviewView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -383,6 +385,7 @@
 				DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */,
 				D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */,
 				DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */,
+				7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */,
 				F372852096382634FBAE62AC /* YearInReviewView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
@@ -605,6 +608,7 @@
 				A51CCABB8FA38DA6665A41A7 /* CollectionsView.swift in Sources */,
 				58DDE1349E4375155252EE23 /* MoreLikeThisView.swift in Sources */,
 				23F1C2E26AB26898C19C8181 /* TasteComparisonView.swift in Sources */,
+				7A3E5C1D9B2F4A6E8C0D1E2F /* TasteMatchView.swift in Sources */,
 				B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,

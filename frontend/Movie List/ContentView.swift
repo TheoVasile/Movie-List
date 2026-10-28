@@ -93,6 +93,8 @@ struct ContentView: View {
                 .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
         }
+        // e.g. Taste Match's "Find Films to Rank"
+        .onReceive(NotificationCenter.default.publisher(for: .openDiscoverTab)) { _ in tab = .discover }
         .onAppear {
             ReviewPrompter.recordSession()
             social.load()
