@@ -1051,6 +1051,24 @@ class APIService {
         }
     }
 
+    private struct MilestoneRecord: Decodable { let milestone: String }
+    private struct MilestoneCreated: Decodable { let created: Bool }
+
+    /// The film-count milestones the user has reached, e.g. ["films_10", "films_50"]
+    func fetchMilestones(completion: @escaping (Result<[String], Error>) -> Void) {
+        sendJSON("GET", "/users/me/milestones") { (result: Result<[MilestoneRecord], Error>) in
+            completion(result.map { $0.map(\.milestone) })
+        }
+    }
+
+    /// Records a milestone, calling back with whether it's new for the user (only then is it celebrated). Fails
+    /// with code 409 when the server counts fewer films than the milestone needs
+    func recordMilestone(_ id: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        sendJSON("POST", "/users/me/milestones", body: ["milestone": id]) { (result: Result<MilestoneCreated, Error>) in
+            completion(result.map(\.created))
+        }
+    }
+
     private struct BlockResponse: Decodable { let blocked: Bool }
 
     /// Blocks or unblocks someone. Calls back with whether it was saved

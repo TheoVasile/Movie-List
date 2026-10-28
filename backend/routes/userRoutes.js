@@ -2,6 +2,7 @@ const express = require("express");
 const { fetchGroups, createGroup, leaveOrDeleteGroup, addGroupMembers, removeGroupMember, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, suggestPick, reactToPick, removePick, likedPicks } = require("../models/groupPicksModel");
 const { yearReview } = require("../models/yearReviewModel");
+const { fetchMilestones, recordMilestone, UnknownMilestoneError, MilestoneNotReachedError } = require("../models/milestonesModel");
 const { fetchFriendActivity } = require("../services/digestService");
 const { watchedEpisodes, setEpisodesWatched } = require("../services/tvEpisodes");
 const { MAX_RECIPIENTS, sendRecommendation, fetchReceived, markSeen, removeReceived } = require("../models/recommendationsModel");
@@ -765,6 +766,30 @@ router.put("/me/episodes/:showId", async (req, res) => {
         res.json(await setEpisodesWatched(req.user.uid, showId, season, episodes, req.body.watched));
     } catch (error) {
         console.error("Error saving watched episodes:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Film-count milestones the user has reached -> [{ "milestone": "films_100", "achieved_at": "..." }]
+router.get("/me/milestones", async (req, res) => {
+    try {
+        res.json(await fetchMilestones(req.user.uid));
+    } catch (error) {
+        console.error("Error fetching milestones:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// Records a milestone, e.g. { "milestone": "films_100" }, once the user's lists really hold that many different films.
+// Asking again is fine -> { "created": false }; the app only celebrates when created is true
+router.post("/me/milestones", async (req, res) => {
+    try {
+        const { created } = await recordMilestone(req.user.uid, req.body?.milestone);
+        res.status(created ? 201 : 200).json({ created });
+    } catch (error) {
+        if (error instanceof UnknownMilestoneError) return res.status(400).json({ error: "Unknown milestone." });
+        if (error instanceof MilestoneNotReachedError) return res.status(409).json({ error: "Not enough films for that milestone yet." });
+        console.error("Error recording milestone:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

@@ -34,7 +34,7 @@ enum AppAnalytics {
     enum WatchSource: String { case list, diary, checkIn = "check_in" }
     enum AIFeature: String { case discover, movieNight = "movie_night", smartPlacement = "smart_placement" }
     enum ShareFormat: String { case image, export }
-    enum ShareKind: String { case listImage = "list_image", yearInReview = "year_in_review", stats, export }
+    enum ShareKind: String { case listImage = "list_image", yearInReview = "year_in_review", stats, export, milestone }
     enum ImportSource: String { case letterboxd, excel, csv }
 
     enum Event {
@@ -65,6 +65,9 @@ enum AppAnalytics {
         // Whether the share sheet was finished (sent, saved, ...) or closed
         case shareCompleted(ShareKind, completed: Bool)
         case importCompleted(ImportSource, films: Int)
+        // A film-count milestone (films_10, films_100, ...) reached for the first time, and its card shared
+        case milestoneReached(String)
+        case milestoneShared(String)
         // Not logged yet: Phase 1 (onboarding, links and invites) wires these
         case onboardingStep(String)
         case linkOpened(String)
@@ -94,6 +97,8 @@ enum AppAnalytics {
             case .reviewPromptShown: return "review_prompt_shown"
             case .shareCompleted: return "share_completed"
             case .importCompleted: return "import_completed"
+            case .milestoneReached: return "milestone_reached"
+            case .milestoneShared: return "milestone_shared"
             case .onboardingStep: return "onboarding_step"
             case .linkOpened: return "link_opened"
             case .inviteSent: return "invite_sent"
@@ -131,6 +136,8 @@ enum AppAnalytics {
             // A size band rather than the count
             case .importCompleted(let source, let films):
                 return ["source": source.rawValue, "count": films <= 10 ? "1-10" : films <= 100 ? "11-100" : "100+"]
+            // One of the fixed milestone ids, never the exact count
+            case .milestoneReached(let milestone), .milestoneShared(let milestone): return ["milestone": milestone]
             // A fixed step or link kind, never the link itself
             case .onboardingStep(let step): return ["step": step]
             case .linkOpened(let kind): return ["kind": kind]

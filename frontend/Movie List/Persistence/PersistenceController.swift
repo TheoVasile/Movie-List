@@ -311,6 +311,8 @@ final class SyncStatus: ObservableObject {
                 self.lastSynced = Date()
                 self.lastError = nil
                 self.finish()
+                // Imports and films added while a milestone couldn't be recorded (offline) are caught here
+                Milestones.shared.check()
             case .failure(let error):
                 print("Couldn't load lists (attempt \(number + 1)):", error.localizedDescription)
                 if number < Self.retryDelays.count {

@@ -393,6 +393,14 @@ const createTables = async () => {
             );
             CREATE INDEX IF NOT EXISTS tmdb_cache_expires ON tmdb_cache (expires_at);
 
+            -- Film-count milestones the user has reached (10, 50, 100...), so each celebration plays once per user, ever
+            CREATE TABLE IF NOT EXISTS user_milestones (
+                user_id VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                milestone TEXT NOT NULL,
+                achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, milestone)
+            );
+
             -- Indexes for the busiest lookups that no primary key or unique constraint already starts with
             CREATE INDEX IF NOT EXISTS lists_user ON lists (user_id);
             -- A user's followers and follow requests
