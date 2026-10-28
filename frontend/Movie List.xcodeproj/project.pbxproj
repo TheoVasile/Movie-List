@@ -38,6 +38,8 @@
 		A51CCABB8FA38DA6665A41A7 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */; };
 		58DDE1349E4375155252EE23 /* MoreLikeThisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */; };
 		23F1C2E26AB26898C19C8181 /* TasteComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */; };
+		A11E57010000000000000004 /* MilestoneCelebrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E57010000000000000003 /* MilestoneCelebrationView.swift */; };
+		7A3E5C1D9B2F4A6E8C0D1E2F /* TasteMatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */; };
 		B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F372852096382634FBAE62AC /* YearInReviewView.swift */; };
 		FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000007 /* LetterboxdImportView.swift */; };
 		FA7E5A012F0000000000000B /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FA7E5A012F0000000000000A /* ZIPFoundation */; };
@@ -65,8 +67,10 @@
 		6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58660986FCF41669AACB301E /* NotificationManager.swift */; };
 		BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */; };
 		A11A7C5E2F00000000000002 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11A7C5E2F00000000000001 /* Analytics.swift */; };
+		C33C9E7F4F00000000000002 /* DiscoverReactionSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */; };
 		5EA4E11A2F00000000000002 /* ShareLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA4E11A2F00000000000001 /* ShareLinks.swift */; };
 		B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B8D6F3F00000000000001 /* ReviewPrompter.swift */; };
+		A11E57010000000000000002 /* Milestones.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E57010000000000000001 /* Milestones.swift */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
 		FA6F64C929F88B6E00B418DB /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6F64C829F88B6E00B418DB /* NetworkService.swift */; };
@@ -169,6 +173,8 @@
 		DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreLikeThisView.swift; sourceTree = "<group>"; };
 		DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasteComparisonView.swift; sourceTree = "<group>"; };
+		A11E57010000000000000003 /* MilestoneCelebrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneCelebrationView.swift; sourceTree = "<group>"; };
+		7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasteMatchView.swift; sourceTree = "<group>"; };
 		F372852096382634FBAE62AC /* YearInReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearInReviewView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000007 /* LetterboxdImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdImportView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000001 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -195,8 +201,10 @@
 		58660986FCF41669AACB301E /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingNowStore.swift; sourceTree = "<group>"; };
 		A11A7C5E2F00000000000001 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
+		C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverReactionSync.swift; sourceTree = "<group>"; };
 		5EA4E11A2F00000000000001 /* ShareLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareLinks.swift; sourceTree = "<group>"; };
 		B22B8D6F3F00000000000001 /* ReviewPrompter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompter.swift; sourceTree = "<group>"; };
+		A11E57010000000000000001 /* Milestones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestones.swift; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
 		FA6F64C829F88B6E00B418DB /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
@@ -326,8 +334,10 @@
 				FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */,
 				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				A11A7C5E2F00000000000001 /* Analytics.swift */,
+				C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */,
 				5EA4E11A2F00000000000001 /* ShareLinks.swift */,
 				B22B8D6F3F00000000000001 /* ReviewPrompter.swift */,
+				A11E57010000000000000001 /* Milestones.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 				FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */,
 			);
@@ -388,6 +398,8 @@
 				DE0DE76C56C24C2C13DFA541 /* CollectionsView.swift */,
 				D54D1BE167FE12336306E498 /* MoreLikeThisView.swift */,
 				DEE67E7CCACDFF9CD49B1A9D /* TasteComparisonView.swift */,
+				A11E57010000000000000003 /* MilestoneCelebrationView.swift */,
+				7A3E5C1D9B2F4A6E8C0D1E30 /* TasteMatchView.swift */,
 				F372852096382634FBAE62AC /* YearInReviewView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
@@ -611,6 +623,8 @@
 				A51CCABB8FA38DA6665A41A7 /* CollectionsView.swift in Sources */,
 				58DDE1349E4375155252EE23 /* MoreLikeThisView.swift in Sources */,
 				23F1C2E26AB26898C19C8181 /* TasteComparisonView.swift in Sources */,
+				A11E57010000000000000004 /* MilestoneCelebrationView.swift in Sources */,
+				7A3E5C1D9B2F4A6E8C0D1E2F /* TasteMatchView.swift in Sources */,
 				B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,
@@ -626,8 +640,10 @@
 				6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */,
 				BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */,
 				A11A7C5E2F00000000000002 /* Analytics.swift in Sources */,
+				C33C9E7F4F00000000000002 /* DiscoverReactionSync.swift in Sources */,
 				5EA4E11A2F00000000000002 /* ShareLinks.swift in Sources */,
 				B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */,
+				A11E57010000000000000002 /* Milestones.swift in Sources */,
 				FAE949E92D547D0300592081 /* AccountView.swift in Sources */,
 				FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */,
 				FAFF24F62BE687A000C4F78D /* MovieRow.swift in Sources */,

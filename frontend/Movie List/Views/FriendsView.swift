@@ -941,6 +941,8 @@ struct FriendProfileView: View {
                     FollowButton(person: person)
                 }
 
+                tasteMatchButton
+
                 if social.hasRequested(person.handle) && !social.isFollowing(person.handle) {
                     Text("Request sent. You'll see @\(person.handle)'s lists, rankings and watched films once they accept.")
                         .font(.subheadline)
@@ -1075,6 +1077,18 @@ struct FriendProfileView: View {
                     .foregroundColor(Theme.textSecondary)
             }
         }
+    }
+
+    // For anyone, followed or not: it only uses the lists of theirs the user can see
+    private var tasteMatchButton: some View {
+        NavigationLink {
+            // TODO(integration): ShareLinks.inviteURL(handle:) / profileURL — pass @person.handle's profile link here
+            TasteMatchView(handle: person.handle, shareURL: nil)
+        } label: {
+            Label("Taste Match", systemImage: "heart.circle.fill")
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .accessibilityHint("How film-compatible you are with @\(person.handle), as a card you can share")
     }
 
     private func block() {

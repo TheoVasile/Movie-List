@@ -36,7 +36,7 @@ enum AppAnalytics {
     enum ShareFormat: String { case image, export }
     enum ShareKind: String {
         case listImage = "list_image", yearInReview = "year_in_review", stats, export, film, profile
-        case invite, groupInvite = "group_invite"
+        case invite, groupInvite = "group_invite", milestone, tasteMatch = "taste_match"
     }
     enum ImportSource: String { case letterboxd, excel, csv }
 
@@ -48,8 +48,12 @@ enum AppAnalytics {
         case filmRanked(RankMethod)
         case filmWatched(WatchSource)
         case aiPickUsed(AIFeature)
-        // A Discover card added to a list, marked Not for Me or skipped, and whether AI Picks was choosing the cards
-        case discoverSwipe(DiscoverReaction, ai: Bool)
+        // A Discover card added to a list, marked Not for Me or skipped, and whether AI Picks was choosing the cards.
+        // With the film's TMDb id, why it was recommended (seed, taste, explore, friend, trending, ai or unknown) and
+        // where in the session's deck it was dealt
+        case discoverSwipe(DiscoverReaction, ai: Bool, tmdbID: Int64, source: String, position: Int)
+        // A Discover card reaching the top of the deck, with the same details
+        case discoverImpression(tmdbID: Int64, source: String, position: Int, ai: Bool)
         case recommendationSent(recipients: Int)
         case theatreCheckInOpened
         case moreLikeThisOpened
@@ -64,6 +68,12 @@ enum AppAnalytics {
         // Whether the share sheet was finished (sent, saved, ...) or closed
         case shareCompleted(ShareKind, completed: Bool)
         case importCompleted(ImportSource, films: Int)
+        // A film-count milestone (films_10, films_100, ...) reached for the first time, and its card shared
+        case milestoneReached(String)
+        case milestoneShared(String)
+        // The Taste Match screen opened, with the score band shown (or "not_enough"), and its card shared
+        case tasteMatchViewed(band: String)
+        case tasteMatchShared(format: String)
         // Not logged yet: onboarding wires this
         case onboardingStep(String)
         // A Marquee link opened the app (list, profile, film, group_invite, personal_invite)
@@ -82,6 +92,7 @@ enum AppAnalytics {
             case .filmWatched: return "film_watched"
             case .aiPickUsed: return "ai_pick_used"
             case .discoverSwipe: return "discover_swipe"
+            case .discoverImpression: return "discover_impression"
             case .recommendationSent: return "recommendation_sent"
             case .theatreCheckInOpened: return "theatre_checkin_opened"
             case .moreLikeThisOpened: return "more_like_this_opened"
@@ -94,6 +105,10 @@ enum AppAnalytics {
             case .reviewPromptShown: return "review_prompt_shown"
             case .shareCompleted: return "share_completed"
             case .importCompleted: return "import_completed"
+            case .milestoneReached: return "milestone_reached"
+            case .milestoneShared: return "milestone_shared"
+            case .tasteMatchViewed: return "taste_match_viewed"
+            case .tasteMatchShared: return "taste_match_shared"
             case .onboardingStep: return "onboarding_step"
             case .linkOpened: return "link_opened"
             case .inviteSent: return "invite_sent"
@@ -109,14 +124,16 @@ enum AppAnalytics {
             case .filmRanked(let method): return [AnalyticsParameterMethod: method.rawValue]
             case .filmWatched(let source): return ["source": source.rawValue]
             case .aiPickUsed(let feature): return ["feature": feature.rawValue]
-            case .discoverSwipe(let reaction, let ai):
+            case .discoverSwipe(let reaction, let ai, let tmdbID, let source, let position):
                 let direction: String
                 switch reaction {
                 case .liked: direction = "add"
                 case .disliked: direction = "dislike"
                 case .skipped: direction = "skip"
                 }
-                return ["direction": direction, "ai": ai ? "true" : "false"]
+                return ["direction": direction, "ai": ai ? "true" : "false", "tmdb_id": tmdbID, "source": source, "position": position]
+            case .discoverImpression(let tmdbID, let source, let position, let ai):
+                return ["tmdb_id": tmdbID, "source": source, "position": position, "ai": ai ? "true" : "false"]
             // Capped, so it's a rough size rather than a count of the user's friends
             case .recommendationSent(let recipients): return ["recipients": min(recipients, 10)]
             // The report form's fixed choices (user, list, …; spam, harassment, …), never what was reported
@@ -129,6 +146,11 @@ enum AppAnalytics {
             // A size band rather than the count
             case .importCompleted(let source, let films):
                 return ["source": source.rawValue, "count": films <= 10 ? "1-10" : films <= 100 ? "11-100" : "100+"]
+            // One of the fixed milestone ids, never the exact count
+            case .milestoneReached(let milestone), .milestoneShared(let milestone): return ["milestone": milestone]
+            // A score band and a card format, never who the match was with
+            case .tasteMatchViewed(let band): return ["band": band]
+            case .tasteMatchShared(let format): return ["format": format]
             // A fixed step or link kind, never the link itself
             case .onboardingStep(let step): return ["step": step]
             case .linkOpened(let kind): return ["kind": kind]
