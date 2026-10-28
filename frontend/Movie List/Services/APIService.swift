@@ -1365,11 +1365,22 @@ class APIService {
     }
     /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
     /// onlyGenres: the user picked these genres themselves, so every film returned has one of them
-    func discoverMovies(seeds: [Int64], kind: DiscoverKind = .movie, genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    /// The films Discover's next batch is based on, as the server reads them: "550:1.000,-1399:0.600" (id:weight,
+    /// shows negative). Weights are kept within what the server accepts (0...2) and never round down to 0, which
+    /// would waste the seed
+    static func encodeSeeds(_ seeds: [(id: Int64, weight: Double)]) -> String {
+        seeds.map { seed in
+            let weight = seed.weight.isFinite ? min(max(seed.weight, 0.001), 2) : 1
+            return "\(seed.id):\(String(format: "%.3f", weight))"
+        }.joined(separator: ",")
+    }
+
+    /// Films for Discover, already ranked by the server, which also sends each one's score and source when it can
+    func discoverMovies(seeds: [(id: Int64, weight: Double)], kind: DiscoverKind = .movie, genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
             URLQueryItem(name: "kind", value: kind.rawValue),
-            URLQueryItem(name: "seeds", value: seeds.map(String.init).joined(separator: ",")),
+            URLQueryItem(name: "seeds", value: Self.encodeSeeds(seeds)),
             URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "page", value: String(page)),
@@ -1382,7 +1393,10 @@ class APIService {
             return
         }
 
-        send(URLRequest(url: url)) { data, response, error in
+        var request = URLRequest(url: url)
+        // A first batch ranked on the server can take several seconds while the user's taste is worked out
+        request.timeoutInterval = 30
+        send(request) { data, response, error in
             guard let data = data, error == nil,
                   let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 DispatchQueue.main.async {
@@ -1401,6 +1415,62 @@ class APIService {
                     completion(.failure(error))
                 }
             }
+        }
+    }
+
+    // MARK: Discover reactions
+
+    /// Where the user's Discover likes, dislikes and skips are kept with the account
+    private static let discoverReactionsPath = "/movies/discover/reactions"
+
+    struct DiscoverReactionRecord: Decodable {
+        let tmdb_id: Int64
+        let reaction: String
+        let updated_at: String?
+    }
+
+    private struct DiscoverReactionsResponse: Decodable { let reactions: [DiscoverReactionRecord] }
+    /// Calls back with the HTTP status (0 when the request never got an answer)
+    private func sendIgnoringReply(_ method: String, _ path: String, query: [URLQueryItem] = [], body: [String: Any]? = nil, completion: @escaping (Int) -> Void) {
+        var components = URLComponents(string: baseURL + path)
+        if !query.isEmpty { components?.queryItems = query }
+        guard let url = components?.url else { return completion(0) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
+        }
+        send(request) { _, response, error in
+            let status = error == nil ? (response as? HTTPURLResponse)?.statusCode ?? 0 : ((error as NSError?)?.code == 401 ? 401 : 0)
+            DispatchQueue.main.async { completion(status) }
+        }
+    }
+
+    /// Records a like, dislike or skip ("like", "dislike", "skip") from Discover
+    func sendDiscoverReaction(tmdbID: Int64, reaction: String, source: String?, completion: @escaping (Int) -> Void) {
+        var body: [String: Any] = ["tmdb_id": tmdbID, "reaction": reaction]
+        if let source { body["source"] = source }
+        sendIgnoringReply("POST", Self.discoverReactionsPath, body: body, completion: completion)
+    }
+
+    /// Up to 2000 reactions at once, each {tmdb_id, reaction, at?}
+    func sendDiscoverReactions(_ reactions: [[String: Any]], completion: @escaping (Int) -> Void) {
+        sendIgnoringReply("POST", Self.discoverReactionsPath + "/bulk", body: ["reactions": reactions], completion: completion)
+    }
+
+    /// Takes back one film's reaction, every reaction of one kind (e.g. "skip", for Show Skipped Again), or every
+    /// reaction when both are nil
+    func deleteDiscoverReactions(tmdbID: Int64?, reaction: String? = nil, completion: @escaping (Int) -> Void) {
+        var query: [URLQueryItem] = []
+        if let tmdbID { query.append(URLQueryItem(name: "tmdb_id", value: String(tmdbID))) }
+        if let reaction { query.append(URLQueryItem(name: "reaction", value: reaction)) }
+        sendIgnoringReply("DELETE", Self.discoverReactionsPath, query: query, completion: completion)
+    }
+
+    func fetchDiscoverReactions(completion: @escaping (Result<[DiscoverReactionRecord], Error>) -> Void) {
+        sendJSON("GET", Self.discoverReactionsPath) { (result: Result<DiscoverReactionsResponse, Error>) in
+            completion(result.map(\.reactions))
         }
     }
 

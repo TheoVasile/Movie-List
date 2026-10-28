@@ -277,7 +277,8 @@ enum QuickAdd {
 }
 
 /// What Discover has learned from the user's likes (films added from Discover) and dislikes (Not for Me). Kept
-/// on this device only, as TMDb film ids, a score per genre (liking a film raises its genres' scores, disliking it
+/// on this device, as TMDb film ids (the likes, dislikes and skips themselves are also kept with the account, see
+/// DiscoverReactionSync), a score per genre (liking a film raises its genres' scores, disliking it
 /// lowers them; skips are never recorded) and the titles of recent likes and dislikes, which AI Discover uses when the user's lists are empty
 struct TasteProfile: Codable {
     struct RecentFilm: Codable, Equatable {
@@ -422,7 +423,10 @@ class DiscoverViewModel: ObservableObject {
     /// Cards still to swipe, top card first
     @Published private(set) var deck: [Movie] = [] {
         // Saved so Discover opens with cards straight away next time
-        didSet { saveDeck() }
+        didSet {
+            saveDeck()
+            logImpressionIfNeeded()
+        }
     }
     @Published private(set) var isLoading = false
     @Published private(set) var loadFailed = false
@@ -430,7 +434,8 @@ class DiscoverViewModel: ObservableObject {
     @Published private(set) var profile: TasteProfile
 
     private var page = 1
-    // Every film in the user's lists, weighted by how highly it's ranked
+    // Films in the user's ranked lists, weighted by how highly they're ranked (and watched films from unranked
+    // lists, lightly)
     private var seedPool: [(id: Int64, weight: Double)] = []
     // Films already used as seeds, so each batch draws on different ones
     private var usedSeeds: Set<Int64> = []
@@ -452,6 +457,11 @@ class DiscoverViewModel: ObservableObject {
     private var aiSuggestedTitles: [String] = []
     // Every film dealt this session
     private var shownIDs: Set<Int64> = []
+    // Where each card was dealt this session, first card 0, for analytics
+    private var positions: [Int64: Int] = [:]
+    private var dealtCount = 0
+    // The last card logged as seen on top, so each is logged once each time it gets there
+    private var impressionID: Int64? = nil
     // Genres the user chose to see; empty means automatic, tuned to their taste. Kept across launches
     @Published private(set) var genreFilter: Set<Int>
     @Published private(set) var filters: DiscoverFilters
@@ -512,6 +522,7 @@ class DiscoverViewModel: ObservableObject {
             .flatMap { try? JSONDecoder().decode([Movie].self, from: $0) } ?? []
         deck = saved.filter { !passedIDs.contains($0.id) && !dislikedIDs.contains($0.id) && !likedIDs.contains($0.id) }
         shownIDs = Set(deck.map(\.id))
+        for movie in deck { notePosition(movie) }
         // A like or dislike taken back from the Liked & Not for Me screen
         reactionsChanged = DiscoverReactions.shared.changed.sink { [weak self] in self?.reloadReactions() }
     }
@@ -521,15 +532,20 @@ class DiscoverViewModel: ObservableObject {
         likedIDs = RecentIDs(UserDefaults.standard.array(forKey: Self.likedKey) as? [Int] ?? [], limit: Self.likedLimit)
         profile = UserDefaults.standard.data(forKey: Self.profileKey)
             .flatMap { try? JSONDecoder().decode(TasteProfile.self, from: $0) } ?? TasteProfile()
+        // Dislikes merged from the account, e.g. after a reinstall, take their cards out
+        let hidden = deck.filter { dislikedIDs.contains($0.id) }
+        if !hidden.isEmpty { deck.removeAll { dislikedIDs.contains($0.id) } }
     }
 
     private static let seedsPerBatch = 6
     private static let likedSeedsPerBatch = 2
+    // A film just liked in Discover says most about what the user wants right now
+    private static let likedSeedWeight = 1.5
 
-    /// Picks the films to base the next batch on: up to two recently liked films, plus a rank-weighted
-    /// sample from the whole collection. Favourites are likelier, but any film can be picked, and no film
-    /// is used again until the rest have been, so one film can't steer the whole deck
-    private func nextSeeds() -> [Int64] {
+    /// Picks the films to base the next batch on, each with how much it should count: up to two recently liked
+    /// films, plus a rank-weighted sample from the ranked lists. Favourites are likelier, but any film can be
+    /// picked, and no film is used again until the rest have been, so one film can't steer the whole deck
+    private func nextSeeds() -> [(id: Int64, weight: Double)] {
         let liked = Array(profile.likedMovieIDs.filter { !usedSeeds.contains($0) }.prefix(Self.likedSeedsPerBatch))
         var available = seedPool.filter { !usedSeeds.contains($0.id) && !liked.contains($0.id) }
         if available.count < Self.seedsPerBatch {
@@ -543,8 +559,9 @@ class DiscoverViewModel: ObservableObject {
             .sorted { $0.key > $1.key }
             .prefix(Self.seedsPerBatch)
             .map(\.id)
-        let seeds = liked + sampled
-        usedSeeds.formUnion(seeds)
+        let weights = Dictionary(seedPool.map { ($0.id, $0.weight) }, uniquingKeysWith: max)
+        let seeds = liked.map { (id: $0, weight: Self.likedSeedWeight) } + sampled.map { (id: $0, weight: weights[$0] ?? 1) }
+        usedSeeds.formUnion(seeds.map(\.id))
         return seeds
     }
 
@@ -582,7 +599,8 @@ class DiscoverViewModel: ObservableObject {
         deck.removeAll { $0.id == movie.id }
         passedIDs.insert(movie.id)
         UserDefaults.standard.set(passedIDs.stored, forKey: Self.passedKey)
-        logSwipe(.skipped)
+        DiscoverReactionSync.shared.record(movie, .skipped)
+        logSwipe(movie, .skipped)
         refillIfNeeded()
     }
 
@@ -594,7 +612,8 @@ class DiscoverViewModel: ObservableObject {
         UserDefaults.standard.set(dislikedIDs.stored, forKey: Self.dislikedKey)
         learn(from: movie, .disliked)
         DiscoverReactions.shared.add(movie, liked: false)
-        logSwipe(.disliked)
+        DiscoverReactionSync.shared.record(movie, .disliked)
+        logSwipe(movie, .disliked)
         refillIfNeeded()
     }
 
@@ -605,10 +624,40 @@ class DiscoverViewModel: ObservableObject {
         UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
         learn(from: movie, .liked)
         DiscoverReactions.shared.add(movie, liked: true)
+        DiscoverReactionSync.shared.record(movie, .liked)
     }
 
-    private func logSwipe(_ reaction: DiscoverReaction) {
-        AppAnalytics.log(.discoverSwipe(reaction, ai: usesAI))
+    private func logSwipe(_ movie: Movie, _ reaction: DiscoverReaction) {
+        AppAnalytics.log(.discoverSwipe(reaction, ai: usesAI, tmdbID: movie.id, source: analyticsSource(movie), position: position(of: movie)))
+    }
+
+    // MARK: Analytics
+
+    // Why the card was picked, as the server said, or "ai" for an AI Pick
+    private func analyticsSource(_ movie: Movie) -> String {
+        movie.source ?? (movie.ai == true ? "ai" : "unknown")
+    }
+
+    private func notePosition(_ movie: Movie) {
+        guard positions[movie.id] == nil else { return }
+        positions[movie.id] = dealtCount
+        dealtCount += 1
+    }
+
+    private func position(of movie: Movie) -> Int {
+        positions[movie.id] ?? 0
+    }
+
+    /// Logs the top card once each time a new one gets there. Also called when Discover appears, for the card
+    /// left on top last time
+    func logImpressionIfNeeded() {
+        guard let top = deck.first else {
+            impressionID = nil
+            return
+        }
+        guard top.id != impressionID else { return }
+        impressionID = top.id
+        AppAnalytics.log(.discoverImpression(tmdbID: top.id, source: analyticsSource(top), position: position(of: top), ai: usesAI))
     }
 
     /// Adds the film to every chosen list at once, however it was added from Discover: a swipe right, Add, or Add
@@ -654,7 +703,7 @@ class DiscoverViewModel: ObservableObject {
                     self.undoHistory[index] = step
                 }
                 AppAnalytics.log(.filmAdded(.discover))
-                self.logSwipe(.liked)
+                self.logSwipe(movie, .liked)
             }
             completion(done)
         }
@@ -676,6 +725,7 @@ class DiscoverViewModel: ObservableObject {
         likedIDs.remove(movie.id)
         UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
         DiscoverReactions.shared.remove(movie.id)
+        DiscoverReactionSync.shared.remove(movie.id)
         profile = before
         if let data = try? JSONEncoder().encode(profile) {
             UserDefaults.standard.set(data, forKey: Self.profileKey)
@@ -690,7 +740,14 @@ class DiscoverViewModel: ObservableObject {
         page = 1
         isExhausted = false
         deck = []
-        loadMore()
+        // The server keeps skips out of Discover too, so they're cleared there first. If that can't be sent now
+        // it's queued and the batch is asked for anyway
+        isLoading = true
+        DiscoverReactionSync.shared.clearSkips { [weak self] in
+            guard let self else { return }
+            self.isLoading = false
+            self.loadMore()
+        }
     }
 
     /// Shows only films in these genres (any of them), or goes back to automatic when empty. Starts the deck over
@@ -721,6 +778,8 @@ class DiscoverViewModel: ObservableObject {
         UserDefaults.standard.set(dislikedIDs.stored, forKey: Self.dislikedKey)
         UserDefaults.standard.set(likedIDs.stored, forKey: Self.likedKey)
         if last.reaction != .skipped && !keepsLike { DiscoverReactions.shared.remove(last.movie.id) }
+        // The account forgets it too; a like from before this add stays
+        if !keepsLike { DiscoverReactionSync.shared.remove(last.movie.id) }
         if last.reaction == .liked {
             listedIDs.remove(last.movie.id)
             removeCopies(last.added, couldNotRemove: couldNotRemove)
@@ -796,10 +855,18 @@ class DiscoverViewModel: ObservableObject {
         likedIDs = RecentIDs([], limit: Self.likedLimit)
         UserDefaults.standard.removeObject(forKey: Self.likedKey)
         DiscoverReactions.shared.clear()
+        DiscoverReactionSync.shared.clearAll()
         page = 1
         isExhausted = false
         deck = []
-        loadMore()
+        // The server keeps skips out of Discover too, so they're cleared there first. If that can't be sent now
+        // it's queued and the batch is asked for anyway
+        isLoading = true
+        DiscoverReactionSync.shared.clearSkips { [weak self] in
+            guard let self else { return }
+            self.isLoading = false
+            self.loadMore()
+        }
     }
 
     private func learn(from movie: Movie, _ reaction: DiscoverReaction) {
@@ -822,6 +889,9 @@ class DiscoverViewModel: ObservableObject {
         aiEmptyBatches = 0
         aiSuggestedTitles = []
         shownIDs = []
+        positions = [:]
+        dealtCount = 0
+        impressionID = nil
     }
 
     // Puts the films that best match the profile first, while spreading out similar ones: each genre a
@@ -843,6 +913,26 @@ class DiscoverViewModel: ObservableObject {
             recentGenres.append(Set(pick.movie.genre_ids ?? []))
         }
         return ordered
+    }
+
+    /// The server's ranked feed is kept in its order, only spread out so two cards in a row don't share a main
+    /// genre: when the next card would, the closest one after it that doesn't comes forward instead
+    private func spreadOut(_ movies: [Movie]) -> [Movie] {
+        var remaining = movies
+        var ordered: [Movie] = []
+        // How far ahead to look for a card to bring forward, so the server's order mostly holds
+        let lookahead = 4
+        while !remaining.isEmpty {
+            let previous = (ordered.last ?? deck.last)?.genre_ids?.first
+            let index = remaining.prefix(lookahead).firstIndex { previous == nil || $0.genre_ids?.first != previous } ?? 0
+            ordered.append(remaining.remove(at: index))
+        }
+        return ordered
+    }
+
+    /// Whether the server ranked these itself (newer servers send a score or source with each film)
+    private func serverRanked(_ movies: [Movie]) -> Bool {
+        movies.contains { $0.score != nil || $0.source != nil }
     }
 
     private func refillIfNeeded() {
@@ -880,6 +970,7 @@ class DiscoverViewModel: ObservableObject {
 
     private func deal(_ movies: [Movie]) {
         shownIDs.formUnion(movies.map(\.id))
+        movies.forEach(notePosition)
         withAnimation(Theme.spring) {
             deck.append(contentsOf: movies)
         }
@@ -960,7 +1051,9 @@ class DiscoverViewModel: ObservableObject {
             switch result {
             case .success(let movies):
                 self.page += 1
-                self.deal(self.orderedByTaste(movies.filter(self.isFresh)))
+                let fresh = movies.filter(self.isFresh)
+                // Older servers send TMDb's order, which is put in taste order here instead
+                self.deal(self.serverRanked(movies) ? self.spreadOut(fresh) : self.orderedByTaste(fresh))
                 if movies.isEmpty || self.page > Self.maxPages {
                     self.isExhausted = true
                 } else {
