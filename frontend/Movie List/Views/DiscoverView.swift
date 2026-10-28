@@ -753,7 +753,8 @@ private extension DiscoverView {
             .accessibilityHint("Same as swiping left. Haven't seen it or not sure: moves on without changing your taste profile")
             addButton
         }
-        .disabled(isSwiping)
+        // Nothing to act on while the first batch loads
+        .disabled(isSwiping || viewModel.topMovie == nil)
     }
 
     // Brings back the last card added, marked Not for Me or skipped. An added film is taken back out of its lists

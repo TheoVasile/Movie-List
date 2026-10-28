@@ -15,7 +15,7 @@ final class DiscoverReactionSync {
     static let shared = DiscoverReactionSync()
 
     private struct Pending: Codable {
-        enum Kind: String, Codable { case react, remove, clear }
+        enum Kind: String, Codable { case react, remove, clear, clearSkips }
         let kind: Kind
         var tmdbID: Int64? = nil
         var reaction: String? = nil
@@ -63,6 +63,17 @@ final class DiscoverReactionSync {
         UserDefaults.standard.set(true, forKey: Self.migratedKey)
         save()
         flush()
+    }
+
+    /// Forgets every skip, for Show Skipped Again, so the server offers those films again. Calls back once the
+    /// change has been sent or queued for later, so the next batch is asked for after it
+    func clearSkips(completion: @escaping () -> Void = {}) {
+        // Skips still waiting to be sent would only be deleted again
+        pending.removeAll { $0.kind == .react && $0.reaction == "skip" }
+        pending.removeAll { $0.kind == .clearSkips }
+        pending.append(Pending(kind: .clearSkips))
+        save()
+        flush { _ in completion() }
     }
 
     /// Uploads what's waiting (and, the first time, the likes and dislikes kept on this device), then merges the
@@ -142,6 +153,8 @@ final class DiscoverReactionSync {
             api.deleteDiscoverReactions(tmdbID: id, completion: completion)
         case .clear:
             api.deleteDiscoverReactions(tmdbID: nil, completion: completion)
+        case .clearSkips:
+            api.deleteDiscoverReactions(tmdbID: nil, reaction: "skip", completion: completion)
         }
     }
 

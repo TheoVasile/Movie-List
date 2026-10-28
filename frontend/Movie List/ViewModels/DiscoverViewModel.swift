@@ -740,7 +740,14 @@ class DiscoverViewModel: ObservableObject {
         page = 1
         isExhausted = false
         deck = []
-        loadMore()
+        // The server keeps skips out of Discover too, so they're cleared there first. If that can't be sent now
+        // it's queued and the batch is asked for anyway
+        isLoading = true
+        DiscoverReactionSync.shared.clearSkips { [weak self] in
+            guard let self else { return }
+            self.isLoading = false
+            self.loadMore()
+        }
     }
 
     /// Shows only films in these genres (any of them), or goes back to automatic when empty. Starts the deck over
@@ -852,7 +859,14 @@ class DiscoverViewModel: ObservableObject {
         page = 1
         isExhausted = false
         deck = []
-        loadMore()
+        // The server keeps skips out of Discover too, so they're cleared there first. If that can't be sent now
+        // it's queued and the batch is asked for anyway
+        isLoading = true
+        DiscoverReactionSync.shared.clearSkips { [weak self] in
+            guard let self else { return }
+            self.isLoading = false
+            self.loadMore()
+        }
     }
 
     private func learn(from movie: Movie, _ reaction: DiscoverReaction) {
