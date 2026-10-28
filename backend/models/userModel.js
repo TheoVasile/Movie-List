@@ -21,7 +21,7 @@ async function getUserByFirebaseUID(firebase_uid) {
 // Permanently deletes an account: its row and everything that references it, then its Firebase sign-in. Every
 // table holding someone's data (lists and their films, watched films and the diary, episodes, notes, follows,
 // blocks, film recommendations sent and received, list editors and list follows, groups they own or are in, poll
-// votes and pick reactions, device tokens and alerts sent) references users ON DELETE CASCADE, so deleting the row
+// votes and pick reactions, Discover reactions, device tokens and alerts sent) references users ON DELETE CASCADE, so deleting the row
 // removes it all. Films they added to other people's lists and groups stay, with who added them cleared.
 // The Firebase user is deleted before committing, so if that fails nothing is deleted and they can try again.
 // Returns whether the account had a row
