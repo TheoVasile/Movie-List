@@ -164,6 +164,9 @@ struct DiscoverView: View {
         .onAppear {
             syncWithLists()
             askAboutQuickAddIfNeeded()
+            viewModel.logImpressionIfNeeded()
+            // Sends any reactions still waiting and brings in ones kept with the account; never holds Discover up
+            DiscoverReactionSync.shared.sync()
         }
         // The Quick Add prompt waits for the AI question to be answered first
         .onChange(of: aiConsentAsked) { _ in askAboutQuickAddIfNeeded() }
@@ -1066,20 +1069,30 @@ private extension DiscoverView {
         Set(movieLists.flatMap { list in list.movies.map { Int64($0.tmdb_id) } })
     }
 
-    // Every film in every list, weighted by its rank within that list (#1 of n weighs n times the last),
-    // so recommendations draw on the whole collection with favourites likelier
+    // The films recommendations are based on, weighted by how much each says about the user's taste
     var seedPool: [(id: Int64, weight: Double)] {
         seedPool(for: viewModel.filters.listIDs)
     }
 
-    // Every film in the lists Discover is based on, weighted by rank: just the chosen list, or all of them
+    // The films in the lists Discover is based on (just the chosen ones, or all of them). In a ranked list each
+    // weighs exp(-rank/10), so the top few count most and the long tail still gets a turn, and half as much again
+    // once watched. An unranked list, like a watchlist, says little about taste: only its watched films count,
+    // and only a little
     func seedPool(for listIDs: [Int64]) -> [(id: Int64, weight: Double)] {
         var weights: [Int64: Double] = [:]
         let lists = listIDs.isEmpty ? Array(movieLists) : movieLists.filter { listIDs.contains($0.id) }
         for list in lists {
+            let isRanked = ListRanking.isRanked(list.id)
             let ranked = list.movies.sorted { $0.rank < $1.rank }
             for (index, movie) in ranked.enumerated() where movie.tmdb_id != 0 {
-                let weight = Double(ranked.count - index) / Double(ranked.count)
+                let weight: Double
+                if isRanked {
+                    weight = exp(-Double(index) / 10) * (movie.watched ? 1.5 : 1)
+                } else if movie.watched {
+                    weight = 0.1
+                } else {
+                    continue
+                }
                 // A film in several lists counts with its best placing
                 weights[Int64(movie.tmdb_id)] = max(weights[Int64(movie.tmdb_id)] ?? 0, weight)
             }
@@ -1269,6 +1282,14 @@ private struct DiscoverCard: View {
             .shadow(color: Theme.shadow.opacity(0.55), radius: 24, y: 12)
     }
 
+    // A film a friend recommended, with who it was
+    private var friendBadge: some View {
+        let handle = movie.recommended_by?.handle
+        return MetaChip(icon: "person.fill", text: handle.map { "Recommended by @\($0)" } ?? "Recommended by a friend", onPoster: true)
+            .lineLimit(1)
+            .accessibilityElement(children: .combine)
+    }
+
     private var info: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Wraps onto a second row rather than spilling past the card's edges
@@ -1294,6 +1315,9 @@ private struct DiscoverCard: View {
                 .foregroundColor(Theme.posterText)
                 .lineLimit(3)
                 .minimumScaleFactor(0.7)
+            if movie.source == "friend" {
+                friendBadge
+            }
             if let reason = movie.reason, !reason.isEmpty {
                 Label(reason, systemImage: "sparkles")
                     .font(.subheadline.weight(.medium))

@@ -64,6 +64,7 @@
 		6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58660986FCF41669AACB301E /* NotificationManager.swift */; };
 		BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */; };
 		A11A7C5E2F00000000000002 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11A7C5E2F00000000000001 /* Analytics.swift */; };
+		C33C9E7F4F00000000000002 /* DiscoverReactionSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */; };
 		B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B8D6F3F00000000000001 /* ReviewPrompter.swift */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
@@ -192,6 +193,7 @@
 		58660986FCF41669AACB301E /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingNowStore.swift; sourceTree = "<group>"; };
 		A11A7C5E2F00000000000001 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
+		C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverReactionSync.swift; sourceTree = "<group>"; };
 		B22B8D6F3F00000000000001 /* ReviewPrompter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompter.swift; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 				FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */,
 				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				A11A7C5E2F00000000000001 /* Analytics.swift */,
+				C33C9E7F4F00000000000001 /* DiscoverReactionSync.swift */,
 				B22B8D6F3F00000000000001 /* ReviewPrompter.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 				FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */,
@@ -619,6 +622,7 @@
 				6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */,
 				BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */,
 				A11A7C5E2F00000000000002 /* Analytics.swift in Sources */,
+				C33C9E7F4F00000000000002 /* DiscoverReactionSync.swift in Sources */,
 				B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */,
 				FAE949E92D547D0300592081 /* AccountView.swift in Sources */,
 				FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */,
