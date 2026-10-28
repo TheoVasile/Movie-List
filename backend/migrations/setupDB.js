@@ -379,6 +379,26 @@ const createTables = async () => {
             );
             CREATE INDEX IF NOT EXISTS tmdb_cache_expires ON tmdb_cache (expires_at);
 
+            -- A list's id in its public link (/l/<public_id>), random so lists can't be found by counting up from
+            -- 1. Filled in for every list, old ones included
+            ALTER TABLE lists ADD COLUMN IF NOT EXISTS public_id UUID NOT NULL DEFAULT gen_random_uuid();
+            CREATE UNIQUE INDEX IF NOT EXISTS lists_public_id ON lists (public_id);
+
+            -- Links that let anyone holding them join a movie night group (/join/group/<token>). The token is
+            -- random (192 bits, URL-safe). A link stops working when it expires, is revoked or has been used
+            -- max_uses times (null: no limit)
+            CREATE TABLE IF NOT EXISTS group_invites (
+                token VARCHAR(64) PRIMARY KEY,
+                group_id INT NOT NULL REFERENCES watch_groups(id) ON DELETE CASCADE,
+                created_by VARCHAR(255) NOT NULL REFERENCES users(firebase_uid) ON DELETE CASCADE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'),
+                max_uses INT,
+                uses INT NOT NULL DEFAULT 0,
+                revoked BOOLEAN NOT NULL DEFAULT false
+            );
+            CREATE INDEX IF NOT EXISTS group_invites_group ON group_invites (group_id) WHERE NOT revoked;
+
             -- Indexes for the busiest lookups that no primary key or unique constraint already starts with
             CREATE INDEX IF NOT EXISTS lists_user ON lists (user_id);
             -- A user's followers and follow requests

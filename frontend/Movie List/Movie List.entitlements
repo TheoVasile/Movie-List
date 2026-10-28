@@ -11,6 +11,13 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- Universal links: Marquee links (/l, /u, /f, /i, /join) open in the app. iOS checks each domain's
+	     /.well-known/apple-app-site-association (served by the backend). For a new domain, add a line like
+	     <string>applinks:onmarquee.app</string> here and change ShareLinks.baseURL (Services/ShareLinks.swift) -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:movie-list-backend-dgct.onrender.com</string>
+	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.Theodor-Vasile.Movie-List</string>

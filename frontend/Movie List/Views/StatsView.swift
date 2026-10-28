@@ -292,7 +292,8 @@ struct StatsView: View {
                 .environment(\.colorScheme, colorScheme))
             renderer.scale = 3
             if let image = renderer.uiImage {
-                shareItem = ShareItem(items: [image], kind: .stats)
+                // The image and the user's link, so friends can find them
+                shareItem = ShareItem(items: [image] + (ShareLinks.myLink.map { [$0] } ?? []), kind: .stats)
             }
         }
     }
@@ -489,9 +490,7 @@ struct StatsShareCard: View {
             }
             HStack {
                 Spacer()
-                Label("Marquee", systemImage: "film.stack")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(Theme.textTertiary)
+                ShareCardFooter()
             }
         }
         .padding(28)

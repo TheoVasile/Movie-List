@@ -34,7 +34,10 @@ enum AppAnalytics {
     enum WatchSource: String { case list, diary, checkIn = "check_in" }
     enum AIFeature: String { case discover, movieNight = "movie_night", smartPlacement = "smart_placement" }
     enum ShareFormat: String { case image, export }
-    enum ShareKind: String { case listImage = "list_image", yearInReview = "year_in_review", stats, export }
+    enum ShareKind: String {
+        case listImage = "list_image", yearInReview = "year_in_review", stats, export, film, profile
+        case invite, groupInvite = "group_invite"
+    }
     enum ImportSource: String { case letterboxd, excel, csv }
 
     enum Event {
@@ -61,10 +64,12 @@ enum AppAnalytics {
         // Whether the share sheet was finished (sent, saved, ...) or closed
         case shareCompleted(ShareKind, completed: Bool)
         case importCompleted(ImportSource, films: Int)
-        // Not logged yet: Phase 1 (onboarding, links and invites) wires these
+        // Not logged yet: onboarding wires this
         case onboardingStep(String)
+        // A Marquee link opened the app (list, profile, film, group_invite, personal_invite)
         case linkOpened(String)
-        case inviteSent
+        // An invite link sent through the share sheet or copied (group or personal), and a group invite accepted
+        case inviteSent(String)
         case inviteAccepted
 
         var name: String {
@@ -127,7 +132,8 @@ enum AppAnalytics {
             // A fixed step or link kind, never the link itself
             case .onboardingStep(let step): return ["step": step]
             case .linkOpened(let kind): return ["kind": kind]
-            case .termsAccepted, .theatreCheckInOpened, .moreLikeThisOpened, .firstListCreated, .firstRanking, .inviteSent, .inviteAccepted: return nil
+            case .inviteSent(let kind): return ["kind": kind]
+            case .termsAccepted, .theatreCheckInOpened, .moreLikeThisOpened, .firstListCreated, .firstRanking, .inviteAccepted: return nil
             }
         }
     }

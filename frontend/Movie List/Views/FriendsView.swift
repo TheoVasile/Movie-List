@@ -325,6 +325,8 @@ struct FollowingSection: View {
                     }
                 }
             }
+            // Shares the user's invite link, for friends who aren't on Marquee yet
+            InviteFriendsButton()
             if social.hasLoaded && social.profile?.handle == nil {
                 Button {
                     Haptics.tap()
@@ -910,6 +912,7 @@ struct FriendProfileView: View {
     @State private var reporting: ReportTarget? = nil
     // Blocked from the report sheet, so the profile closes once that sheet does
     @State private var blockedFromReport = false
+    @State private var shareItem: ShareItem? = nil
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Personalization.aiAllowedKey) private var aiAllowed = false
     @AppStorage(Personalization.ageRangeKey) private var ageRange = Personalization.notShared
@@ -1000,6 +1003,16 @@ struct FriendProfileView: View {
             MovieNightView(people: [person], canUseAI: aiAllowed && Personalization.ageRange(birthday: birthday, legacy: ageRange) != Personalization.under18 && (lists?.ai_allowed ?? false))
         }
         .toolbar {
+            // Its own button, beside More
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Haptics.tap()
+                    shareItem = ShareItem(items: ["@\(person.handle) on Marquee", ShareLinks.profile(handle: person.handle)], kind: .profile)
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel("Share Profile")
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button {
@@ -1030,6 +1043,10 @@ struct FriendProfileView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Check your connection and try again.")
+        }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(item: item)
+                .presentationDetents([.medium, .large])
         }
         .onAppear(perform: load)
         .onChange(of: social.isFollowing(person.handle)) { _ in load() }

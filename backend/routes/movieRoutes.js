@@ -861,6 +861,19 @@ router.get("/tv/:id/season/:season", async (req, res) => {
     }
 });
 
+// One film or show by TMDb id, for opening a shared film link (/f/<id>) when it isn't in the user's lists:
+// { tmdb_id, title, release_date, overview, poster_path }. Nothing is saved
+router.get("/film/:id", async (req, res) => {
+    try {
+        const film = await require("../models/publicModel").publicFilm(req.params.id);
+        if (!film) return res.status(404).json({ error: "Film not found." });
+        res.json({ ...film, release_date: film.release_date ?? "", overview: film.overview ?? "", poster_path: film.poster_path || null });
+    } catch (error) {
+        console.error("Error fetching film:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // More Like This: films like one film or show (negative id), best match first, leaving out the ones already in the
 // user's lists, e.g. /771/similar -> [discover movie...]. TMDb's pages are cached for a day, since they rarely change
 router.get("/:id/similar", async (req, res) => {

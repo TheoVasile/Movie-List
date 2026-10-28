@@ -42,6 +42,7 @@ We store the content you create and the things you do in the App, including:
 - People you follow, people who follow you, follow requests, and people you have blocked
 - Lists you follow, and lists you have invited others to edit or been invited to edit
 - Movie night groups you create or belong to, and the films, reactions and votes in them
+- Invite links you create for a movie night group: the group, who made the link, when it was made and expires, how many times it has been used and whether it was turned off
 - The Terms of Service version you accepted and when, and that you confirmed you are at least 13
 - Reports you make about other users or their content: who and what you reported, the reason you picked and any details you add
 - Whether automated moderation is holding one of your notes or recommendation messages for review, and the report it created about it
@@ -69,7 +70,7 @@ We do not use cookies in the App. We do not collect your device's advertising id
 The App uses Google Analytics for Firebase, provided by Google, to understand how Marquee is used so we can fix problems and improve it. It collects:
 
 - A random **app instance identifier** created when the App is installed. It is not your device's advertising identifier, and it changes if you delete and reinstall the App
-- **Events** recording that you used certain features: signing up or signing in (and the method), accepting the Terms, creating your first and later lists, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, opening More Like This, sharing a list, your stats or your Year in Review (and whether the share was completed), importing lists (the source and roughly how many films), adding a film from Discover, marking one Not for Me or skipping one (and whether AI Picks was on), whether you allowed notifications, when the App asked you to rate it, and sending a report (only the type of content and the reason you picked). Events never include film or list names, notes, messages, @usernames or anything else you type
+- **Events** recording that you used certain features: signing up or signing in (and the method), accepting the Terms, creating your first and later lists, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, opening More Like This, sharing a list, a film, a profile, your stats or your Year in Review (and whether the share was completed), opening a Marquee link (only the kind of link, such as a list, profile or invite), sending or accepting an invite, importing lists (the source and roughly how many films), adding a film from Discover, marking one Not for Me or skipping one (and whether AI Picks was on), whether you allowed notifications, when the App asked you to rate it, and sending a report (only the type of content and the reason you picked). Events never include film or list names, notes, messages, @usernames or anything else you type
 - **Device and App information**, such as the device model, iOS version, App version, language and time zone
 - **Approximate location** (country, region and city), which Google works out from your IP address. The App does not send your device's location
 - **Session information**, such as when the App is first opened, how often and for how long it is used, and when it is updated
@@ -172,6 +173,8 @@ Marquee is a social app, so some of your information is visible to other users:
 - People who follow you may see your watched films, rankings, notes on films, and recent activity, such as films you have added or watched
 - People you send recommendations to see the film and any message you add, and the people in your movie night groups and shared lists see your suggestions, reactions, votes and edits
 - Notifications to your friends may include your name or @username and the film involved
+- **Web pages for shared links.** Lists marked **Public** on an account that is not private, and the profiles of accounts that are not private, also have a web page at a Marquee link, such as the link included when you share a list. **Anyone who has the link can view that page, including people without a Marquee account**, and the services that show link previews in apps like Messages can read it. A list's page shows its name, description, films and your @username; a profile's page shows your display name, @username, profile photo, follower and following counts and some of your public lists. These pages never show lists marked Followers or Private, private profiles, your email address, phone number or birthday. Changing a list to Followers or Private, or making your account private, takes its page down within a few minutes
+- **Invite links.** If you share your personal invite link, anyone with it sees your @username (and your display name and profile photo, unless your account is private). Anyone in a movie night group can create an invite link to it: anyone holding the link can see the group's name, how many people are in it and the @username of whoever made the link, and can join the group. Invite links stop working after 30 days, and anyone in the group can turn a link off at any time in the App
 - If you report someone, we do not tell them who reported them
 - Your birthday, if you add one, is only ever visible to you
 
@@ -232,6 +235,7 @@ We keep your information for as long as your account exists, because we need it 
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
 - Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
 - Daily AI usage counts are deleted after a few days, and with your account
+- Group invite links are kept until their group, or the account that made them, is deleted
 - Usage analytics are kept by Google Analytics for 14 months and then deleted automatically
 - Crash reports are kept by Firebase Crashlytics for 90 days and then deleted automatically
 - Server logs are kept by our hosting providers for a limited time, usually no more than a few weeks

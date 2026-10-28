@@ -24,6 +24,7 @@ struct UserProfileView: View {
     @State private var photoError: String? = nil
     @ObservedObject private var social = SocialStore.shared
     @ObservedObject private var sync = SyncStatus.shared
+    @State private var shareItem: ShareItem? = nil
     var body: some View {
         NavigationStack {
             ZStack{
@@ -46,6 +47,19 @@ struct UserProfileView: View {
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // The user's own link: their profile page, or their invite link if their profile is private
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if let link = ShareLinks.myLink {
+                        Button {
+                            Haptics.tap()
+                            shareItem = ShareItem(items: ["My films on Marquee", link], kind: .profile)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .accessibilityLabel("Share Profile")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         Haptics.tap()
@@ -61,6 +75,10 @@ struct UserProfileView: View {
                 UserSettingsView()
                     .environmentObject(viewModel)
             })
+            .sheet(item: $shareItem) { item in
+                ShareSheet(item: item)
+                    .presentationDetents([.medium, .large])
+            }
         }
     }
 

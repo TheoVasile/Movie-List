@@ -44,6 +44,7 @@ struct GroupMovieNightView: View {
     @State private var showFilters = false
     @State private var showSuggest = false
     @State private var reporting: ReportTarget? = nil
+    @State private var showInvite = false
 
     init(group: MovieGroup, canUseAI: Bool) {
         _group = State(initialValue: group)
@@ -82,6 +83,15 @@ struct GroupMovieNightView: View {
                     Button("Done") { dismiss() }
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // An invite link anyone can join with
+                    Button {
+                        Haptics.tap()
+                        showInvite = true
+                    } label: {
+                        Image(systemName: "person.badge.plus")
+                    }
+                    .accessibilityLabel("Invite")
+                    .accessibilityHint("Share a link that lets people join this group")
                     Button {
                         showFilters = true
                     } label: {
@@ -132,6 +142,11 @@ struct GroupMovieNightView: View {
             }
             .sheet(item: $reporting) { target in
                 ReportSheet(target: target)
+            }
+            .sheet(isPresented: $showInvite) {
+                GroupInviteLinkSheet(group: group)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showSuggest) {
                 SuggestFilmSheet(alreadyIn: Set(picks.map(\.tmdb_id))) { movie in

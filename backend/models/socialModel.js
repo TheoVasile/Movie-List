@@ -404,4 +404,4 @@ async function fetchBlocked(user_id) {
     return result.rows;
 }
 
-module.exports = { notBlocked, blockUser, unblockUser, fetchBlocked, setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };
+module.exports = { notBlocked, blockUser, unblockUser, fetchBlocked, setPrivate, isPrivate, isHash, setPhone, matchContacts, isValidHandle, getProfile, setAvatar, fetchAvatar, setDisplayName, setAIAllowed, setBirthday, setHandle, searchUsers, setFollowing, fetchFollowRequests, respondToFollowRequest, fetchConnections, fetchFollowing, fetchUserLists, fetchListsWithFilms, fetchFollowedLists, fetchFriendsOnFilm, HandleTakenError };

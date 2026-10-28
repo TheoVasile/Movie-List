@@ -20,6 +20,7 @@
 		FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000005 /* LetterboxdExport.swift */; };
 		FA7E5A012F00000000000015 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000014 /* FriendsView.swift */; };
 		FA7E5A012F00000000000012 /* ListSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000011 /* ListSharing.swift */; };
+		5EA4E11A2F00000000000004 /* LinkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA4E11A2F00000000000003 /* LinkViews.swift */; };
 		FA7E5A012F00000000000017 /* ListPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7E5A012F00000000000016 /* ListPickerSheet.swift */; };
 		AD2F10A1B2C3D4E5F6A7B802 /* AddToListFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2F10A1B2C3D4E5F6A7B801 /* AddToListFlow.swift */; };
 		7E2A5C1D9B3F4E6A8C0D2F12 /* TermsOfServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */; };
@@ -64,6 +65,7 @@
 		6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58660986FCF41669AACB301E /* NotificationManager.swift */; };
 		BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */; };
 		A11A7C5E2F00000000000002 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11A7C5E2F00000000000001 /* Analytics.swift */; };
+		5EA4E11A2F00000000000002 /* ShareLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA4E11A2F00000000000001 /* ShareLinks.swift */; };
 		B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B8D6F3F00000000000001 /* ReviewPrompter.swift */; };
 		FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */; };
 		FA48CE982BDE07E9007FEA8B /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */; };
@@ -149,6 +151,7 @@
 		FA7E5A012F00000000000005 /* LetterboxdExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetterboxdExport.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000014 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000011 /* ListSharing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSharing.swift; sourceTree = "<group>"; };
+		5EA4E11A2F00000000000003 /* LinkViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkViews.swift; sourceTree = "<group>"; };
 		FA7E5A012F00000000000016 /* ListPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListPickerSheet.swift; sourceTree = "<group>"; };
 		AD2F10A1B2C3D4E5F6A7B801 /* AddToListFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToListFlow.swift; sourceTree = "<group>"; };
 		7E2A5C1D9B3F4E6A8C0D2F11 /* TermsOfServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsOfServiceView.swift; sourceTree = "<group>"; };
@@ -192,6 +195,7 @@
 		58660986FCF41669AACB301E /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingNowStore.swift; sourceTree = "<group>"; };
 		A11A7C5E2F00000000000001 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
+		5EA4E11A2F00000000000001 /* ShareLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareLinks.swift; sourceTree = "<group>"; };
 		B22B8D6F3F00000000000001 /* ReviewPrompter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompter.swift; sourceTree = "<group>"; };
 		FA48CE952BDE07BB007FEA8B /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FA48CE972BDE07E9007FEA8B /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
@@ -322,6 +326,7 @@
 				FA7E5A012F000000000000A1 /* TheatreCheckIns.swift */,
 				530489DE1F5EBAACD1774BE7 /* StreamingNowStore.swift */,
 				A11A7C5E2F00000000000001 /* Analytics.swift */,
+				5EA4E11A2F00000000000001 /* ShareLinks.swift */,
 				B22B8D6F3F00000000000001 /* ReviewPrompter.swift */,
 				FA7E5A012F00000000000005 /* LetterboxdExport.swift */,
 				FA1613E12D6C394400CD99D0 /* SpreadsheetImport.swift */,
@@ -386,6 +391,7 @@
 				F372852096382634FBAE62AC /* YearInReviewView.swift */,
 				FA7E5A012F00000000000007 /* LetterboxdImportView.swift */,
 				FA7E5A012F00000000000011 /* ListSharing.swift */,
+				5EA4E11A2F00000000000003 /* LinkViews.swift */,
 				FA7E5A012F00000000000014 /* FriendsView.swift */,
 			);
 			path = Views;
@@ -608,6 +614,7 @@
 				B7EB432D5026E3ABF588B871 /* YearInReviewView.swift in Sources */,
 				FA7E5A012F00000000000008 /* LetterboxdImportView.swift in Sources */,
 				FA7E5A012F00000000000012 /* ListSharing.swift in Sources */,
+				5EA4E11A2F00000000000004 /* LinkViews.swift in Sources */,
 				FA7E5A012F00000000000015 /* FriendsView.swift in Sources */,
 				FA7E5A012F00000000000006 /* LetterboxdExport.swift in Sources */,
 				FA0124A32BDECC4B00A1C13C /* CDMovieList+helper.swift in Sources */,
@@ -619,6 +626,7 @@
 				6B68287DDA12E1255BA5C8EA /* NotificationManager.swift in Sources */,
 				BBE307D590A5FD09BB33BAB2 /* StreamingNowStore.swift in Sources */,
 				A11A7C5E2F00000000000002 /* Analytics.swift in Sources */,
+				5EA4E11A2F00000000000002 /* ShareLinks.swift in Sources */,
 				B22B8D6F3F00000000000002 /* ReviewPrompter.swift in Sources */,
 				FAE949E92D547D0300592081 /* AccountView.swift in Sources */,
 				FA48CE962BDE07BB007FEA8B /* HomeViewModel.swift in Sources */,

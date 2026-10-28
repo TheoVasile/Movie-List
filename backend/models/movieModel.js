@@ -299,6 +299,6 @@ async function setListOrder(listId, movieIds) {
 }
 
 module.exports = {
-    ensureMovie, movieJSON, movieFields, parseTmdbId, createMovie, addMovieToList, appendMovieToList, getMovieByTmdbId,
+    ensureMovie, fetchMovieFields, movieJSON, movieFields, parseTmdbId, createMovie, addMovieToList, appendMovieToList, getMovieByTmdbId,
     removeMovieFromList, updateMovieRank, setListOrder, MAX_TITLE, MAX_OVERVIEW,
 };

@@ -194,9 +194,7 @@ struct ListShareCard: View {
                         .foregroundColor(Theme.textSecondary)
                 }
                 Spacer()
-                Label("Marquee", systemImage: "film.stack")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(Theme.textTertiary)
+                ShareCardFooter()
             }
         }
         .padding(28)
@@ -223,7 +221,8 @@ struct ListShareCard: View {
 
 // MARK: - Share sheet
 
-/// Something to hand to the system share sheet: an image or a file, and what it is for analytics
+/// Something to hand to the system share sheet: an image, a file or a link (usually an image and its link), and
+/// what it is for analytics
 struct ShareItem: Identifiable {
     let id = UUID()
     let items: [Any]
@@ -240,6 +239,8 @@ struct ShareSheet: UIViewControllerRepresentable {
         let kind = item.kind
         controller.completionWithItemsHandler = { _, completed, _, _ in
             AppAnalytics.log(.shareCompleted(kind, completed: completed))
+            if completed && kind == .invite { AppAnalytics.log(.inviteSent("personal")) }
+            if completed && kind == .groupInvite { AppAnalytics.log(.inviteSent("group")) }
         }
         return controller
     }

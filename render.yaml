@@ -27,6 +27,13 @@ services:
       # Supabase's pooled connection string in transaction mode: port 6543 on *.pooler.supabase.com (see config/db.js)
       - key: DATABASE_URL
         sync: false
+      # Public address of shared links and their web pages (no trailing slash). Defaults to this Render URL; set
+      # to https://onmarquee.app (or whichever domain) once it points here. The app's copy is ShareLinks.baseURL
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # The app's App Store id (digits), for the Smart App Banner and "Get the app" on shared pages. Unset until listed
+      - key: APP_STORE_ID
+        sync: false
       # Database connections each instance keeps open
       - key: DB_POOL_MAX
         value: "10"

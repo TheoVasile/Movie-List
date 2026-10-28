@@ -9,6 +9,7 @@ const PREFERENCE = {
     list_invite: "notify_requests",
     group_added: "notify_requests",
     group_suggestion: "notify_activity",
+    group_joined: "notify_activity",
     recommendation: "notify_activity",
     activity: "notify_activity",
     streaming: "notify_streaming",
