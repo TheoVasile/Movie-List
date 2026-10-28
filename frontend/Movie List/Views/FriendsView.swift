@@ -1082,8 +1082,8 @@ struct FriendProfileView: View {
     // For anyone, followed or not: it only uses the lists of theirs the user can see
     private var tasteMatchButton: some View {
         NavigationLink {
-            // TODO(integration): ShareLinks.inviteURL(handle:) / profileURL — pass @person.handle's profile link here
-            TasteMatchView(handle: person.handle, shareURL: nil)
+            // The user's own invite link, so whoever gets the card can see their own match with them
+            TasteMatchView(handle: person.handle, shareURL: ShareLinks.myInvite)
         } label: {
             Label("Taste Match", systemImage: "heart.circle.fill")
         }

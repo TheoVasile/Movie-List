@@ -158,13 +158,14 @@ struct MilestoneCelebrationView: View {
         Haptics.tap()
         autoDismiss?.cancel()
         AppAnalytics.log(.milestoneShared(milestone.id))
-        // TODO(integration): ShareLinks.profileURL(handle:)
-        let card = MilestoneShareCard(milestone: milestone, shareURL: nil)
+        // Their profile link, or their invite link when their profile is private, as with Stats and Year in Review
+        let link = ShareLinks.myLink
+        let card = MilestoneShareCard(milestone: milestone, shareURL: link)
             .environment(\.colorScheme, colorScheme)
         let renderer = ImageRenderer(content: card)
         renderer.scale = 3
         if let image = renderer.uiImage {
-            shareItem = ShareItem(items: [image], kind: .milestone)
+            shareItem = ShareItem(items: [image] + (link.map { [$0] } ?? []), kind: .milestone)
         }
     }
 }
@@ -232,8 +233,8 @@ private struct Confetti: View {
     }
 }
 
-/// The image shared from a celebration: the number, its line and Marquee's name. shareURL, when there is one, is
-/// printed at the bottom so people can find the user
+/// The image shared from a celebration: the number, its line and Marquee's name. When there is a shareURL (the
+/// user's link, sent alongside the image), the "@handle · domain" footer is printed at the bottom so people can find them
 struct MilestoneShareCard: View {
     let milestone: Milestone
     var shareURL: URL? = nil
@@ -264,10 +265,8 @@ struct MilestoneShareCard: View {
                     .font(.footnote.weight(.heavy))
                     .tracking(4)
                     .foregroundStyle(Theme.accentGradient)
-                if let shareURL {
-                    Text(shareURL.absoluteString.replacingOccurrences(of: "https://", with: ""))
-                        .font(.caption2)
-                        .foregroundColor(Theme.textTertiary)
+                if shareURL != nil {
+                    ShareCardFooter()
                 }
             }
             MarqueeLights(animated: false)

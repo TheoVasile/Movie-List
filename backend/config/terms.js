@@ -3,11 +3,11 @@ const path = require("path");
 
 // The Terms of Service everyone has to accept. Bump the version when the Terms change materially, so everyone
 // is asked to accept them again
-const TERMS_VERSION = "2026-10-24";
-const TERMS_UPDATED = "October 24, 2026";
+const TERMS_VERSION = "2026-10-28";
+const TERMS_UPDATED = "October 28, 2026";
 
 // The Privacy Policy. Nobody accepts it, so its version is only for reference
-const PRIVACY_VERSION = "2026-10-28.1";
+const PRIVACY_VERSION = "2026-10-28.2";
 const PRIVACY_UPDATED = "October 28, 2026";
 
 // Filled into the Terms and Privacy Policy text; TERMS_COMPANY_NAME and TERMS_CONTACT_EMAIL override them

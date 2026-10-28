@@ -40,6 +40,12 @@ enum ShareLinks {
         return profile.is_private == true ? personalInvite(handle: handle) : self.profile(handle: handle)
     }
 
+    /// The signed-in user's personal invite link (/i/<handle>), for cards that invite the recipient to try the same
+    /// thing with them, like a Taste Match. Works for private profiles too. nil until they have an @username
+    static var myInvite: URL? {
+        SocialStore.shared.profile?.handle.map { personalInvite(handle: $0) }
+    }
+
     /// The footer on share images: "@sam · onmarquee.app"
     static var cardFooter: String {
         SocialStore.shared.profile?.handle.map { "@\($0) · \(shortDomain)" } ?? shortDomain

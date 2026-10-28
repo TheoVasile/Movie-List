@@ -310,9 +310,7 @@ struct TasteMatchCard: View {
                 fightOver
             }
             Spacer(minLength: 0)
-            Text("Marquee · find your taste match")
-                .font(.caption.weight(.bold))
-                .foregroundColor(Theme.textTertiary)
+            ShareCardFooter()
         }
         .padding(isStory ? 20 : 16)
         .frame(width: format.size.width, height: format.size.height)
