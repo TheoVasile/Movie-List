@@ -1455,13 +1455,12 @@ class APIService {
     }
 
     /// Films for Discover, already ranked by the server, which also sends each one's score and source when it can
-    func discoverMovies(seeds: [(id: Int64, weight: Double)], kind: DiscoverKind = .movie, genres: [Int] = [], avoidGenres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
+    func discoverMovies(seeds: [(id: Int64, weight: Double)], kind: DiscoverKind = .movie, genres: [Int] = [], onlyGenres: Bool = false, languages: [String] = [], providers: [Int] = [], page: Int, completion: @escaping (Result<[Movie], Error>) -> Void) {
         var components = URLComponents(string: "\(baseURL)/movies/discover")
         components?.queryItems = [
             URLQueryItem(name: "kind", value: kind.rawValue),
             URLQueryItem(name: "seeds", value: Self.encodeSeeds(seeds)),
             URLQueryItem(name: "genres", value: genres.map(String.init).joined(separator: ",")),
-            URLQueryItem(name: "avoid_genres", value: avoidGenres.map(String.init).joined(separator: ",")),
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "languages", value: languages.joined(separator: ",")),
             URLQueryItem(name: "providers", value: providers.map(String.init).joined(separator: ",")),
@@ -1499,7 +1498,7 @@ class APIService {
 
     // MARK: Discover reactions
 
-    /// Where the user's Discover likes, dislikes and skips are kept with the account
+    /// Where the user's Discover likes and dislikes are kept with the account
     private static let discoverReactionsPath = "/movies/discover/reactions"
 
     struct DiscoverReactionRecord: Decodable {
@@ -1509,6 +1508,26 @@ class APIService {
     }
 
     private struct DiscoverReactionsResponse: Decodable { let reactions: [DiscoverReactionRecord] }
+
+    /// A page of the films the user liked, or marked Not for Me, newest first
+    struct DiscoverHistoryPage: Decodable {
+        struct Item: Decodable {
+            let tmdb_id: Int64
+            let reacted_at: String
+            // nil when the film's details can't be had right now
+            let movie: Movie?
+        }
+
+        struct Counts: Decodable {
+            let like: Int
+            let dislike: Int
+        }
+
+        let items: [Item]
+        let next_cursor: String?
+        let counts: Counts
+    }
+
     /// Calls back with the HTTP status (0 when the request never got an answer)
     private func sendIgnoringReply(_ method: String, _ path: String, query: [URLQueryItem] = [], body: [String: Any]? = nil, completion: @escaping (Int) -> Void) {
         var components = URLComponents(string: baseURL + path)
@@ -1526,10 +1545,12 @@ class APIService {
         }
     }
 
-    /// Records a like, dislike or skip ("like", "dislike", "skip") from Discover
-    func sendDiscoverReaction(tmdbID: Int64, reaction: String, source: String?, completion: @escaping (Int) -> Void) {
+    /// Records a "like" or "dislike" from Discover. at is when it was made, for one sent late: the server then keeps
+    /// a newer one instead
+    func sendDiscoverReaction(tmdbID: Int64, reaction: String, source: String?, at: Date? = nil, completion: @escaping (Int) -> Void) {
         var body: [String: Any] = ["tmdb_id": tmdbID, "reaction": reaction]
         if let source { body["source"] = source }
+        if let at { body["at"] = ISO8601DateFormatter().string(from: at) }
         sendIgnoringReply("POST", Self.discoverReactionsPath, body: body, completion: completion)
     }
 
@@ -1538,12 +1559,10 @@ class APIService {
         sendIgnoringReply("POST", Self.discoverReactionsPath + "/bulk", body: ["reactions": reactions], completion: completion)
     }
 
-    /// Takes back one film's reaction, every reaction of one kind (e.g. "skip", for Show Skipped Again), or every
-    /// reaction when both are nil
-    func deleteDiscoverReactions(tmdbID: Int64?, reaction: String? = nil, completion: @escaping (Int) -> Void) {
+    /// Takes back one film's reaction, or every reaction when nil
+    func deleteDiscoverReactions(tmdbID: Int64?, completion: @escaping (Int) -> Void) {
         var query: [URLQueryItem] = []
         if let tmdbID { query.append(URLQueryItem(name: "tmdb_id", value: String(tmdbID))) }
-        if let reaction { query.append(URLQueryItem(name: "reaction", value: reaction)) }
         sendIgnoringReply("DELETE", Self.discoverReactionsPath, query: query, completion: completion)
     }
 
@@ -1551,6 +1570,13 @@ class APIService {
         sendJSON("GET", Self.discoverReactionsPath) { (result: Result<DiscoverReactionsResponse, Error>) in
             completion(result.map(\.reactions))
         }
+    }
+
+    /// reaction is "like" or "dislike"; cursor is the last page's next_cursor, nil for the first
+    func fetchDiscoverHistory(reaction: String, cursor: String?, completion: @escaping (Result<DiscoverHistoryPage, Error>) -> Void) {
+        var query = [URLQueryItem(name: "reaction", value: reaction), URLQueryItem(name: "limit", value: "40")]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        sendJSON("GET", Self.discoverReactionsPath + "/history", query: query, completion: completion)
     }
 
     /// Films in theatres in a country (e.g. "US"), most popular first, for theatre check-ins
@@ -1876,11 +1902,36 @@ class APIService {
         }
     }
 
+    /// Posted, on the main thread, when filmsBeingPlaced changes
+    static let placementsChanged = Notification.Name("placementsChanged")
+    // How many placement requests are under way for each film, by its id in the list
+    private var placementCounts: [Int64: Int] = [:]
+
+    /// Films a list is being asked to place right now, with Smart Placement, Compare or Set Rank. Used on the main
+    /// thread, e.g. so Discover's Undo doesn't take a film out of a list that's about to put it in its place
+    var filmsBeingPlaced: Set<Int64> { Set(placementCounts.keys) }
+
+    /// Counts the film as being placed until the completion returned has been called and its caller has moved it
+    private func placing<T>(_ movieID: Int64, _ completion: @escaping (Result<T, Error>) -> Void) -> (Result<T, Error>) -> Void {
+        placementCounts[movieID, default: 0] += 1
+        NotificationCenter.default.post(name: Self.placementsChanged, object: nil)
+        return { result in
+            completion(result)
+            // Callers move the film on the main queue, so this comes after that
+            DispatchQueue.main.async {
+                let left = (self.placementCounts[movieID] ?? 1) - 1
+                self.placementCounts[movieID] = left > 0 ? left : nil
+                NotificationCenter.default.post(name: Self.placementsChanged, object: nil)
+            }
+        }
+    }
+
     private struct Placement: Decodable { let rank: Int; let reason: String }
 
     /// Smart Placement: the AI decides where a film already in the list belongs, and the server moves it there.
     /// Calls back with the new rank and why, or an error whose code is the HTTP status
     func smartPlace(listID: Int64, movieID: Int64, completion: @escaping (Result<(rank: Int, reason: String), Error>) -> Void) {
+        let completion = placing(movieID, completion)
         sendJSON("POST", "/movies/smart-place", body: ["list_id": listID, "movie_id": movieID]) { (result: Result<Placement, Error>) in
             completion(result.map { ($0.rank, $0.reason) })
         }
@@ -1914,7 +1965,8 @@ class APIService {
 
     func updateMovieRanking(list_id: Int64, movie_id: Int64, rank: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/movies/updateRank") else { return }
-        
+        let completion = placing(movie_id, completion)
+
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

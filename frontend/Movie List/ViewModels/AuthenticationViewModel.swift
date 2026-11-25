@@ -61,6 +61,8 @@ class AuthenticationViewModel: ObservableObject {
     if authStateHandler == nil {
       authStateHandler = Auth.auth().addStateDidChangeListener { auth, user in
         self.user = user
+        // Before Discover appears, so it never shows one account's likes and dislikes to another
+        DiscoverReactionSync.shared.use(user?.uid)
         self.authenticationState = user == nil ? .unauthenticated : .authenticated
         // An Apple Hide My Email address means nothing to them, so their name is shown instead
         self.displayName = self.shownEmail ?? user?.displayName ?? ""
@@ -155,6 +157,8 @@ extension AuthenticationViewModel {
         // sign in shouldn't get it
         UserDefaults.standard.removeObject(forKey: Personalization.birthdayKey)
       try Auth.auth().signOut()
+      // Likes and dislikes are kept with the account and come back when it signs in again
+      DiscoverReactionSync.shared.signedOut()
     }
     catch {
       print(error)
@@ -290,11 +294,8 @@ extension AuthenticationViewModel {
     // AI and personalization
     Personalization.aiAllowedKey, Personalization.useAIKey, Personalization.aiConsentAskedKey,
     Personalization.ageRangeKey, Personalization.birthdayKey, Personalization.pronounsKey, "personalization.gender",
-    // Discover: taste profile, reactions, deck, filters and Quick Add
-    DiscoverViewModel.profileKey, DiscoverViewModel.likedKey, DiscoverViewModel.dislikedKey,
-    "discover.passedMovieIDs", "discover.genreFilter", "discover.filters", "discover.kind", "discover.savedDeck",
-    "discover.likedFilms", "discover.dislikedFilms",
-    QuickAdd.onKey, QuickAdd.listIDKey, QuickAdd.placementKey, QuickAdd.askedKey,
+    // Discover's intro. Its taste profile, reactions, deck and filters go when signing out
+    DiscoverReactions.gesturesSeenKey,
     // Lists and their sharing, and cached film details
     "unrankedLists", "listVisibility", "aiPlacedFilms", "listSharing",
     "movieInfoCache", "genreCache", "imdbIDs", "filmographies",
@@ -305,6 +306,8 @@ extension AuthenticationViewModel {
 
   /// Once the account is deleted: signs out and removes what the app kept on this phone for it
   func signOutDeletedAccount() {
+    // Signing out keeps Discover changes that haven't been sent yet, which a deleted account has no use for
+    DiscoverReactionSync.shared.forgetAccount()
     // Also unregisters this phone from notifications, turns off theatre check-ins and clears Core Data
     signOut()
     GIDSignIn.sharedInstance.signOut()

@@ -48,9 +48,9 @@ enum AppAnalytics {
         case filmRanked(RankMethod)
         case filmWatched(WatchSource)
         case aiPickUsed(AIFeature)
-        // A Discover card added to a list, marked Not for Me or skipped, and whether AI Picks was choosing the cards.
-        // With the film's TMDb id, why it was recommended (seed, taste, explore, friend, trending, ai or unknown) and
-        // where in the session's deck it was dealt
+        // A Discover card liked or marked Not for Me, and whether AI Picks was choosing the cards. With the film's TMDb
+        // id, why it was recommended (seed, taste, explore, friend, trending, ai or unknown) and where in the session's
+        // deck it was dealt
         case discoverSwipe(DiscoverReaction, ai: Bool, tmdbID: Int64, source: String, position: Int)
         // A Discover card reaching the top of the deck, with the same details
         case discoverImpression(tmdbID: Int64, source: String, position: Int, ai: Bool)
@@ -125,13 +125,7 @@ enum AppAnalytics {
             case .filmWatched(let source): return ["source": source.rawValue]
             case .aiPickUsed(let feature): return ["feature": feature.rawValue]
             case .discoverSwipe(let reaction, let ai, let tmdbID, let source, let position):
-                let direction: String
-                switch reaction {
-                case .liked: direction = "add"
-                case .disliked: direction = "dislike"
-                case .skipped: direction = "skip"
-                }
-                return ["direction": direction, "ai": ai ? "true" : "false", "tmdb_id": tmdbID, "source": source, "position": position]
+                return ["direction": reaction == .liked ? "like" : "dislike", "ai": ai ? "true" : "false", "tmdb_id": tmdbID, "source": source, "position": position]
             case .discoverImpression(let tmdbID, let source, let position, let ai):
                 return ["tmdb_id": tmdbID, "source": source, "position": position, "ai": ai ? "true" : "false"]
             // Capped, so it's a rough size rather than a count of the user's friends

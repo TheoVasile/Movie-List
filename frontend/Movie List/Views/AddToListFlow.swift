@@ -16,6 +16,9 @@ struct AddToListFlow: ViewModifier {
     // Setting it opens the list picker; it goes back to nil when the picker closes
     @Binding var movie: Movie?
     let source: AppAnalytics.FilmSource
+    // True from choosing lists until the film is added and placed in each, for screens that block other actions
+    // meanwhile. Set before the picker closes, so a picker that closes without it was cancelled
+    @Binding var isBusy: Bool
     // Called on the main thread with the lists the film went into and its new copy in each, before ranking
     var onAdded: (Movie, [(list: CDMovieList, movie: CDMovie)]) -> Void
 
@@ -73,6 +76,7 @@ struct AddToListFlow: ViewModifier {
 
     private func add(_ movie: Movie, to lists: [CDMovieList]) {
         guard !lists.isEmpty else { return }
+        isBusy = true
         withAnimation(Theme.spring) { isAdding = true }
         var added: [Int: CDMovie] = [:]
         let group = DispatchGroup()
@@ -87,6 +91,7 @@ struct AddToListFlow: ViewModifier {
             withAnimation(Theme.spring) { isAdding = false }
             let done = lists.indices.compactMap { index in added[index].map { (list: lists[index], movie: $0) } }
             guard !done.isEmpty else {
+                isBusy = false
                 showToast("Couldn't add \(movie.title). Try again.")
                 return
             }
@@ -105,10 +110,13 @@ struct AddToListFlow: ViewModifier {
         }
     }
 
-    /// Starts placing the film in the next list waiting for it; false when there are none left
+    /// Starts placing the film in the next list waiting for it; false when there are none left, which ends the flow
     @discardableResult
     private func startNextRanking() -> Bool {
-        guard let next = rankingQueue.first else { return false }
+        guard let next = rankingQueue.first else {
+            isBusy = false
+            return false
+        }
         rankingQueue.removeFirst()
         let model = ListViewModel(movieList: next.list, context: context)
         // Give the list picker time to finish closing before Compare appears
@@ -180,8 +188,8 @@ struct AddToListFlow: ViewModifier {
 extension View {
     /// Adds the film in `movie` to the lists the user picks, the same way as everywhere else in the app: list
     /// picker, then Compare (or Smart Placement) in each ranked list. Logs `film_added` with `source`
-    func addToListFlow(movie: Binding<Movie?>, source: AppAnalytics.FilmSource,
+    func addToListFlow(movie: Binding<Movie?>, source: AppAnalytics.FilmSource, isBusy: Binding<Bool> = .constant(false),
                        onAdded: @escaping (Movie, [(list: CDMovieList, movie: CDMovie)]) -> Void = { _, _ in }) -> some View {
-        modifier(AddToListFlow(movie: movie, source: source, onAdded: onAdded))
+        modifier(AddToListFlow(movie: movie, source: source, isBusy: isBusy, onAdded: onAdded))
     }
 }

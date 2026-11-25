@@ -381,7 +381,7 @@ struct UserProfileView: View {
                     Text("Liked & Not for Me")
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
-                    Text("Films you liked or passed on for good in Discover")
+                    Text("Films you liked or marked Not for Me in Discover")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .lineLimit(1)
