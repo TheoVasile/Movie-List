@@ -44,7 +44,7 @@ Marquee helps you keep track of the films and TV series you want to watch and ha
 
 - Create ranked and unranked lists, a watchlist, and collections, and place films in your rankings
 - Mark films and TV episodes as watched, keep a viewing diary, and write notes on films that the people who follow you can see
-- Discover new films by swiping through suggestions, including optional AI-powered picks, and find more films like one you pick
+- Discover new films by swiping through suggestions, including optional AI-powered picks, and find more films like one you pick. The films you like or mark "Not for Me" help choose what we suggest to you and to your movie night groups, and where a film you add to a ranked list might go. They are not votes in a group, and are not shown to other users
 - Follow other people, see what the people you follow are watching and ranking, and compare your taste with theirs
 - Recommend films to friends, share lists, and invite friends to edit a list with you
 - Plan a movie night with friends in a group, suggest films, react to picks and vote in polls
@@ -149,7 +149,7 @@ AI features are off by default and only work if you turn on **Allow AI Features*
 
 ### What is sent to the AI provider
 
-When you use an AI feature, we send the AI provider the information needed to make suggestions, which may include the names of your lists and the titles, years, rankings and watched status of the films in them, the films you liked, skipped or marked "not for me" in Discover, your genre preferences, your chosen streaming services, and your device's country and language. For Discover, it may also include your age range and pronouns if you have chosen to share them. For Movie Night, it includes similar list information for the friends you are planning with. We do not send your name, email address, phone number or contacts. More detail is in our Privacy Policy.
+When you use an AI feature, we send the AI provider the information needed to make suggestions, which may include the names of your lists and the titles, years, rankings and watched status of the films in them, the films you liked or marked "not for me" in Discover, your genre preferences, your chosen streaming services, and your device's country and language. For Discover, it may also include your age range and pronouns if you have chosen to share them. For Movie Night, it includes similar list information for the friends you are planning with, but not anyone's Discover likes or dislikes. We do not send your name, email address, phone number or contacts. More detail is in our Privacy Policy.
 
 ### Limits on AI output
 

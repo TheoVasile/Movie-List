@@ -17,11 +17,15 @@ types.setTypeParser(TIMESTAMP_WITHOUT_TIME_ZONE, (value) => new Date(value.repla
 // under the pooler's client limit
 const POOL_MAX = Number(process.env.DB_POOL_MAX) || 10;
 
+// Set by `node --test`. Tests stand in for the database, so a query they miss has to fail rather than reach it,
+// even when one file is run without testSetup.js
+const UNDER_TEST = Boolean(process.env.NODE_TEST_CONTEXT);
+
 function getPool() {
     let pool;
     if (!pool) {
         pool = new Pool({
-            connectionString: process.env.DATABASE_URL,
+            connectionString: UNDER_TEST ? "postgres://127.0.0.1:1/none" : process.env.DATABASE_URL,
             ssl: {
                 rejectUnauthorized: false // Enable if your RDS requires SSL
             },

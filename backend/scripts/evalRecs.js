@@ -10,6 +10,11 @@
 //   new: services/discoverFeed.js with the taste vector, seed weights, MMR and explore slots
 // Both use the same seeds: the top SEEDS remaining films of the ranked list (as the app sends its top films)
 //
+// Then, for up to EVAL_USERS users with Discover reactions, 20% of their likes and half of their dislikes are hidden, and
+// "lists only" is compared with "with reactions" (the rest of them): recall@20 of hidden likes, and how many hidden
+// dislikes come in the first 20 (fewer is better). Last, a stress check: one dislike of a film in the user's top genre
+// should hardly change that genre's share of the first 20. Few people have reacted to much, so these are sanity checks
+//
 // Run from backend/ (for .env): node scripts/evalRecs.js [users] [min ranked films, default 30]
 
 const pool = require("../config/db");
@@ -60,6 +65,68 @@ async function oldStrategy(seeds, genres, listed) {
         .filter((movie) => movie && !seen.has(movie.id) && seen.add(movie.id))
         .filter((movie) => !listed.has(movie.id))
         .map((movie) => movie.id);
+}
+
+// The feed for some of a user's rows, leaving out what they've listed and reacted to
+async function recommend(rows) {
+    const weights = weightFilms(rows);
+    const taste = tasteFromWeights(weights, await featuresFor(filmsToFetch(weights)));
+    const exclude = new Set([...rows.entries, ...rows.reactions].map((row) => Number(row.tmdb_id)));
+    const items = await buildDiscover({ taste, avoidGenres: taste.avoidedGenres, exclude, get, features: featuresFor, toMovie: toDiscoverMovie });
+    return { taste, items };
+}
+
+async function evaluateReactions() {
+    const users = (await pool.query(
+        `SELECT user_id, md5(user_id) AS sort_key FROM discover_reactions WHERE reaction <> 'skip' AND tmdb_id > 0
+         GROUP BY user_id HAVING COUNT(*) >= 5 ORDER BY sort_key LIMIT $1`,
+        [EVAL_USERS]
+    )).rows.map((row) => row.user_id);
+    const totals = { "lists only": { recall: 0, dislikes: 0 }, "with reactions": { recall: 0, dislikes: 0 } };
+    let withLikes = 0;
+    let hiddenDislikes = 0;
+    const shareDrops = [];
+    for (const [index, user] of users.entries()) {
+        const rows = await loadTasteRows(user);
+        const next = random(index + 1);
+        const pick = (reaction, share) => {
+            const listed = new Set(rows.entries.map((entry) => entry.tmdb_id));
+            const ids = rows.reactions.filter((row) => row.reaction === reaction && row.tmdb_id > 0 && !listed.has(Number(row.tmdb_id))).map((row) => Number(row.tmdb_id));
+            return new Set([...ids].sort(() => next() - 0.5).slice(0, Math.round(ids.length * share)));
+        };
+        const likes = pick("like", 0.2), dislikes = pick("dislike", 0.5);
+        const visible = rows.reactions.filter((row) => !likes.has(Number(row.tmdb_id)) && !dislikes.has(Number(row.tmdb_id)));
+        const watched = new Set([...rows.watched].filter((id) => !likes.has(id)));
+        const rewatches = new Map([...rows.rewatches].filter(([id]) => !likes.has(id)));
+        const { items, taste } = await recommend({ ...rows, watched, rewatches, reactions: visible });
+        const rankings = { "lists only": (await recommend({ ...rows, watched, rewatches, reactions: [] })).items, "with reactions": items };
+        // Films reacted to and not hidden are never candidates, with or without reactions
+        const known = new Set(visible.map((row) => Number(row.tmdb_id)));
+        for (const [name, total] of Object.entries(totals)) {
+            const ids = rankings[name].map((item) => item.id).filter((id) => !known.has(id));
+            if (likes.size) total.recall += metrics(ids, likes).recall;
+            total.dislikes += ids.slice(0, K).filter((id) => dislikes.has(id)).length;
+        }
+        if (likes.size) withLikes++;
+        hiddenDislikes += dislikes.size;
+
+        const genre = taste.topGenres[0];
+        const share = (list) => list.slice(0, K).filter((item) => item.genre_ids.includes(genre)).length / K;
+        const victim = items.find((item) => item.genre_ids.includes(genre));
+        if (victim) {
+            const after = (await recommend({ ...rows, watched, rewatches, reactions: [...visible, { tmdb_id: victim.id, reaction: "dislike" }] })).items;
+            shareDrops.push(share(items.filter((item) => item.id !== victim.id)) - share(after));
+        }
+    }
+    if (!users.length) return console.log("\nNo users with enough Discover reactions.");
+    console.log(`\nReactions: ${users.length} users (${withLikes} with hidden likes), ${hiddenDislikes} hidden dislikes`);
+    console.log("strategy                recall@20 of hidden likes  hidden dislikes in top 20");
+    for (const [name, total] of Object.entries(totals)) {
+        console.log(`${name.padEnd(22)}  ${(withLikes ? total.recall / withLikes : 0).toFixed(4).padStart(25)}  ${String(total.dislikes).padStart(25)}`);
+    }
+    if (shareDrops.length) {
+        console.log(`One dislike in the top genre lowers its share of the top 20 by at most ${(100 * Math.max(...shareDrops)).toFixed(0)} points (should be 10 or less)`);
+    }
 }
 
 async function main() {
@@ -131,7 +198,7 @@ async function main() {
     process.stderr.write("\n");
     if (!evaluated) {
         console.log("No users with enough ranked films.");
-        return;
+        return evaluateReactions();
     }
     console.log(`Users: ${evaluated}, hidden films: ${hiddenTotal} (20% of each user's top ${TOP_N} ranked films)`);
     console.log("strategy                recall@20  NDCG@20  found in top 20  recall@50");
@@ -139,6 +206,7 @@ async function main() {
         const t = totals[name];
         console.log(`${name.padEnd(22)}  ${(t.recall / evaluated).toFixed(4).padStart(9)}  ${(t.ndcg / evaluated).toFixed(4).padStart(7)}  ${String(t.hits).padStart(15)}  ${(t.recall50 / evaluated).toFixed(4).padStart(9)}`);
     }
+    await evaluateReactions();
 }
 
 main()

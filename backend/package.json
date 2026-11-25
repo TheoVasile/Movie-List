@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "migrate": "node migrations/setupDB.js",
-    "test": "node --test test/"
+    "test": "node --require ./testSetup.js --test test/"
   },
   "keywords": [],
   "author": "",

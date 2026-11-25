@@ -5,7 +5,8 @@
 // - seed support: the sum, over the seed films whose TMDb recommendations include it, of the seed's weight times a
 //   small decay for how far down that seed's recommendations it is. Films recommended from several of the user's
 //   favourites rise to the top, like Movie Night's classic picks
-// - taste: cosine(candidate, liked films) - DISLIKE_PENALTY x cosine(candidate, disliked films) (services/tasteVector.js)
+// - taste: cosine(candidate, liked films) - DISLIKE_PENALTY x confidence x cosine(candidate, disliked films), where
+//   confidence grows with how many films were disliked (services/tasteVector.js)
 // - a little TMDb rating, so of two equal matches the better film comes first
 // Then MMR re-ranks for variety, and explore and friend picks are slotted in at fixed places
 
@@ -68,7 +69,7 @@ function seedSupport(seedResults) {
 /// How well a film fits the user's taste: -DISLIKE_PENALTY...1, 0 without a taste vector
 function tasteScore(vector, taste) {
     if (!taste || !vector?.size) return 0;
-    return cosine(vector, taste.likes) - DISLIKE_PENALTY * cosine(vector, taste.dislikes);
+    return cosine(vector, taste.likes) - DISLIKE_PENALTY * (taste.dislikeConfidence ?? 1) * cosine(vector, taste.dislikes);
 }
 
 /// 0...1 from TMDb's rating: 5 or less is 0, 9 or more is 1
@@ -155,7 +156,55 @@ function rerankByTaste(films, taste, vectorOf) {
         .map(({ film }) => film);
 }
 
+// Movie night: how much the group's Discover reactions can raise a pick, and lower it (for being like films people
+// marked Not for Me). Less than one more person's favourites leading to a film (1), with GROUP_QUALITY for its rating,
+// so what people ranked always counts for more
+const GROUP_BOOST = 0.5;
+const GROUP_PENALTY = 0.2;
+const GROUP_QUALITY = 0.25;
+// Reactions at which someone's taste from them counts for half as much as it would at most
+const GROUP_HALF_CONFIDENCE = 5;
+
+/// One person's Discover taste for a movie night, from their reactions alone ({ likes: [ids], dislikes: [ids] }).
+/// features: Map id -> features, of whichever of those films are known
+function groupTaste({ likes = [], dislikes = [] }, features = new Map()) {
+    const combined = (ids) => {
+        const vector = new Map();
+        const known = ids.filter((id) => features.has(id));
+        for (const id of known) {
+            for (const [key, value] of filmVector(features.get(id))) vector.set(key, (vector.get(key) ?? 0) + value);
+        }
+        return { vector, confidence: known.length / (known.length + GROUP_HALF_CONFIDENCE) };
+    };
+    return { liked: new Set(likes), disliked: new Set(dislikes), like: combined(likes), dislike: combined(dislikes) };
+}
+
+/// How much the group's reactions move a film: -GROUP_PENALTY...GROUP_BOOST, the average over everyone of how well it
+/// fits their reactions (a film they liked fits fully). 0 when nobody has reacted to anything
+function groupBoost(id, vector, tastes) {
+    if (!tastes.length) return 0;
+    const fits = tastes.map(({ liked, like, dislike }) => (liked.has(id)
+        ? 1
+        : like.confidence * cosine(vector, like.vector) - DISLIKE_PENALTY * dislike.confidence * cosine(vector, dislike.vector)));
+    const fit = fits.reduce((sum, value) => sum + value, 0) / fits.length;
+    return Math.min(Math.max(GROUP_BOOST * fit, -GROUP_PENALTY), GROUP_BOOST);
+}
+
+/// Orders a group's candidates by base (what their lists say) plus groupBoost, and leaves out the films someone marked
+/// Not for Me, unless fewer than count are left: then those follow, the fewest dislikes first. items:
+/// [{ id, base, vector, ... }]; ties keep their order
+function rankForGroup(items, tastes, count) {
+    const scored = items.map((item) => ({
+        item,
+        score: item.base + groupBoost(item.id, item.vector, tastes),
+        dislikes: tastes.filter(({ disliked }) => disliked.has(item.id)).length,
+    })).sort((a, b) => a.dislikes - b.dislikes || b.score - a.score);
+    const wanted = scored.filter(({ dislikes }) => !dislikes);
+    return [...wanted, ...scored.slice(wanted.length, Math.max(count, wanted.length))].map(({ item }) => item);
+}
+
 module.exports = {
+    groupTaste, groupBoost, rankForGroup, GROUP_BOOST, GROUP_PENALTY, GROUP_QUALITY,
     parseSeeds, seedSupport, tasteScore, combineScore, quality, similarityVector, mmr, blendExplore, placeFriends,
     rerankByTaste, SEED_LIMIT, MMR_LAMBDA, EXPLORE_EVERY, FRIEND_POSITIONS, MAX_FRIEND_PICKS, DISLIKE_PENALTY,
 };

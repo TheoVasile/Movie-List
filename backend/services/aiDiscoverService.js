@@ -1,5 +1,6 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const pool = require("../config/db");
+const { isWatchlist } = require("./tasteVector");
 
 const MODEL = "claude-haiku-5-5";
 // Plenty for anyone's lists, while keeping each request to a fraction of a cent
@@ -9,11 +10,11 @@ const DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 40;
 // keeps a day under about $25
 const GLOBAL_DAILY_LIMIT = Number(process.env.AI_GLOBAL_DAILY_LIMIT) || 5000;
 
-const SYSTEM_PROMPT = `You recommend films for the Discover tab of a film-ranking app. The user swipes through your picks one at a time and adds the ones they like to their lists.
+const SYSTEM_PROMPT = `You recommend films for the Discover tab of a film-ranking app. The user swipes through your picks one at a time: right means they like it, left means "not for me". Adding a film to a list is separate, and says nothing about whether they like it.
 
-You'll get the user's lists (films in rank order, best first, where ✓ marks films they've watched) with a summary of their eras and languages, and sometimes films they've liked, skipped or marked "not for me" in Discover, genres they lean towards or away from, how often they like what Discover shows them, their country and language, and an age range or pronouns they chose to share. Lists are the strongest signal: weigh highly ranked films most (a list marked unranked is in no particular order, so never read a film's place in it as liking or disliking it), and notice the patterns across the whole collection (directors, eras, countries, tone, themes), not just the top few. A list's name can say what it's for, such as a watchlist or a holiday list. When there are no lists, rely on the swipes and anything else provided, and if there's nothing at all, pick widely loved films across genres, eras and countries.
+You'll get the user's lists (films in rank order, best first, where ✓ marks films they've watched) with a summary of their eras and languages, and sometimes films they've liked or marked "not for me" in Discover, genres they lean towards or away from, how often they like what Discover shows them, their country and language, and an age range or pronouns they chose to share. Lists are the strongest signal: weigh highly ranked films most (a list marked unranked is in no particular order, so never read a film's place in it as liking or disliking it), and notice the patterns across the whole collection (directors, eras, countries, tone, themes), not just the top few. A list's name can say what it's for, such as a watchlist or a holiday list. When there are no lists, rely on the swipes and anything else provided, and if there's nothing at all, pick widely loved films across genres, eras and countries.
 
-Recommend real, released feature films. Never recommend a film that's in the user's lists, that they liked, skipped or marked "not for me" in Discover, or that's in the already-suggested list: check each pick against them, and if it's there, choose a different film instead. Never include a film only to say it should be skipped. Always return the full number of films asked for. Liked films are a strong signal, almost as strong as their top-ranked films: weigh them heavily and find more films like them. "Not for me" films show what to steer away from. A skip only means "not now" or "seen it": don't read it as dislike, and don't avoid similar films because of it. If they like few of the films Discover shows them, stay closer to their lists; if they like many, be more adventurous. Prefer films likely to be available in their country, and in their language or with subtitles. Mix close matches with a few adventurous picks so the deck doesn't repeat itself. If the user is under 18, only recommend films suitable for their age. Use the age range and pronouns only as soft hints, never as a stereotype.
+Recommend real, released feature films. Never recommend a film that's in the user's lists, that they liked or marked "not for me" in Discover, or that's in the already-suggested list: check each pick against them, and if it's there, choose a different film instead. Never include a film only to say it should be left out. Always return the full number of films asked for. Liked films are a good signal, so find more films like them, but where the user has ranked films, their rankings outweigh their likes. "Not for me" films show what to steer away from: a few of them rule out close matches, not a whole genre, director or era. If they like few of the films Discover shows them, stay closer to their lists; if they like many, be more adventurous. Prefer films likely to be available in their country, and in their language or with subtitles. Mix close matches with a few adventurous picks so the deck doesn't repeat itself. If the user is under 18, only recommend films suitable for their age. Use the age range and pronouns only as soft hints, never as a stereotype.
 
 For each film give its exact original release title as listed on TMDb, its release year, and one short sentence (under 20 words) on why this user would like it, mentioning films or patterns from their lists when you can.`;
 
@@ -128,6 +129,25 @@ function describeLists(lists, who = "The user", maxFilms = MAX_LIST_FILMS) {
     return `${who}'s lists:\n\n${sections.join("\n\n")}\n\nAt a glance: ${summary}`;
 }
 
+/// The films liked and disliked in Discover to tell the AI about, up to limit of each: the ones saved on the server
+/// (reacted, from fetchReactedFilms), topped up with the ones the app sent, without repeating any and without films in
+/// ranked lists, whose places say more. The server's word wins over the app's, which can be out of date
+function mergeReactedFilms(sent, reacted, lists, limit) {
+    const key = (film) => `${String(film.title).toLowerCase()}|${film.year ?? ""}`;
+    const seen = new Set(lists.filter((list) => list.ranked !== false && !isWatchlist(list.name)).flatMap((list) => list.films.map(key)));
+    const merged = { liked: [], disliked: [] };
+    for (const source of [reacted, sent]) {
+        for (const field of ["liked", "disliked"]) {
+            for (const film of source[field]) {
+                if (!film.title || merged[field].length >= limit || seen.has(key(film))) continue;
+                seen.add(key(film));
+                merged[field].push({ title: String(film.title).slice(0, 120), year: String(film.year ?? "").slice(0, 4) });
+            }
+        }
+    }
+    return merged;
+}
+
 function describeRequest(signals, count) {
     const parts = [];
     const titles = (films) => films.map(filmLabel).join("; ");
@@ -147,7 +167,6 @@ function describeRequest(signals, count) {
     }
     if (signals.liked.length) parts.push(`Liked in Discover, most recent first: ${titles(signals.liked)}`);
     if (signals.disliked.length) parts.push(`Marked "not for me" in Discover: ${titles(signals.disliked)}`);
-    if (signals.passed.length) parts.push(`Skipped in Discover (not now, not a dislike): ${titles(signals.passed)}`);
     if (signals.favoriteGenres.length) parts.push(`Leans towards: ${signals.favoriteGenres.join(", ")}`);
     if (signals.avoidedGenres.length) parts.push(`Leans away from: ${signals.avoidedGenres.join(", ")}`);
     if (signals.swipeCount) parts.push(`Liked ${signals.likeCount} of the ${signals.swipeCount} films they've swiped in Discover`);
@@ -304,9 +323,14 @@ async function recommendForGroup(user_id, people, count, constraints = {}) {
     return JSON.parse(text).recommendations ?? [];
 }
 
+// Similar films from each kind of reaction Smart Placement is told about
+const MAX_PLACEMENT_FILMS = 8;
+
 const PLACEMENT_PROMPT = `You place a film in someone's ranked film list, best first, where they would most likely rank it themselves.
 
 Read the whole list to understand their taste and how strict they are: which directors, genres, eras and tones they rank high or low, and how films similar to the new one are placed. Then choose the position for the new film, where 1 means it becomes their favourite and one more than the list's length means it goes at the bottom.
+
+You may also be told how they reacted in Discover to the new film, or to films like it. Those are weak hints: the list's order and its patterns always outweigh them, and don't mention reactions in your answer.
 
 Give the position as an integer and one short sentence (under 15 words) naming the films it falls between or the pattern you used.`;
 
@@ -320,13 +344,26 @@ const PLACEMENT_SCHEMA = {
     additionalProperties: false,
 };
 
+/// What the user's Discover reactions say about a film being placed, or "" when they say nothing.
+/// { own: "like" | "dislike" | undefined, liked: [{ title, year }], disliked: [...] } (films like it)
+function describePlacementReactions({ own, liked = [], disliked = [] } = {}) {
+    const titles = (films) => films.slice(0, MAX_PLACEMENT_FILMS).map(filmLabel).join("; ");
+    return [
+        own === "like" ? "In Discover they liked this film." : own === "dislike" ? "In Discover they marked this film not for me." : "",
+        liked.length ? `Films like it they liked in Discover: ${titles(liked)}.` : "",
+        disliked.length ? `Films like it they marked not for me: ${titles(disliked)}.` : "",
+    ].filter(Boolean).join(" ");
+}
+
 /// Asks the AI where a film belongs in one of the user's ranked lists. films is the list in rank order (without
-/// the new film), as { title, year }. Returns { rank, reason } with rank clamped to 1...films.length + 1
-async function placeInList(user_id, listName, films, newFilm) {
+/// the new film), as { title, year }; reactions is what describePlacementReactions takes. Returns { rank, reason }
+/// with rank clamped to 1...films.length + 1
+async function placeInList(user_id, listName, films, newFilm, reactions = {}) {
     const anthropic = getClient();
     await takeDailyRequest(user_id);
 
     const lines = films.map((film, i) => `${i + 1}. ${filmLabel(film)}`).join("\n");
+    const hints = describePlacementReactions(reactions);
     const response = await anthropic.messages.create({
         model: MODEL,
         // Room for the model's reasoning as well as the answer: a long list can take it past 500 tokens, and a
@@ -339,7 +376,7 @@ async function placeInList(user_id, listName, films, newFilm) {
         },
         messages: [{
             role: "user",
-            content: `The list "${listName}" (${films.length} films, best first):\n${lines}\n\nWhere would they rank ${filmLabel(newFilm)}?`,
+            content: `The list "${listName}" (${films.length} films, best first):\n${lines}\n\n${hints ? `${hints}\n\n` : ""}Where would they rank ${filmLabel(newFilm)}?`,
         }],
     });
     const { usage: tokens } = response;
@@ -352,4 +389,7 @@ async function placeInList(user_id, listName, films, newFilm) {
     return { rank: Math.min(Math.max(Math.round(Number(rank) || films.length + 1), 1), films.length + 1), reason: String(reason ?? "").slice(0, 200) };
 }
 
-module.exports = { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILimitError };
+module.exports = {
+    recommendFilms, recommendForGroup, placeInList, mergeReactedFilms, describeRequest, describePlacementReactions,
+    AIUnavailableError, AILimitError, SYSTEM_PROMPT, PLACEMENT_PROMPT,
+};
