@@ -345,6 +345,50 @@ struct MetaChip: View {
     }
 }
 
+/// A film or show's genres on a line, like "Drama · Thriller". Nothing at all when it has none
+struct GenreLine: View {
+    // nil while they load, which keeps the line's place
+    let genres: [Int]?
+    let isTV: Bool
+    // The most to name; nil names them all
+    var limit: Int? = nil
+    var lineLimit: Int? = nil
+    // Over a poster, white like the other text there
+    var onPoster = false
+
+    var body: some View {
+        if let genres {
+            let names = Array(TasteProfile.names(of: genres, isTV: isTV).prefix(limit ?? .max))
+            if !names.isEmpty {
+                // The space before each dot doesn't break, so no line starts with one
+                line(Text(names.joined(separator: "\u{00A0}· ")))
+                    .accessibilityLabel((names.count == 1 ? "Genre: " : "Genres: ") + names.joined(separator: ", "))
+            }
+        } else {
+            HStack(spacing: 6) {
+                // No taller than the text, so the line doesn't change height once loaded
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(onPoster ? Theme.posterText : Theme.textSecondary)
+                    .frame(height: 12)
+                line(Text("Loading genres…"))
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func line(_ text: Text) -> some View {
+        text
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(onPoster ? Theme.posterText.opacity(0.85) : Theme.textSecondary)
+            .lineLimit(lineLimit)
+            // A little smaller before being cut off
+            .minimumScaleFactor(lineLimit == nil ? 1 : 0.85)
+            .truncationMode(.tail)
+            .multilineTextAlignment(.leading)
+    }
+}
+
 /// Lays its views out in rows, left to right, starting a new row when the next one doesn't fit. Used for chips
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8

@@ -30,6 +30,7 @@ struct MovieDetailView: View {
     @State private var friendTakes: [FriendTake] = []
     @State private var imdbID: String? = nil
     @State private var info: MovieInfo? = nil
+    @State private var infoLoading = true
     @State private var providers: WatchProviders? = nil
     @State private var recommending = false
     @State private var showingMoreLikeThis = false
@@ -94,6 +95,7 @@ struct MovieDetailView: View {
         MovieInfoCache.shared.fetchMissing([tmdbID], onBatch: {}, completion: {
             withAnimation(Theme.spring) {
                 info = MovieInfoCache.shared.info(for: tmdbID)
+                infoLoading = false
             }
         })
     }
@@ -376,6 +378,12 @@ struct MovieDetailView: View {
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                // Every genre; gone if TMDb has none or they couldn't be loaded
+                if info != nil || infoLoading {
+                    GenreLine(genres: info?.genres, isTV: movie.isTV)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                }
                 if let onApprovePlacement, !placementApproved {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")

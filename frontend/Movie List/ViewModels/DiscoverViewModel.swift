@@ -271,6 +271,26 @@ struct TasteProfile: Codable {
         10752: "War", 37: "Western",
     ]
 
+    // Genres only TV shows have. They can't be filtered by, so they're kept apart: only for showing what a show is
+    private static let tvGenreNames: [Int: String] = [
+        10759: "Action & Adventure", 10762: "Kids", 10763: "News", 10764: "Reality", 10765: "Sci-Fi & Fantasy",
+        10766: "Soap", 10767: "Talk", 10768: "War & Politics",
+    ]
+
+    // The server sends some TV genres as the closest film genres (backend/services/tmdbMedia.js). TMDb has no shows in
+    // these film genres, so on a show they're turned back: Game of Thrones is "Sci-Fi & Fantasy", not science fiction
+    private static let filmGenresAsTV: [Int: Int] = [28: 10759, 12: 10759, 878: 10765, 14: 10765, 10752: 10768]
+
+    /// A film or show's genres by name, in TMDb's order, leaving out any it's not known how to name
+    static func names(of genres: [Int], isTV: Bool) -> [String] {
+        var names: [String] = []
+        for genre in genres {
+            let genre = isTV ? filmGenresAsTV[genre] ?? genre : genre
+            if let name = genreNames[genre] ?? tvGenreNames[genre], !names.contains(name) { names.append(name) }
+        }
+        return names
+    }
+
     mutating func record(_ movie: Movie, _ reaction: DiscoverReaction) {
         let film = RecentFilm(title: movie.title, year: Theme.year(from: movie.release_date))
         swipeCount += 1
