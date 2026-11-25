@@ -203,8 +203,8 @@ struct MoreLikeThisView: View {
             isLoading = false
             switch result {
             case .success(let similar):
-                // The server leaves out films in the user's lists; this also catches ones added since it last synced,
-                // and the ones marked Not for Me, which are only kept on this device
+                // The server leaves out films in the user's lists and ones they marked Not for Me; this also catches
+                // ones added or marked on this device that haven't reached it yet
                 let listed = Set(movieLists.flatMap { $0.movies.map { Int64($0.tmdb_id) } })
                 let disliked = Set((UserDefaults.standard.array(forKey: DiscoverViewModel.dislikedKey) as? [Int] ?? []).map(Int64.init))
                 let kept = similar.filter { !listed.contains($0.id) && !disliked.contains($0.id) && $0.id != source.id }
