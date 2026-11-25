@@ -1014,6 +1014,14 @@ private struct DiscoverCard: View {
     @State private var providers: WatchProviders? = nil
     // How long it runs, like "2h 14m", loaded with the details
     @State private var length: String? = nil
+    // For a card saved without genres
+    @State private var loadedGenres: [Int]? = nil
+
+    // Sent with every card; looked up otherwise, nil until they are
+    private var genres: [Int]? {
+        if let genres = movie.genre_ids, !genres.isEmpty { return genres }
+        return MovieInfoCache.shared.info(for: movie.id)?.genres ?? movie.genre_ids ?? loadedGenres
+    }
 
     var body: some View {
         // Every card is as wide as the screen allows and as tall as the space left, whatever the poster's
@@ -1058,6 +1066,9 @@ private struct DiscoverCard: View {
                 .foregroundColor(Theme.posterText)
                 .lineLimit(3)
                 .minimumScaleFactor(0.7)
+            // The first few, and all of them with the details
+            GenreLine(genres: genres, isTV: movie.isTV, limit: showDetails ? nil : 3, lineLimit: showDetails ? 2 : 1, onPoster: true)
+                .onAppear(perform: loadGenres)
             if movie.source == "friend" {
                 friendBadge
             }
@@ -1116,6 +1127,15 @@ private struct DiscoverCard: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    private func loadGenres() {
+        guard genres == nil else { return }
+        let tmdbID = movie.id
+        MovieInfoCache.shared.fetchMissing([tmdbID], onBatch: {}, completion: {
+            // None when they can't be found, which takes the line away
+            withAnimation(Theme.spring) { loadedGenres = MovieInfoCache.shared.info(for: tmdbID)?.genres ?? [] }
+        })
     }
 
     // Streaming and free services only, since that's what decides "can I watch this tonight?"
