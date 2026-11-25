@@ -49,7 +49,8 @@ function vectorFor(movie, features) {
 }
 
 /// The Discover feed, best first. Options:
-/// seeds [{ id, weight }]; types ["movie"] / ["tv"] / both; page; genres, avoidGenres (film genre ids); onlyGenres;
+/// seeds [{ id, weight }]; types ["movie"] / ["tv"] / both; page; genres, avoidGenres (film genre ids, ranked lower
+/// but never left out); onlyGenres;
 /// exclude: Set of ids never to show (listed, reacted to, already shown); taste: the taste vector or null;
 /// friends: discover movies friends recommended, each with recommended_by; extraFeeds: more TMDb results (already
 /// films) to treat as taste candidates; get(path, params): a cached TMDb answer; features(ids): Map id -> features;
@@ -89,7 +90,6 @@ async function buildDiscover({
         ...(feedGenres.length ? [resultsOf(type, `discover/${type}`, {
             page,
             with_genres: genresFor(type, feedGenres).join("|"),
-            without_genres: genresFor(type, avoidGenres).join(","),
             sort_by: "vote_average.desc",
             "vote_count.gte": type === "tv" ? 150 : 300,
             include_adult: false,
@@ -98,7 +98,6 @@ async function buildDiscover({
             page,
             with_keywords: keywords.join("|"),
             ...(onlyGenres && genres.length ? { with_genres: genresFor(type, genres).join("|") } : {}),
-            without_genres: genresFor(type, avoidGenres).join(","),
             sort_by: "vote_count.desc",
             "vote_count.gte": MIN_VOTES,
             include_adult: false,

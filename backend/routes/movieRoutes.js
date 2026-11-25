@@ -6,7 +6,7 @@ const requireListOwner = require("../middleware/listOwnership");
 const { setMovieWatched, logWatch, deleteRewatch, fetchDiary } = require("../models/watchedModel");
 const { mapWithConcurrency, createLimiter } = require("../services/letterboxdService");
 const { fetchListsForTaste, fetchListedTmdbIds, fetchFriend, fetchTopFilms, fetchUnwatchedWatchlist } = require("../models/tasteModel");
-const { recommendFilms, recommendForGroup, placeInList, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
+const { recommendFilms, recommendForGroup, placeInList, mergeReactedFilms, AIUnavailableError, AILimitError } = require("../services/aiDiscoverService");
 const { MAX_MEMBERS: MAX_GROUP_MEMBERS, followedByHandle, groupParticipants } = require("../models/groupModel");
 const { fetchPicks, pickHistory, saveRecommendations } = require("../models/groupPicksModel");
 const pool = require("../config/db");
@@ -18,10 +18,12 @@ const { showDetails, seasonEpisodes } = require("../services/tvEpisodes");
 const { directedFilms } = require("../services/directorFilmography");
 const { similarFilms } = require("../services/similarFilms");
 const { buildDiscover, toDiscoverMovie } = require("../services/discoverFeed");
-const { parseSeeds, rerankByTaste } = require("../services/discoverRanker");
+const { parseSeeds, rerankByTaste, quality, groupTaste, rankForGroup, GROUP_QUALITY } = require("../services/discoverRanker");
+const { GENRE_NAMES } = require("../services/tasteMatch");
+const { placementHint, similarReactions } = require("../services/placementHint");
 const { tasteVectorWithin, invalidateTaste, featuresFor, filmVector } = require("../services/tasteVector");
 const reactionsModel = require("../models/reactionsModel");
-const { fetchReactionMap, fetchReactedFilms, fetchFriendPicks } = reactionsModel;
+const { fetchReactionMap, fetchReactedFilms, fetchFriendPicks, fetchNewestReactions, fetchGroupReactions, MAX_AI_REACTIONS } = reactionsModel;
 const { createReactionsRouter } = require("./discoverReactionsRoutes");
 
 const router = express.Router();
@@ -135,6 +137,20 @@ function parseMediaIds(value, limit) {
         .slice(0, limit);
 }
 
+// Whether someone has liked or disliked anything in Discover, from fetchReactionMap
+const hasReacted = (reactions) => [...reactions.values()].some((reaction) => reaction !== "skip");
+
+/// promise's value, or fallback if it fails or takes longer than ms
+async function within(promise, ms, fallback) {
+    let timer;
+    const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), ms); });
+    try {
+        return await Promise.race([promise.catch(() => fallback), timeout]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 // A film or show id from a query parameter, or null when it isn't one
 function mediaId(value) {
     const id = Number(value);
@@ -147,10 +163,11 @@ function mediaId(value) {
 // front (first page only); and an explore pick (trending) about every 7th place. Re-ranked for variety (MMR).
 //   seeds: comma-separated ids, each with an optional weight, e.g. "550:1,680:0.6,-1399" (shows are negative;
 //          weight 0...2, 1 when left out, as older builds send). With no seeds, the user's top films are used
-//   genres, avoid_genres, only_genres=1 (every film has one of genres), kind=movie|tv|all, page, languages,
-//   providers, region (filters), exclude_ids (comma-separated ids never to return, e.g. already shown)
-// Films in the user's lists, films they liked or disliked in Discover and films they skipped in the last 30 days
-// are left out (before the discover_reactions table exists, only listed ones). Each film has the usual fields plus
+//   genres, only_genres=1 (every film has one of genres), kind=movie|tv|all, page, languages, providers, region
+//   (filters), exclude_ids (comma-separated ids never to return, e.g. already shown), avoid_genres (ranked lower,
+//   only while the server has no likes or dislikes of the user's to go on; older builds send it)
+// Films in the user's lists, films they liked or disliked in Discover and films they skipped in an older build in the
+// last 30 days are left out (before the discover_reactions table exists, only listed ones). Each film has the usual fields plus
 // score (number), source ("seed" | "taste" | "explore" | "friend" | "trending") and, for friends' picks,
 // recommended_by: { handle, display_name }
 router.get("/discover", async (req, res) => {
@@ -161,7 +178,6 @@ router.get("/discover", async (req, res) => {
         const seeds = parseSeeds(req.query.seeds).filter((seed) => types.includes(isTV(seed.id) ? "tv" : "movie"));
         const onlyGenres = req.query.only_genres === "1";
         const genres = parseIds(req.query.genres, onlyGenres ? 20 : 3);
-        const avoidGenres = parseIds(req.query.avoid_genres, 3);
         // Optional: only films in these original languages, and/or streaming on these services in region
         const filters = parseFilters(req.query);
         const genresFor = (type, ids) => (type === "tv" ? tvGenres(ids) : ids);
@@ -176,6 +192,7 @@ router.get("/discover", async (req, res) => {
             page === 1 ? fetchFriendPicks(req.user.uid).catch(() => []) : [],
         ]);
         const exclude = new Set([...listed, ...reactions.keys(), ...parseMediaIds(req.query.exclude_ids, 2000)]);
+        const avoidGenres = hasReacted(reactions) ? taste?.avoidedGenres ?? [] : parseIds(req.query.avoid_genres, 3);
 
         // With filters, recommendations alone rarely have enough matches, so TMDb is also asked directly for films
         // that fit: one feed per language (or one for the services alone), in the chosen genres
@@ -227,8 +244,9 @@ router.get("/discover", async (req, res) => {
     }
 });
 
-// Discover reactions (likes, dislikes and skips), kept on the server: see routes/discoverReactionsRoutes.js
-router.use("/discover/reactions", createReactionsRouter(reactionsModel, invalidateTaste));
+// Discover reactions (likes and dislikes, and older builds' skips), kept on the server: see
+// routes/discoverReactionsRoutes.js
+router.use("/discover/reactions", createReactionsRouter(reactionsModel, invalidateTaste, (id) => ensureMovie(id)));
 
 // Films in theatres in one country, most popular first, for theatre check-ins ("What did you see?"), e.g.
 // ?region=CA -> [discover movie...]. Cached per region for an hour, since TMDb's now-playing list changes slowly
@@ -282,22 +300,6 @@ async function findOnTmdb(title, year) {
     return results[0] ?? null;
 }
 
-/// Adds films liked or disliked in Discover (saved on the server, with titles where known) to the AI's signals,
-/// after the ones the app sent and without repeating any, up to 500 each
-function mergeReactedFilms(signals, reacted) {
-    const key = (film) => `${String(film.title).toLowerCase()}|${film.year}`;
-    for (const [field, films] of [["liked", reacted.liked], ["disliked", reacted.disliked]]) {
-        const seen = new Set(signals[field].map(key));
-        for (const film of films) {
-            if (!film.title || signals[field].length >= 500) continue;
-            const clean = { title: cleanText(film.title), year: cleanText(film.year, 4) };
-            if (seen.has(key(clean))) continue;
-            seen.add(key(clean));
-            signals[field].push(clean);
-        }
-    }
-}
-
 const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": "They/Them" };
 
 // Films for the Discover tab chosen by the AI from everything in the user's lists, plus their Discover
@@ -310,14 +312,48 @@ const LEGACY_GENDER_PRONOUNS = { Woman: "She/Her", Man: "He/Him", "Non-binary": 
 const MOVIE_NIGHT_SEEDS = 6;
 const MOVIE_NIGHT_PER_SEED = 2;
 const MOVIE_NIGHT_MIN_VOTES = 100;
+// Discover reactions (to films) each person's taste is worked out from, how long that can take, and how many of their
+// likes lead to picks when everyone's favourites don't lead to enough
+const MOVIE_NIGHT_REACTIONS = 30;
+const MOVIE_NIGHT_REACTIONS_MS = 4000;
+const MOVIE_NIGHT_LIKE_SEEDS = 2;
+
+// Why a film led to by someone's likes was picked: never who liked what
+const MOVIE_NIGHT_GROUP_REASON = "Picked for your group";
+
+/// What people's Discover reactions say about a movie night (one groupTaste each, in people's order) and the vectors
+/// of the candidate films. Reactions only choose and order the films shown: they are never votes, never sent to the AI
+/// and never shown. Anything that can't be had in time is done without
+async function movieNightTaste(reactions, movies) {
+    const newest = [...reactions.values()].flatMap(({ likes, dislikes }) => [
+        ...likes.slice(0, MOVIE_NIGHT_REACTIONS), ...dislikes.slice(0, MOVIE_NIGHT_REACTIONS),
+    ]);
+    const features = newest.length
+        ? await within(featuresFor([...newest, ...movies.map((movie) => movie.id)]), MOVIE_NIGHT_REACTIONS_MS, new Map())
+        : new Map();
+    const tastes = [...reactions.values()].map((person) => {
+        const recent = { likes: person.likes.slice(0, MOVIE_NIGHT_REACTIONS), dislikes: person.dislikes.slice(0, MOVIE_NIGHT_REACTIONS) };
+        // Taste comes from recent reactions, but a film anyone ever reacted to counts however long ago that was
+        return { ...groupTaste(recent, features), liked: new Set(person.likes), disliked: new Set(person.dislikes) };
+    });
+    const vectorOf = (movie) => filmVector(features.get(movie.id) ?? { genres: movie.genre_ids });
+    return { tastes, vectorOf };
+}
+
+const movieNightReactions = (people) => fetchGroupReactions(people.map((person) => person.firebase_uid))
+    .catch(() => new Map(people.map((person) => [person.firebase_uid, { likes: [], dislikes: [] }])));
 
 /// Movie night picks without AI, for the user and everyone else coming: films on several people's watchlists
 /// first, then films TMDb recommends from everyone's favourites, preferring films recommended from more people's
-/// favourites. Each favourite leads to at most a couple of picks. people is [{ firebase_uid, name, me }].
-/// filters (languages, services) and genres narrow the picks. Returns [{ ...discover movie, reason }]
+/// favourites, then ones that suit everyone's Discover reactions (movieNightTaste), leaving out films someone marked
+/// Not for Me while there are enough others. Each favourite leads to at most a couple of picks. people is
+/// [{ firebase_uid, name, me }].
+/// filters (languages, services) and genres narrow the picks. Returns [{ ...discover movie, reason, base }], where base
+/// is how the film would rank without anyone's reactions
 async function classicMovieNight(people, count, filters, genres) {
     // Fewer favourites each as the group grows, so the number of TMDb requests stays about the same
     const seedsEach = Math.max(2, Math.floor(12 / people.length));
+    const reactions = await movieNightReactions(people);
     const data = await Promise.all(people.map(async (person) => {
         const [seeds, listed, watchlist] = await Promise.all([
             fetchTopFilms(person.firebase_uid, seedsEach, !person.me),
@@ -345,10 +381,11 @@ async function classicMovieNight(people, count, filters, genres) {
     for (const [id, { row, count: wanted }] of [...onWatchlists].filter(([, e]) => e.count >= 2).sort((a, b) => b[1].count - a[1].count)) {
         const movie = toDiscoverMovie({ ...row, id, release_date: String(row.release_date ?? "").slice(0, 10), poster_path: row.poster_path || null });
         if (!movie || !(await fits(movie))) continue;
-        shared.push({ ...movie, reason: wanted === people.length
+        // More than are used, as ones someone marked Not for Me are passed over
+        shared.push({ movie, base: wanted, reason: wanted === people.length
             ? (people.length === 2 ? "On both your watchlists, and neither of you has seen it yet" : "On all your watchlists, and none of you has seen it yet")
             : `On ${wanted} of your watchlists` });
-        if (shared.length >= 3) break;
+        if (shared.length >= 9) break;
     }
 
     // Which people's favourites TMDb recommends each film from
@@ -356,6 +393,10 @@ async function classicMovieNight(people, count, filters, genres) {
     const params = { language: "en-US", page: 1 };
     // Movie night is for films, so shows in people's lists don't seed it
     const seeds = data.flatMap((person, index) => person.seeds.filter((seed) => !isTV(seed.tmdb_id)).map((seed) => ({ ...seed, person: index })));
+    const favourites = new Set(seeds.map((seed) => seed.tmdb_id));
+    for (const { likes } of reactions.values()) {
+        seeds.push(...likes.filter((id) => !favourites.has(id)).slice(0, MOVIE_NIGHT_LIKE_SEEDS).map((id) => ({ tmdb_id: id, person: null })));
+    }
     const outcomes = await Promise.allSettled(
         seeds.map((seed) => tmdbGet(`movie/${seed.tmdb_id}/recommendations`, params, HOUR))
     );
@@ -366,14 +407,21 @@ async function classicMovieNight(people, count, filters, genres) {
             const movie = toDiscoverMovie(result);
             if (!movie || (result.vote_count ?? 0) < MOVIE_NIGHT_MIN_VOTES || listedByAnyone.has(movie.id)) continue;
             const entry = candidates.get(movie.id) ?? { movie, from: new Map() };
-            if (!entry.from.has(seeds[i].person)) entry.from.set(seeds[i].person, seeds[i].title);
+            // A film only someone's likes lead to comes after every film a favourite leads to
+            if (seeds[i].person !== null && !entry.from.has(seeds[i].person)) entry.from.set(seeds[i].person, seeds[i].title);
             candidates.set(movie.id, entry);
         }
     });
-    const ranked = [...candidates.values()].sort((a, b) =>
-        (b.from.size - a.from.size) || (b.movie.vote_average - a.movie.vote_average));
+    const { tastes, vectorOf } = await movieNightTaste(reactions, [
+        ...shared.map((entry) => entry.movie),
+        ...[...candidates.values()].sort((a, b) => (b.from.size - a.from.size) || (b.movie.vote_average - a.movie.vote_average)).slice(0, 80).map((entry) => entry.movie),
+    ]);
+    const ready = (entry, base) => ({ ...entry, id: entry.movie.id, vector: vectorOf(entry.movie), base });
+    const ranked = [...candidates.values()].map((entry) => ready(entry, entry.from.size + GROUP_QUALITY * quality(entry.movie.vote_average)));
+    const isDisliked = (id) => tastes.some(({ disliked }) => disliked.has(id));
 
     const reasonFor = (entry) => {
+        if (!entry.from.size) return MOVIE_NIGHT_GROUP_REASON;
         const sources = [...entry.from].slice(0, 3).map(([index, title]) => `${possessive(data[index])} ${title}`);
         if (sources.length === 1) {
             const [index, title] = [...entry.from][0];
@@ -383,16 +431,21 @@ async function classicMovieNight(people, count, filters, genres) {
     };
     const perSeed = new Map();
     const picks = [];
-    for (const entry of ranked) {
+    for (const entry of rankForGroup(ranked, tastes, ranked.length)) {
         if (picks.length >= count * 2) break;
+        // Films someone marked Not for Me come last, and only to make up the number
+        if (isDisliked(entry.id) && picks.length >= count) break;
         const titles = [...entry.from.values()];
         if (titles.some((title) => (perSeed.get(title) ?? 0) >= MOVIE_NIGHT_PER_SEED)) continue;
         if (!(await fits(entry.movie))) continue;
         titles.forEach((title) => perSeed.set(title, (perSeed.get(title) ?? 0) + 1));
-        picks.push({ ...entry.movie, reason: reasonFor(entry) });
+        picks.push({ ...entry.movie, reason: reasonFor(entry), base: entry.base });
     }
+    const onWatchlist = rankForGroup(shared.map((entry) => ready(entry, entry.base)), tastes, 0).slice(0, 3)
+        // Watchlists before everything else
+        .map((entry) => ({ ...entry.movie, reason: entry.reason, base: 1000 + entry.base }));
     const seen = new Set();
-    return [...shared, ...picks].filter((movie) => !seen.has(movie.id) && seen.add(movie.id)).slice(0, count);
+    return [...onWatchlist, ...picks].filter((movie) => !seen.has(movie.id) && seen.add(movie.id)).slice(0, count);
 }
 
 // Films the user and the people coming would all enjoy. Either a saved group ({ "group_id": 3 }) or people
@@ -432,11 +485,15 @@ router.post("/movie-night", async (req, res) => {
         const people = [{ ...me, me: true }, ...others.map((p) => ({ ...p, name: p.handle ? `@${p.handle}` : p.name, me: false }))];
         const saving = body.save === true && Number.isInteger(body.group_id);
         const history = saving ? await pickHistory(body.group_id) : { exclude: new Set(), liked: [], dismissed: [], shortlist: [] };
-        // Sends the picks, or saves them to the group's shortlist and sends that
+        // Sends the picks, or saves them to the group's shortlist and sends that. The order films are saved in breaks
+        // ties in the group's vote, so there it's the order without anyone's Discover reactions (base): those only
+        // choose which films are shown
         const reply = async (movies) => {
             const fresh = movies.filter((movie) => !history.exclude.has(movie.id)).slice(0, count);
-            if (!saving) return res.json(fresh);
-            await saveRecommendations(body.group_id, fresh);
+            if (saving) fresh.sort((a, b) => b.base - a.base || a.id - b.id);
+            const plain = fresh.map(({ base, ...movie }) => movie);
+            if (!saving) return res.json(plain);
+            await saveRecommendations(body.group_id, plain);
             res.json(await fetchPicks(req.user.uid, body.group_id));
         };
 
@@ -468,9 +525,12 @@ router.post("/movie-night", async (req, res) => {
             shortlist: history.shortlist,
         };
         const wanted = new Set(genres);
-        // Extra picks, since some turn out to be in someone's lists, can't be found or don't fit the filters
+        const reactions = await movieNightReactions(people);
+        const reacted = [...reactions.values()].some(({ likes, dislikes }) => likes.length || dislikes.length);
+        // Extra picks, since some turn out to be in someone's lists, can't be found or don't fit the filters, and some
+        // may be films someone marked Not for Me
         const picks = await recommendForGroup(req.user.uid, data.map((p) => ({ name: p.me ? "you" : p.name, lists: p.lists })),
-            count + (hasFilters(filters) || wanted.size ? 12 : 5), constraints);
+            Math.min(count + (hasFilters(filters) || wanted.size ? 12 : 5) + (reacted ? 5 : 0), 30), constraints);
 
         const found = await mapWithConcurrency(picks, async (pick) => {
             try {
@@ -484,8 +544,12 @@ router.post("/movie-night", async (req, res) => {
             }
         });
         const seen = new Set();
-        const fresh = found.filter((movie) => movie && !listedByAnyone.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id));
-        await reply(fresh);
+        const fresh = found.filter((movie) => movie && !listedByAnyone.has(movie.id) && !seen.has(movie.id) && seen.add(movie.id)
+            && !history.exclude.has(movie.id));
+        // The AI is never told about reactions: its picks are re-ordered by them afterwards
+        const { tastes, vectorOf } = await movieNightTaste(reactions, fresh);
+        const items = fresh.map((movie, i) => ({ movie, id: movie.id, vector: vectorOf(movie), base: 1 / (1 + 0.05 * i) }));
+        await reply(rankForGroup(items, tastes, count).map(({ movie, base }) => ({ ...movie, base })));
     } catch (error) {
         if (error instanceof AIUnavailableError) {
             return res.status(503).json({ error: "AI recommendations aren't set up." });
@@ -551,7 +615,6 @@ router.post("/ai-discover", async (req, res) => {
         const fromLists = (Array.isArray(body.list_ids) ? body.list_ids : [body.list_id]).filter(Number.isInteger).slice(0, 20);
         const signals = {
             liked: cleanFilms(body.liked, 500),
-            passed: cleanFilms(body.passed, 500),
             disliked: cleanFilms(body.disliked, 500),
             favoriteGenres: cleanStrings(body.favorite_genres, 10),
             avoidedGenres: cleanStrings(body.avoided_genres, 10),
@@ -570,15 +633,17 @@ router.post("/ai-discover", async (req, res) => {
         const count = Math.min(Math.max(parseInt(body.count, 10) || 20, 1), 30);
         const exclude = new Set(parseIds(Array.isArray(body.exclude_ids) ? body.exclude_ids.join(",") : "", 5000));
 
-        const [allLists, listedIds, reacted, reactions] = await Promise.all([
+        const [allLists, listedIds, reacted, reactions, taste] = await Promise.all([
             fetchListsForTaste(req.user.uid),
             fetchListedTmdbIds(req.user.uid),
             fetchReactedFilms(req.user.uid).catch(() => ({ liked: [], disliked: [] })),
             fetchReactionMap(req.user.uid).catch(() => new Map()),
+            // Only for the genres they lean away from, so not worth keeping the first pick waiting
+            tasteVectorWithin(req.user.uid, 1500),
         ]);
-        // Likes and dislikes saved on the server join the ones the app sent (older builds only send these), and
-        // nothing the user reacted to is suggested again
-        const untitled = [...reacted.liked, ...reacted.disliked].filter((film) => !film.title).slice(0, 60);
+        // Likes and dislikes saved on the server come before the ones the app sent, and nothing the user reacted to
+        // is suggested again
+        const untitled = [reacted.liked, reacted.disliked].flatMap((films) => films.filter((film) => !film.title).slice(0, 60));
         if (untitled.length) {
             // Films never saved to a list (e.g. dislikes) are named from TMDb, cached
             const named = await featuresFor(untitled.map((film) => film.tmdb_id)).catch(() => new Map());
@@ -587,7 +652,10 @@ router.post("/ai-discover", async (req, res) => {
                 if (features) Object.assign(film, { title: features.title, year: String(features.year ?? "") });
             }
         }
-        mergeReactedFilms(signals, reacted);
+        Object.assign(signals, mergeReactedFilms(signals, reacted, allLists, MAX_AI_REACTIONS));
+        if (hasReacted(reactions)) {
+            signals.avoidedGenres = (taste?.avoidedGenres ?? []).map((id) => GENRE_NAMES[id]).filter(Boolean);
+        }
         for (const tmdbId of reactions.keys()) exclude.add(tmdbId);
         const chosenLists = allLists.filter((list) => fromLists.includes(list.id));
         const lists = chosenLists.length ? chosenLists : allLists;
@@ -683,6 +751,50 @@ router.post("/create", async (req, res) => {
     }
 });
 
+/// What the user's own Discover reactions say about a film being placed, for Smart Placement: their reaction to it, and
+/// the films like it (not in the list already) they liked or marked Not for Me
+async function placementReactions(user_id, tmdb_id, listed) {
+    const reactions = await fetchNewestReactions(user_id);
+    const features = await featuresFor([tmdb_id, ...reactions.map((row) => row.tmdb_id)]);
+    const inList = new Set(listed);
+    const similar = similarReactions(tmdb_id, reactions, features).filter((row) => !inList.has(row.tmdb_id));
+    const films = (reaction) => similar.filter((row) => row.reaction === reaction).map((row) => {
+        const { title, year } = features.get(row.tmdb_id);
+        return { title, year: String(year ?? ""), tv: isTV(row.tmdb_id) };
+    });
+    return { own: reactions.find((row) => row.tmdb_id === tmdb_id)?.reaction, liked: films("like"), disliked: films("dislike") };
+}
+
+// Where Compare should start when a film is added to a ranked list, from the user's own Discover reactions
+// (services/placementHint.js), e.g. ?list_id=3&movie_id=120 -> { start_index: 7, count: 24, basis: "like" }. start_index
+// is a place among the list's other films (0 = top), or null to start in the middle as usual
+router.get("/placement-hint", (req, res, next) => {
+    const valid = [req.query.list_id, req.query.movie_id].every((id) => /^\d{1,9}$/.test(String(id ?? "")));
+    return valid ? next() : res.status(400).json({ error: "list_id and movie_id are required." });
+}, requireListOwner.requireListEditor((req) => req.query.list_id), async (req, res) => {
+    try {
+        const rows = (await pool.query(
+            `SELECT l.is_ranked, lm.movie_id, m.tmdb_id
+             FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
+             WHERE l.id = $1`,
+            [Number(req.query.list_id)]
+        )).rows;
+        const film = rows.find((row) => row.movie_id === Number(req.query.movie_id));
+        if (!film) return res.status(404).json({ error: "That film isn't in this list." });
+        const tmdbId = Number(film.tmdb_id);
+        const base = { tmdb_id: tmdbId, count: rows.length - 1, ranked: film.is_ranked !== false };
+        const hint = async () => {
+            const reactions = await fetchNewestReactions(req.user.uid);
+            const features = reactions.length ? await featuresFor([tmdbId, ...reactions.map((row) => row.tmdb_id)]) : new Map();
+            return placementHint({ ...base, reactions, features });
+        };
+        res.json(await within(hint(), 1500, placementHint({ ...base, ranked: false })));
+    } catch (error) {
+        console.error("Error finding where to start placing a film:", error.message);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 // Smart Placement: asks the AI where a film already in the user's list belongs, moves it there and marks it as
 // placed by AI, e.g. { "list_id": 3, "movie_id": 120 } -> { rank, reason }. Needs the user to allow AI
 router.post("/smart-place", editsBodyList, async (req, res) => {
@@ -700,7 +812,7 @@ router.post("/smart-place", editsBodyList, async (req, res) => {
             return res.status(400).json({ error: "This list is unranked, so films just go at the end." });
         }
         const rows = (await pool.query(
-            `SELECT l.name, lm.movie_id, lm.rank, m.title, m.release_date
+            `SELECT l.name, lm.movie_id, lm.rank, m.tmdb_id, m.title, m.release_date
              FROM lists l JOIN list_movies lm ON lm.list_id = l.id JOIN movies m ON m.id = lm.movie_id
              WHERE l.id = $1 ORDER BY lm.rank`,
             [listId]
@@ -710,7 +822,8 @@ router.post("/smart-place", editsBodyList, async (req, res) => {
         const others = rows.filter((row) => row.movie_id !== movieId)
             .map((row) => ({ title: row.title, year: String(row.release_date ?? "").slice(0, 4) }));
         const { rank, reason } = await placeInList(req.user.uid, film.name, others,
-            { title: film.title, year: String(film.release_date ?? "").slice(0, 4) });
+            { title: film.title, year: String(film.release_date ?? "").slice(0, 4) },
+            await within(placementReactions(req.user.uid, Number(film.tmdb_id), rows.map((row) => Number(row.tmdb_id))), 3000, {}));
         await updateMovieRank(listId, movieId, rank, true);
         res.json({ rank, reason });
     } catch (error) {

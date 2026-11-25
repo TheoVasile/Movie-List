@@ -11,7 +11,12 @@
 //   long list doesn't drown out a short one and a 3-film list doesn't count for more than its films
 // - Unranked lists and watchlists: their order means nothing, so only FLAT_WATCHED, and only for watched films
 // - Watched: +WATCHED_BOOST; each rewatch in the diary: +REWATCH_BOOST (up to MAX_REWATCHES)
-// - Discover likes: +LIKE_WEIGHT. Dislikes make a separate vector the ranker subtracts
+// - Discover likes: +LIKE_WEIGHT, halving every REACTION_HALF_LIFE days, and nothing for films in ranked lists (their
+//   place already says more). Together they count for at most LIKE_SHARE of everything else (or LIKE_MASS), so
+//   swiping a lot doesn't drown out the lists
+// - Dislikes make a separate vector the ranker subtracts, the older the less. A film in a ranked list ignores its
+//   dislike: ranking it is the clearer sign. One dislike says little about a whole genre, decade or language, so
+//   those only count once several dislikes, and most of what the user has reacted to or ranked there, agree
 //
 // The vector is kept in memory per user for TASTE_TTL, and dropped when the user reacts in Discover
 
@@ -24,11 +29,26 @@ const FLAT_WATCHED = 0.1;
 const WATCHED_BOOST = 0.2;
 const REWATCH_BOOST = 0.3;
 const MAX_REWATCHES = 3;
-const LIKE_WEIGHT = 0.8;
+const LIKE_WEIGHT = 0.6;
 const DISLIKE_WEIGHT = 1;
+const REACTION_HALF_LIFE = 180; // days
+// An old like never fades past this share of its weight
+const MIN_LIKE_DECAY = 0.2;
+const LIKE_SHARE = 0.6;
+const LIKE_MASS = 4;
+// Dislikes at which the ranker subtracts half as much as it would at most
+const DISLIKE_HALF_CONFIDENCE = 5;
+// When a genre, decade or language counts against films: this many dislikes, making up this share
+const BROAD_KINDS = ["g", "y", "l"];
+const BROAD_MIN_DISLIKES = 3;
+const BROAD_MIN_SHARE = 0.65;
+// When the user leans away from a genre, for the ranker's avoided genres and the AI
+const AVOID_MIN_DISLIKES = 5;
+const AVOID_MIN_SHARE = 0.75;
+const MAX_AVOIDED_GENRES = 2;
 // The films considered, so building the vector stays cheap however big someone's lists are
 const MAX_LIKED_FILMS = 150;
-const MAX_DISLIKED_FILMS = 50;
+const MAX_DISLIKED_FILMS = 100;
 const FEATURE_CONCURRENCY = 12;
 const TASTE_TTL = 15 * 60 * 1000;
 const TASTE_CACHE_SIZE = 2000;
@@ -163,9 +183,11 @@ function addScaled(sum, vector, weight) {
 /// How much each of the user's films counts, from plain rows (see the top of this file):
 /// entries: [{ list_id, list_name, is_ranked, position (0 = top), size, tmdb_id }]
 /// watched: Set of TMDb ids marked watched; rewatches: Map TMDb id -> rewatches in the diary;
-/// reactions: [{ tmdb_id, reaction }]. Returns { likes: Map id -> weight, dislikes: Map id -> weight }
+/// reactions: [{ tmdb_id, reaction, age_days (0 when left out) }].
+/// Returns { likes: Map id -> weight, dislikes: Map id -> weight }
 function weightFilms({ entries = [], watched = new Set(), rewatches = new Map(), reactions = [] }) {
     const likes = new Map();
+    const rankedIds = new Set();
     const add = (id, weight) => likes.set(Number(id), (likes.get(Number(id)) ?? 0) + weight);
 
     const lists = new Map();
@@ -185,26 +207,40 @@ function weightFilms({ entries = [], watched = new Set(), rewatches = new Map(),
         const raw = sorted.map((_, i) => Math.exp(-i / RANK_DECAY));
         const total = raw.reduce((sum, value) => sum + value, 0);
         const scale = Math.min(sorted.length, RANK_DECAY) / total;
-        sorted.forEach((film, i) => add(film.tmdb_id, raw[i] * scale));
+        sorted.forEach((film, i) => {
+            add(film.tmdb_id, raw[i] * scale);
+            rankedIds.add(Number(film.tmdb_id));
+        });
     }
     for (const id of watched) add(id, WATCHED_BOOST);
     for (const [id, count] of rewatches) add(id, REWATCH_BOOST * Math.min(count, MAX_REWATCHES));
 
     const dislikes = new Map();
-    for (const { tmdb_id: id, reaction } of reactions) {
-        if (reaction === "like") add(id, LIKE_WEIGHT);
-        if (reaction === "dislike") dislikes.set(Number(id), DISLIKE_WEIGHT);
+    const reactionLikes = new Map();
+    for (const { tmdb_id, reaction, age_days: age = 0 } of reactions) {
+        const id = Number(tmdb_id);
+        if (rankedIds.has(id)) continue;
+        const decay = 0.5 ** (Math.max(age, 0) / REACTION_HALF_LIFE);
+        if (reaction === "like") reactionLikes.set(id, LIKE_WEIGHT * Math.max(decay, MIN_LIKE_DECAY));
+        if (reaction === "dislike") dislikes.set(id, DISLIKE_WEIGHT * decay);
     }
-    // A film the user disliked in Discover doesn't also count as liked
+    // A film the user disliked in Discover (and hasn't ranked) doesn't also count as liked for being watched
     for (const id of dislikes.keys()) likes.delete(id);
+    const sum = (weights) => [...weights.values()].reduce((total, weight) => total + weight, 0);
+    const likeMass = sum(reactionLikes);
+    const most = Math.max(LIKE_MASS, LIKE_SHARE * sum(likes));
+    // With no lists, likes are all there is to go on
+    const scale = entries.length && likeMass > most ? most / likeMass : 1;
+    for (const [id, weight] of reactionLikes) add(id, weight * scale);
     return { likes, dislikes };
 }
 
 const topByWeight = (weights, limit) => [...weights].sort((a, b) => b[1] - a[1]).slice(0, limit);
 
 /// The taste vector from film weights (weightFilms) and their features (Map id -> features):
-/// { likes: Map, dislikes: Map, topGenres: [ids], topKeywords: [ids], seeds: [{ id, weight }], size }.
-/// seeds are the films that count most, for when the app sends none
+/// { likes: Map, dislikes: Map, dislikeConfidence, topGenres: [ids], avoidedGenres: [ids], topKeywords: [ids],
+/// seeds: [{ id, weight }], size }. seeds are the films that count most, for when the app sends none;
+/// dislikeConfidence (0...1) is how much the dislikes are worth subtracting, growing with how many there are
 function tasteFromWeights({ likes, dislikes }, features) {
     const likeVector = new Map();
     const dislikeVector = new Map();
@@ -213,20 +249,44 @@ function tasteFromWeights({ likes, dislikes }, features) {
         const film = features.get(id);
         if (film) addScaled(likeVector, filmVector(film), weight);
     }
-    for (const [id, weight] of topByWeight(dislikes, MAX_DISLIKED_FILMS)) {
-        const film = features.get(id);
-        if (film) addScaled(dislikeVector, filmVector(film), weight);
+    // How many liked (or ranked, or watched) and disliked films have each genre, decade and language
+    const likedWith = new Map();
+    const dislikedWith = new Map();
+    const countBroad = (counts, film) => {
+        for (const key of filmVector(film, BROAD_KINDS).keys()) counts.set(key, (counts.get(key) ?? 0) + 1);
+    };
+    const disliked = topByWeight(dislikes, MAX_DISLIKED_FILMS).filter(([id]) => features.has(id));
+    for (const [id] of liked) if (features.has(id)) countBroad(likedWith, features.get(id));
+    for (const [id] of disliked) countBroad(dislikedWith, features.get(id));
+    const counts = (key) => {
+        if (!BROAD_KINDS.includes(key.slice(0, key.indexOf(":")))) return true;
+        const n = dislikedWith.get(key) ?? 0;
+        return n >= BROAD_MIN_DISLIKES && n / (n + (likedWith.get(key) ?? 0)) >= BROAD_MIN_SHARE;
+    };
+    for (const [id, weight] of disliked) {
+        addScaled(dislikeVector, new Map([...filmVector(features.get(id))].filter(([key]) => counts(key))), weight);
     }
+    const dislikeMass = disliked.reduce((sum, [, weight]) => sum + weight, 0);
     const top = (prefix, limit) => [...likeVector]
         .filter(([key]) => key.startsWith(prefix))
         .sort((a, b) => b[1] - a[1])
         .slice(0, limit)
         .map(([key]) => Number(key.slice(prefix.length)));
     const maxWeight = liked[0]?.[1] ?? 1;
+    const topGenres = top("g:", 5);
+    const avoidedGenres = [...dislikedWith]
+        .filter(([key, n]) => key.startsWith("g:") && n >= AVOID_MIN_DISLIKES && !topGenres.includes(Number(key.slice(2))))
+        .map(([key, n]) => ({ id: Number(key.slice(2)), n, share: (n + 1) / (n + (likedWith.get(key) ?? 0) + 2) }))
+        .filter(({ share }) => share >= AVOID_MIN_SHARE)
+        .sort((a, b) => b.share - a.share || b.n - a.n)
+        .slice(0, MAX_AVOIDED_GENRES)
+        .map(({ id }) => id);
     return {
         likes: likeVector,
         dislikes: dislikeVector,
-        topGenres: top("g:", 5),
+        dislikeConfidence: dislikeMass / (dislikeMass + DISLIKE_HALF_CONFIDENCE),
+        topGenres,
+        avoidedGenres,
         topKeywords: top("k:", 10),
         seeds: liked.slice(0, 24).map(([id, weight]) => ({ id, weight: weight / maxWeight })),
         size: liked.length,
@@ -255,7 +315,11 @@ async function loadTasteRows(user_id) {
             [user_id]
         ),
         // Read-only callers (scripts/evalRecs.js) may run before the table exists
-        pool.query("SELECT tmdb_id, reaction FROM discover_reactions WHERE user_id = $1 AND reaction <> 'skip'", [user_id])
+        pool.query(
+            `SELECT tmdb_id, reaction, (EXTRACT(EPOCH FROM (LOCALTIMESTAMP - updated_at)) / 86400)::float8 AS age_days
+             FROM discover_reactions WHERE user_id = $1 AND reaction <> 'skip'`,
+            [user_id]
+        )
             .catch((error) => (error.code === "42P01" ? { rows: [] } : Promise.reject(error))),
     ]);
     return {

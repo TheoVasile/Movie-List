@@ -1,15 +1,24 @@
 const express = require("express");
 
 // Discover reactions, mounted at /movies/discover/reactions (signed in and rate limited like every /movies route):
-//   POST   /                { tmdb_id, reaction: "like" | "dislike" | "skip", source? } -> { ok: true }
+//   POST   /                { tmdb_id, reaction: "like" | "dislike" | "skip", source?, at? } -> { ok: true, reaction:
+//                            { tmdb_id, reaction, updated_at } }, the one kept: an earlier at than the saved
+//                            reaction's changes nothing. Newer builds never send skips
 //   POST   /bulk            { reactions: [{ tmdb_id, reaction, at? }] } (at most 2000; the newest reaction to a film
 //                            wins) -> { ok: true, saved }. For moving a device's history to the server once
 //   GET    /                -> { reactions: [{ tmdb_id, reaction, updated_at }] }, newest first
+//   GET    /history         ?reaction=like|dislike&limit=40&cursor= -> { items: [{ tmdb_id, reaction, reacted_at,
+//                            movie }], next_cursor, counts: { like, dislike } }, newest first. movie is null when
+//                            its details can't be had right now
 //   DELETE /                deletes them all (Reset Taste Profile); ?tmdb_id= deletes one (Undo); ?reaction=skip
 //                            deletes every skip (Show Skipped Again) -> { ok: true, deleted }
 // Skips keep a film out of Discover for 30 days; likes and dislikes for good
-// TV shows have negative ids. The model (models/reactionsModel.js) and onChange (called with the user's id after a
-// change, to forget their cached taste) are passed in, so tests can use stand-ins
+// TV shows have negative ids. The model (models/reactionsModel.js), onChange (called with the user's id after a
+// change, to forget their cached taste) and saveFilm (called with a liked or disliked film's id, to have its details
+// ready for the history) are passed in, so tests can use stand-ins
+
+const HISTORY_LIMIT = 40;
+const MAX_HISTORY_LIMIT = 50;
 
 /// A film or show id, or null
 function tmdbIdOf(value) {
@@ -17,7 +26,29 @@ function tmdbIdOf(value) {
     return Number.isInteger(id) && id !== 0 && Math.abs(id) < 2 ** 31 ? id : null;
 }
 
-function createReactionsRouter(model, onChange = () => {}) {
+/// A time from the app, or null when it's missing or isn't one. One in the future is now
+function timeOf(value) {
+    const at = new Date(value ?? NaN);
+    const now = new Date();
+    return Number.isNaN(at.getTime()) ? null : at > now ? now : at;
+}
+
+// Where a page of the history ended, as an opaque string for the next one
+const encodeCursor = (next) => next && Buffer.from(`${next.at}|${next.tmdb_id}`).toString("base64url");
+
+/// { at, tmdb_id } from a cursor, or null when it isn't one
+function decodeCursor(value) {
+    const [at, id, ...rest] = Buffer.from(String(value), "base64url").toString().split("|");
+    const tmdbId = tmdbIdOf(id);
+    if (rest.length || tmdbId === null || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/.test(at)) return null;
+    // Postgres turns away dates that don't exist, e.g. February 31
+    const [year, month, day] = at.slice(0, 10).split("-").map(Number);
+    const date = new Date(`${at.slice(0, 10)}T${at.slice(11, 19)}Z`);
+    if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null;
+    return { at, tmdb_id: tmdbId };
+}
+
+function createReactionsRouter(model, onChange = () => {}, saveFilm = async () => {}) {
     const router = express.Router();
     const valid = (reaction) => model.REACTIONS.includes(reaction);
 
@@ -29,9 +60,13 @@ function createReactionsRouter(model, onChange = () => {}) {
         }
         const source = typeof body.source === "string" && body.source.trim() ? body.source.trim().slice(0, 40) : null;
         try {
-            await model.upsertReaction(req.user.uid, tmdbId, body.reaction, source);
+            const reaction = await model.upsertReaction(req.user.uid, tmdbId, body.reaction, source, timeOf(body.at));
             onChange(req.user.uid);
-            res.json({ ok: true });
+            res.json({ ok: true, reaction });
+            if (body.reaction !== "skip") {
+                // Nobody waits for this: the history looks up what's missing
+                Promise.resolve(saveFilm(tmdbId)).catch((error) => console.warn("Couldn't save a reacted film's details:", error.message));
+            }
         } catch (error) {
             console.error("Error saving a Discover reaction:", error.message);
             res.status(500).json({ error: "Internal server error" });
@@ -44,13 +79,11 @@ function createReactionsRouter(model, onChange = () => {}) {
         if (list.length > model.MAX_BULK) {
             return res.status(400).json({ error: `At most ${model.MAX_BULK} reactions at a time.` });
         }
-        const now = new Date();
         // Entries that aren't valid are skipped rather than failing the rest; a missing, bad or future time is now
         const reactions = list.flatMap((entry) => {
             const tmdbId = tmdbIdOf(entry?.tmdb_id);
             if (tmdbId === null || !valid(entry?.reaction)) return [];
-            const at = new Date(entry.at ?? NaN);
-            return [{ tmdb_id: tmdbId, reaction: entry.reaction, at: Number.isNaN(at.getTime()) || at > now ? now : at }];
+            return [{ tmdb_id: tmdbId, reaction: entry.reaction, at: timeOf(entry.at) ?? new Date() }];
         });
         try {
             const saved = await model.upsertReactions(req.user.uid, reactions);
@@ -68,6 +101,29 @@ function createReactionsRouter(model, onChange = () => {}) {
             res.json({ reactions: reactions.map((row) => ({ tmdb_id: Number(row.tmdb_id), reaction: row.reaction, updated_at: row.updated_at })) });
         } catch (error) {
             console.error("Error fetching Discover reactions:", error.message);
+            res.status(500).json({ error: "Internal server error" });
+        }
+    });
+
+    router.get("/history", async (req, res) => {
+        const reaction = req.query.reaction;
+        if (reaction !== "like" && reaction !== "dislike") {
+            return res.status(400).json({ error: "reaction must be like or dislike." });
+        }
+        const limit = req.query.limit === undefined ? HISTORY_LIMIT : Number(req.query.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HISTORY_LIMIT) {
+            return res.status(400).json({ error: `limit must be 1 to ${MAX_HISTORY_LIMIT}.` });
+        }
+        let after = null;
+        if (req.query.cursor) {
+            after = decodeCursor(req.query.cursor);
+            if (!after) return res.status(400).json({ error: "That cursor isn't valid." });
+        }
+        try {
+            const { items, next, counts } = await model.fetchHistory(req.user.uid, reaction, limit, after);
+            res.json({ items, next_cursor: encodeCursor(next), counts });
+        } catch (error) {
+            console.error("Error fetching the Discover history:", error.message);
             res.status(500).json({ error: "Internal server error" });
         }
     });

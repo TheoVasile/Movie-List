@@ -45,6 +45,15 @@ test("taste score subtracts similarity to disliked films", () => {
     assert.strictEqual(ranker.tasteScore(filmVector({ genres: [27] }), null), 0);
 });
 
+test("one dislike costs a film at most 0.03 of its score", () => {
+    const { tasteFromWeights } = require("../services/tasteVector");
+    const film = { id: 1, genres: [27], keywords: [5, 6], directors: [9], year: 1990, language: "en" };
+    const taste = tasteFromWeights({ likes: new Map(), dislikes: new Map([[1, 1]]) }, new Map([[1, film]]));
+    // Even for a film just like it
+    const cost = ranker.combineScore({ taste: 0 }) - ranker.combineScore({ taste: ranker.tasteScore(filmVector(film), taste) });
+    assert.ok(cost > 0 && cost <= 0.03, `${cost}`);
+});
+
 test("MMR keeps the best first and breaks up near-duplicates", () => {
     const item = (id, score, genres) => ({ id, score, vector: filmVector({ genres }) });
     const items = [item("a", 1, [1]), item("b", 0.95, [1]), item("c", 0.9, [1]), item("d", 0.8, [2]), item("e", 0.3, [3])];

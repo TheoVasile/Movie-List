@@ -42,16 +42,69 @@ test("unranked lists and watchlists only count watched films, a little", () => {
     assert.ok(!likes.has(11) && !likes.has(12));
 });
 
-test("rewatches and likes add weight, dislikes go to their own vector and aren't liked", () => {
+test("rewatches and likes add weight; a ranked film ignores its reaction", () => {
     const { likes, dislikes } = weightFilms({
         entries: [entry(1, 1, 0), entry(1, 2, 1)],
         rewatches: new Map([[1, 5]]),
-        reactions: [{ tmdb_id: 3, reaction: "like" }, { tmdb_id: 2, reaction: "dislike" }, { tmdb_id: 4, reaction: "skip" }],
+        reactions: [
+            { tmdb_id: 3, reaction: "like" }, { tmdb_id: 1, reaction: "like" }, { tmdb_id: 2, reaction: "dislike" },
+            { tmdb_id: 4, reaction: "skip" }, { tmdb_id: 5, reaction: "dislike" },
+        ],
+        watched: new Set([5]),
     });
-    assert.ok(likes.get(1) > 1.5);
-    near(likes.get(3), 0.8);
-    assert.ok(!likes.has(2) && !likes.has(4));
-    assert.deepStrictEqual([...dislikes.keys()], [2]);
+    const plain = weightFilms({ entries: [entry(1, 1, 0), entry(1, 2, 1)], rewatches: new Map([[1, 5]]) }).likes;
+    near(likes.get(1), plain.get(1));
+    near(likes.get(2), plain.get(2));
+    near(likes.get(3), 0.6);
+    // Watched but disliked isn't liked
+    assert.ok(!likes.has(4) && !likes.has(5));
+    assert.deepStrictEqual([...dislikes.keys()], [5]);
+});
+
+test("reactions fade with age, a like never below a fifth", () => {
+    const { likes, dislikes } = weightFilms({ reactions: [
+        { tmdb_id: 1, reaction: "like", age_days: 180 }, { tmdb_id: 2, reaction: "like", age_days: 5000 },
+        { tmdb_id: 3, reaction: "dislike", age_days: 360 },
+    ] });
+    near(likes.get(1), 0.3);
+    near(likes.get(2), 0.12);
+    near(dislikes.get(3), 0.25);
+});
+
+test("many likes don't outweigh the lists, unless there are no lists", () => {
+    const reactions = Array.from({ length: 100 }, (_, i) => ({ tmdb_id: 1000 + i, reaction: "like" }));
+    const mass = (likes) => [...likes].filter(([id]) => id >= 1000).reduce((sum, [, weight]) => sum + weight, 0);
+    const entries = Array.from({ length: 30 }, (_, i) => entry(1, 100 + i, i));
+    near(mass(weightFilms({ entries, reactions }).likes), 0.6 * RANK_DECAY, 1e-6);
+    near(mass(weightFilms({ entries: [entry(1, 1, 0)], reactions }).likes), 4, 1e-6);
+    near(mass(weightFilms({ reactions }).likes), 60, 1e-6);
+});
+
+test("a genre, decade or language only counts against films once several dislikes agree", () => {
+    const features = new Map(Array.from({ length: 12 }, (_, i) => [i + 1, { id: i + 1, genres: [18], directors: [i + 1], year: 1994, language: "en" }]));
+    const taste = (disliked, liked) => tasteFromWeights({
+        likes: new Map(liked.map((id) => [id, 1])), dislikes: new Map(disliked.map((id) => [id, 1])),
+    }, features);
+    const one = taste([1], [5]);
+    assert.deepStrictEqual([...one.dislikes.keys()], ["d:1"]);
+    near(one.dislikeConfidence, 1 / 6);
+    assert.ok(taste([1, 2, 3], [5]).dislikes.has("g:18"));
+    // Three dislikes, but they like as many
+    assert.ok(!taste([1, 2, 3], [5, 6, 7]).dislikes.has("g:18"));
+});
+
+test("leaning away from a genre takes five dislikes, and never a favourite genre", () => {
+    const features = new Map([
+        ...Array.from({ length: 12 }, (_, i) => [i + 1, { id: i + 1, genres: [i < 6 ? 27 : 10749] }]),
+        [50, { id: 50, genres: [878] }],
+    ]);
+    const taste = (disliked, liked) => tasteFromWeights({
+        likes: new Map(liked.map((id) => [id, 1])), dislikes: new Map(disliked.map((id) => [id, 1])),
+    }, features).avoidedGenres;
+    assert.deepStrictEqual(taste([1, 2, 3, 4], [50]), []);
+    assert.deepStrictEqual(taste([1, 2, 3, 4, 5], [50]), [27]);
+    assert.deepStrictEqual(taste([1, 2, 3, 4, 5], [6]), []);
+    assert.deepStrictEqual(taste([1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12], [50]).sort(), [10749, 27]);
 });
 
 test("the taste vector leans towards liked features and names the top genres and seeds", () => {
@@ -65,7 +118,8 @@ test("the taste vector leans towards liked features and names the top genres and
     assert.deepStrictEqual(taste.seeds.map((seed) => seed.id), [1, 2]);
     near(taste.seeds[0].weight, 1);
     assert.ok(cosine(filmVector({ genres: [878], directors: [525] }), taste.likes) > cosine(filmVector({ genres: [10749] }), taste.likes));
-    assert.ok(cosine(filmVector({ genres: [10749] }), taste.dislikes) > 0.9);
+    // One dislike doesn't count against its whole genre
+    assert.strictEqual(taste.dislikes.size, 0);
 });
 
 test("features come from TMDb details, keywords and credits, for films and shows", () => {

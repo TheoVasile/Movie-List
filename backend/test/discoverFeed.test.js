@@ -52,6 +52,18 @@ test("with no seeds the taste vector's films seed it, and taste feeds use its ge
     assert.deepStrictEqual(items.map((item) => [item.id, item.source]).sort(), [[70, "seed"], [80, "taste"]]);
 });
 
+test("avoided genres are ranked lower, never filtered out", async () => {
+    const params = [];
+    const get = async (path, query) => {
+        params.push(query);
+        return { results: path === "movie/1/recommendations" && query.page === 1 ? [film(10, { genre_ids: [27] }), film(11, { genre_ids: [18] })] : [] };
+    };
+    const taste = { likes: filmVector({ genres: [99] }), dislikes: new Map(), topGenres: [99], topKeywords: [1], seeds: [] };
+    const items = await buildDiscover({ seeds: [{ id: 1, weight: 1 }], avoidGenres: [27], taste, get, toMovie });
+    assert.deepStrictEqual(items.map((item) => item.id), [11, 10]);
+    assert.ok(params.every((query) => !("without_genres" in query)));
+});
+
 test("friends' picks go second with who recommended them; trending alone is labelled trending", async () => {
     const tmdb = fakeTmdb({ "trending/movie/week": [film(1), film(2), film(3)] });
     const friend = { ...toMovie(film(9)), recommended_by: { handle: "sam", display_name: "Sam" } };

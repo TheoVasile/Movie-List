@@ -7,7 +7,7 @@ This Privacy Policy explains how {{COMPANY_NAME}} ("we", "us" or "our") collects
 ## 1. The Short Version
 
 - We collect what we need to run Marquee: your account details, your profile, the films and lists you add, and the people you connect with.
-- A lot stays on your iPhone. Your location, your contacts and your pronouns are kept on your device, and are only sent anywhere in the limited ways described below. Your Discover likes, dislikes and skips are stored with your account so we can personalise your recommendations, and you can reset them at any time. If you add your birthday, we store it with your account, and only you can see it.
+- A lot stays on your iPhone. Your location, your contacts and your pronouns are kept on your device, and are only sent anywhere in the limited ways described below. Your Discover likes and dislikes are stored with your account so we can personalise your recommendations, and you can see, change, remove or reset them at any time. If you add your birthday, we store it with your account, and only you can see it.
 - AI features are off unless you turn them on. When you use them, we send your film lists and preferences to our AI provider, Anthropic, but not your name, email address, phone number or contacts.
 - We do not sell your personal information, we do not show ads, and we do not track you across other companies' apps or websites.
 - We use Google Analytics for Firebase to count which features are used, and Firebase Crashlytics to receive crash reports, without your advertising identifier or your name, email address or content. You can turn both off in Settings.
@@ -42,7 +42,7 @@ We store the content you create and the things you do in the App, including:
 - People you follow, people who follow you, follow requests, and people you have blocked
 - Lists you follow, and lists you have invited others to edit or been invited to edit
 - Movie night groups you create or belong to, and the films, reactions and votes in them
-- Your Discover reactions: the films you liked, disliked (Not for Me) or skipped in Discover, when, and where in the App you reacted (see "Discover reactions" below)
+- Your Discover reactions: the films you liked or disliked (Not for Me) in Discover, or skipped in an earlier version of the App, when, and where in the App you reacted (see "Discover reactions" below)
 - Which film-count milestones you have reached (such as 10 or 100 films in your lists) and when, so each celebration is only shown to you once
 - Invite links you create for a movie night group: the group, who made the link, when it was made and expires, how many times it has been used and whether it was turned off
 - The Terms of Service version you accepted and when, and that you confirmed you are at least 13
@@ -51,7 +51,15 @@ We store the content you create and the things you do in the App, including:
 
 ### Discover reactions
 
-When you like a film in Discover (by adding it to a list from Discover), mark it Not for Me, or skip it, we store that reaction on our servers with your account: the film, which reaction it was, where in the App you reacted and when. If you used Discover before this was stored on our servers, the App sends us your existing Discover history once, so that it is kept with your account. We use your reactions only to personalise recommendations for you, in Discover, More Like This and (if you have turned AI features on) AI Picks: to avoid showing you films you have already reacted to, and, together with your lists, rankings and watch history, to work out a taste profile that ranks suggestions. Skips only keep a film from being shown again; they are not used as a sign of what you like or dislike. Your reactions are not shown to other users. They are kept until you reset them or delete your account. You can delete them at any time in Discover by tapping **•••** and then **Reset Taste Profile**, and you can undo a single reaction straight after making it.
+When you like a film in Discover (by swiping right or tapping Like) or mark it Not for Me (by swiping left or tapping Not for Me), we store that reaction on our servers with your account: the film, which reaction it was, where in the App you reacted and when. Adding a film to a list from Discover is separate, and is not stored as a reaction. Earlier versions of the App worked differently: adding a film from Discover could also save it as liked, and films could be skipped. Skips from those versions only keep a film from being shown again for 30 days; they are not used as a sign of what you like or dislike. If you used Discover before reactions were stored on our servers, the App sends us your existing Discover history once, so that it is kept with your account.
+
+We use your likes and dislikes to:
+
+- Personalise your recommendations in Discover, More Like This and (if you have turned AI features on) AI Picks: to avoid suggesting films you have already reacted to, and, together with your lists, rankings and watch history, to work out a taste profile that ranks suggestions
+- Suggest where to start when you place a film in one of your ranked lists and, if you have turned AI features on, help Smart Placement choose its place. Your own choices always decide
+- Help choose and order the films suggested to movie night groups you are in, and to other movie nights that include you, along with everyone else's. They are never counted as votes or as reactions in the group, and are not sent to our AI provider for Movie Night. We do not show anyone which films you liked or disliked, or say that a suggestion came from you, although people you plan with could sometimes guess something about your taste from what is suggested
+
+Your Discover reactions are not shown to other users. You can see them, change them or remove them one at a time in **Liked & Not for Me** (in Discover, tap **•••**, or open it from your profile), delete them all in Discover by tapping **•••** and then **Reset Taste Profile**, and undo a reaction straight after making it. They are kept until you remove or reset them or delete your account.
 
 ### Your settings
 
@@ -76,7 +84,7 @@ We do not use cookies in the App. We do not collect your device's advertising id
 The App uses Google Analytics for Firebase, provided by Google, to understand how Marquee is used so we can fix problems and improve it. It collects:
 
 - A random **app instance identifier** created when the App is installed. It is not your device's advertising identifier, and it changes if you delete and reinstall the App
-- **Events** recording that you used certain features: signing up or signing in (and the method), accepting the Terms, creating your first and later lists, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, opening More Like This, sharing a list, a film, a profile, your stats, your Year in Review or a Taste Match card (and whether the share was completed), opening a Taste Match (only the score band shown, never who it was with), opening a Marquee link (only the kind of link, such as a list, profile or invite), sending or accepting an invite, importing lists (the source and roughly how many films), reaching a film-count milestone or sharing its card (only which milestone), seeing a recommendation in Discover, and adding a film from Discover, marking one Not for Me or skipping one (for these Discover events, the film's TMDb number, why it was recommended, such as a film in your lists, your taste, a friend's recommendation or trending, its position in the stack, and whether AI Picks was on), whether you allowed notifications, when the App asked you to rate it, and sending a report (only the type of content and the reason you picked). Events never include film or list names (Discover events include only the film's public TMDb number), notes, messages, @usernames or anything else you type
+- **Events** recording that you used certain features: signing up or signing in (and the method), accepting the Terms, creating your first and later lists, adding, ranking or marking a film as watched (and where in the App you did it, such as Discover or search), using an AI feature, sending a recommendation (and roughly to how many people), opening a Theatre Check-in, opening More Like This, sharing a list, a film, a profile, your stats, your Year in Review or a Taste Match card (and whether the share was completed), opening a Taste Match (only the score band shown, never who it was with), opening a Marquee link (only the kind of link, such as a list, profile or invite), sending or accepting an invite, importing lists (the source and roughly how many films), reaching a film-count milestone or sharing its card (only which milestone), seeing a recommendation in Discover, and adding a film from Discover, liking one, marking one Not for Me or, in earlier versions of the App, skipping one (for these Discover events, the film's TMDb number, why it was recommended, such as a film in your lists, your taste, a friend's recommendation or trending, its position in the stack, and whether AI Picks was on), whether you allowed notifications, when the App asked you to rate it, and sending a report (only the type of content and the reason you picked). Events never include film or list names (Discover events include only the film's public TMDb number), notes, messages, @usernames or anything else you type
 - **Device and App information**, such as the device model, iOS version, App version, language and time zone
 - **Approximate location** (country, region and city), which Google works out from your IP address. The App does not send your device's location
 - **Session information**, such as when the App is first opened, how often and for how long it is used, and when it is updated
@@ -101,7 +109,7 @@ Crash reports are controlled by the same **Share Usage & Crash Data** setting as
 
 Some features work only on your device. This information is not sent to us, except as described here:
 
-- **Discover.** Your Discover filters and your Quick Add choice are stored on your iPhone. The App also keeps a copy of your Discover reactions on your iPhone so Discover works quickly, but your likes, dislikes and skips themselves are stored on our servers with your account (see "Discover reactions" in Section 2). Skipping a film says nothing about your taste: it is not used for your taste profile or sent to our AI provider.
+- **Discover.** Your Discover filters are stored on your iPhone. The App also keeps a copy of your Discover reactions on your iPhone so Discover works quickly and can save a reaction you make while offline, but your likes and dislikes themselves are stored on our servers with your account (see "Discover reactions" in Section 2).
 - **Pronouns and age range.** If you choose your pronouns for better recommendations, they are stored on your iPhone. Your birthday is stored with your account (see Section 2), and the App also keeps a copy of it on your iPhone, where it works out your age range (such as 25–34). Only that age range, and your pronouns, are sent with AI Discover requests, and only while AI features are on; your birthday itself is never sent to our AI provider. If you chose an age range in an earlier version of the App and have not added a birthday, that age range stays on your iPhone and is used in the same way. If your birthday or age range shows you are under 18, the App turns AI features off for you.
 - **Daylight appearance.** If you choose the Daylight appearance, the App uses your approximate location, rounded to about 10 kilometres, to work out sunrise and sunset. It is stored on your iPhone and is not sent to us.
 - **Theatre check-ins.** If you turn on Theatre Check-ins, the App uses your iPhone's location, including in the background and with precise location, to notice when you spend about a film's length at a movie theatre and then leave. The theatres near you, when you arrived and where you are stay on your iPhone. To find nearby theatres, the App asks Apple Maps, which means Apple receives your approximate location under Apple's own privacy policy. If you then choose what you saw, we receive only the film and the date, like any other diary entry, and not the theatre or your location.
@@ -131,10 +139,11 @@ AI features (AI Picks in Discover, AI suggestions for Movie Night, and Smart Pla
 When you use an AI feature, our servers send our AI provider, Anthropic, the information needed to make suggestions. Depending on the feature, this can include:
 
 - The names of your lists and the titles, years, original languages, rankings and watched status of the films and shows in them (for Movie Night, only lists that are not private)
-- The films you liked in Discover (the films you added to a list from Discover) or marked Not for Me (not the films you skipped), how many you liked, and the films already suggested
+- For AI Picks, films you liked in Discover or marked Not for Me (not films you skipped in an earlier version), how many you liked, and the films already suggested
+- For Smart Placement, whether you liked the film being placed in Discover or marked it Not for Me, and a few similar films you did the same with
 - Your genre preferences and filters, your chosen streaming services, and your country and language
 - The age range worked out from your birthday, and your pronouns, if you chose to share them (Discover only). Never your birthday itself
-- For Movie Night, the same kind of list information for each friend you are planning with, identified by their @username, and the films your group has liked, turned down or shortlisted
+- For Movie Night, the same kind of list information for each friend you are planning with, identified by their @username, and the films your group has liked, turned down or shortlisted in the group. Nobody's Discover likes or dislikes are sent for Movie Night
 
 We do not send your name, email address, phone number, notes, photo or contacts. Anthropic processes this information on our behalf to generate suggestions. Under its commercial terms, Anthropic may not use it to train its models, and it keeps it only for a limited time. AI suggestions we show you, such as the reason a film was picked, may be saved with your lists or groups.
 
@@ -147,6 +156,7 @@ We use personal information to:
 - Create and secure your account, sign you in and verify your phone number
 - Provide the App's features, such as saving and ranking your lists, your diary, notes, Year in Review, statistics and recommendations
 - Personalise the films we suggest to you in Discover and More Like This, using your lists, rankings, watch history and Discover reactions, and show you films your friends recommended to you
+- Help place films in your ranked lists, and choose films to suggest to your movie night groups, using the Discover reactions of the people involved
 - Run the social features you use, such as following, private accounts, blocking, shared lists, recommendations, activity and movie night groups
 - Find streaming availability and send the notifications and alerts you have chosen, including the daily friends summary
 - Provide the optional AI features you have turned on
@@ -178,7 +188,7 @@ Marquee is a social app, so some of your information is visible to other users:
 - Your display name, @username, profile photo, and the number of people you follow and who follow you can be seen by other signed-in users, who can also find you by searching for your @username
 - Lists marked **Public** can be seen by any signed-in user, lists marked **Followers** only by people who follow you, and lists marked **Private** only by you and anyone you invite to edit them. If your account is private, only followers you have approved can see more than your basic profile
 - People who follow you may see your watched films, rankings, notes on films, and recent activity, such as films you have added or watched
-- People you send recommendations to see the film and any message you add, and the people in your movie night groups and shared lists see your suggestions, reactions, votes and edits
+- People you send recommendations to see the film and any message you add, and the people in your movie night groups and shared lists see your suggestions, votes and edits, and the likes and dislikes you give films in the group (not your Discover reactions, which nobody else sees)
 - Notifications to your friends may include your name or @username and the film involved
 - Taste Match compares another user's rankings with yours using only the ranked lists of yours they can already see (as described above), and shows them a score and the films you have both ranked, with each of your placings in them. A match is worked out when someone opens it and is not stored
 - **Web pages for shared links.** Lists marked **Public** on an account that is not private, and the profiles of accounts that are not private, also have a web page at a Marquee link, such as the link included when you share a list. **Anyone who has the link can view that page, including people without a Marquee account**, and the services that show link previews in apps like Messages can read it. A list's page shows its name, description, films and your @username; a profile's page shows your display name, @username, profile photo, follower and following counts and some of your public lists. These pages never show lists marked Followers or Private, private profiles, your email address, phone number or birthday. Changing a list to Followers or Private, or making your account private, takes its page down within a few minutes
@@ -243,7 +253,7 @@ We keep your information for as long as your account exists, because we need it 
 - Records of alerts we have sent you are kept to avoid duplicates and are deleted with your account
 - Reports are kept so we can review them and act on them, and are deleted when the account that made the report, or the account it is about, is deleted
 - Daily AI usage counts are deleted after a few days, and with your account
-- Discover reactions are kept until you reset them (Discover, then **•••**, then **Reset Taste Profile**) or delete your account
+- Discover reactions are kept until you remove them, reset them (Discover, then **•••**, then **Reset Taste Profile**) or delete your account
 - Group invite links are kept until their group, or the account that made them, is deleted
 - Which film-count milestones you have reached is kept until you delete your account
 - Usage analytics are kept by Google Analytics for 14 months and then deleted automatically
@@ -274,6 +284,7 @@ Usage analytics and crash reports are not linked to your account, so they are no
 - Make your account private, approve or decline follow requests, choose each list's visibility, and block people
 - Edit or delete your lists, notes, diary entries and recommendations
 - Turn off AI features, location features, contacts access, notifications, usage analytics and crash reports
+- See, change or remove the films you liked or marked Not for Me (in Discover, tap **•••**, then **Liked & Not for Me**)
 - Reset your Discover history and taste profile, which deletes your Discover reactions from our servers too (in Discover, tap **•••**, then **Reset Taste Profile**)
 - Export your lists in Letterboxd's format
 - Delete your account
