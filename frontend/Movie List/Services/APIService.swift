@@ -570,6 +570,21 @@ extension Error {
     var serverField: String? { (self as NSError).userInfo[APIService.serverFieldKey] as? String }
 }
 
+/// Where in a list Compare could start placing a new film
+struct PlacementHint: Decodable {
+    // Position among the list's other films in rank order, first is 0. nil when there's nothing to go on
+    let startIndex: Int?
+    // How many other films the server counted in the list
+    let count: Int
+    // "like", "dislike", "similar" or "none"
+    let basis: String
+
+    private enum CodingKeys: String, CodingKey {
+        case startIndex = "start_index"
+        case count, basis
+    }
+}
+
 class APIService {
     static let shared = APIService()
     static let serverMessageKey = "serverMessage"
@@ -1934,6 +1949,19 @@ class APIService {
         let completion = placing(movieID, completion)
         sendJSON("POST", "/movies/smart-place", body: ["list_id": listID, "movie_id": movieID]) { (result: Result<Placement, Error>) in
             completion(result.map { ($0.rank, $0.reason) })
+        }
+    }
+
+    /// Where Compare could start for a film just added to a list, from what the user liked and disliked in Discover.
+    /// Calls back with nil when the list or film can't be found, or an error whose code is the HTTP status
+    func placementHint(listID: Int64, movieID: Int64, completion: @escaping (Result<PlacementHint?, Error>) -> Void) {
+        let query = [URLQueryItem(name: "list_id", value: String(listID)), URLQueryItem(name: "movie_id", value: String(movieID))]
+        sendJSON("GET", "/movies/placement-hint", query: query) { (result: Result<PlacementHint, Error>) in
+            switch result {
+            case .success(let hint): completion(.success(hint))
+            case .failure(let error) where (error as NSError).code == 404: completion(.success(nil))
+            case .failure(let error): completion(.failure(error))
+            }
         }
     }
 

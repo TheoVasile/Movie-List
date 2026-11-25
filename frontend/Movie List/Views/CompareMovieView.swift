@@ -21,22 +21,30 @@ struct CompareMovieView: View {
     @State var middle: Int = 0
     @State private var picked: Side? = nil
     @State private var round: Int = 1
+    // True while waiting to hear where to start; picks are blocked until then
+    @State private var isFindingStart = false
     var onRankingUpdate: (CDMovie, Int) -> Void
     var onCancel: (() -> Void)?
     var prompt: String
     var cancelTitle: String
     // Offered when adding a film: let the AI choose its place instead of comparing
     var onSmartPlace: (() -> Void)?
+    // Given when placing a new film: looks up which film to compare with first. Only the first one, every later
+    // one is the middle of what the user's picks leave
+    var findStart: ((@escaping (Int?) -> Void) -> Void)?
 
     private enum Side { case selected, other }
+    // How long to wait for a starting point before using the plain middle
+    private static let startTimeout: TimeInterval = 1.5
     
-    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, prompt: String = "Which do you prefer?", cancelTitle: String = "Cancel", onCancel: (() -> Void)? = nil, onSmartPlace: (() -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
+    init(movies: Binding<[CDMovie]>, movie: Binding<CDMovie>, prompt: String = "Which do you prefer?", cancelTitle: String = "Cancel", onCancel: (() -> Void)? = nil, onSmartPlace: (() -> Void)? = nil, findStart: ((@escaping (Int?) -> Void) -> Void)? = nil, onRankingUpdate: @escaping (CDMovie, Int) -> Void) {
             self._movies = movies
             self._movie = movie
             self.prompt = prompt
             self.cancelTitle = cancelTitle
             self.onCancel = onCancel
             self.onSmartPlace = onSmartPlace
+            self.findStart = findStart
             self.onRankingUpdate = onRankingUpdate
         }
     
@@ -49,7 +57,9 @@ struct CompareMovieView: View {
                     MovieCard(movie: $movie, isHighlighted: picked == .selected)
                         .opacity(picked == .other ? 0.45 : 1)
                         .onTapGesture { choose(.selected) }
-                    if middle < otherMovies.count {
+                    if isFindingStart {
+                        startPlaceholder
+                    } else if middle < otherMovies.count {
                         MovieCard(movie: .constant(otherMovies[middle]), isHighlighted: picked == .other)
                             .opacity(picked == .selected ? 0.45 : 1)
                             .id(otherMovies[middle].id)
@@ -61,6 +71,7 @@ struct CompareMovieView: View {
                     }
                 }
                 .overlay(alignment: .top) { versusBadge.offset(y: 100) }
+                .allowsHitTesting(!isFindingStart)
             } else{
                 Text("Need at least 2 movies to compare")
                     .foregroundColor(Theme.textSecondary)
@@ -98,7 +109,7 @@ struct CompareMovieView: View {
             low = 0
             high = otherMovies.count
             if high > 0 {
-                compare()
+                begin()
             }
         }
     }
@@ -110,7 +121,7 @@ struct CompareMovieView: View {
                 .tracking(2)
                 .foregroundStyle(Theme.accentGradient)
                 .contentTransition(.numericText())
-            Text(prompt)
+            Text(isFindingStart ? "Finding a good place to start…" : prompt)
                 .font(.title3.weight(.bold))
                 .foregroundColor(Theme.textPrimary)
                 .multilineTextAlignment(.center)
@@ -120,6 +131,18 @@ struct CompareMovieView: View {
                 .animation(Theme.spring, value: progress)
                 .padding(.horizontal, 40)
         }
+    }
+
+    // Stands in for the film to compare with while the starting point is looked up
+    private var startPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Theme.surfaceRaised)
+            .aspectRatio(2/3, contentMode: .fit)
+            .overlay(ProgressView().tint(Theme.accent))
+            .frame(maxWidth: .infinity)
+            .transition(.opacity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Finding a good place to start")
     }
 
     private var versusBadge: some View {
@@ -146,7 +169,7 @@ struct CompareMovieView: View {
 
     private func choose(_ side: Side) {
         // Ignore taps while the previous pick is still animating
-        guard picked == nil, low < high else { return }
+        guard !isFindingStart, picked == nil, low < high else { return }
         Haptics.select()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             picked = side
@@ -164,6 +187,27 @@ struct CompareMovieView: View {
                 }
                 compare()
             }
+        }
+    }
+
+    /// Starts with the film `findStart` suggests, or the middle one if it has nothing to suggest or takes too long
+    private func begin() {
+        guard let findStart else {
+            compare()
+            return
+        }
+        isFindingStart = true
+        findStart { start(at: $0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.startTimeout) { start(at: nil) }
+    }
+
+    private func start(at index: Int?) {
+        // The other one of the suggestion and the timeout came first
+        guard isFindingStart else { return }
+        withAnimation(Theme.spring) {
+            isFindingStart = false
+            compare()
+            if let index, (low..<high).contains(index) { middle = index }
         }
     }
 

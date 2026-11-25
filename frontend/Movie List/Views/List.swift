@@ -94,7 +94,8 @@ struct ListView: View {
                     onSmartPlace: viewModel.isRankingNewMovie && Personalization.aiAllowed ? {
                         dismissCompare()
                         viewModel.smartPlace(selectedMovie) { showToast($0) }
-                    } : nil
+                    } : nil,
+                    findStart: viewModel.isRankingNewMovie ? { viewModel.compareStart(for: selectedMovie, completion: $0) } : nil
                 ) { updatedMovie, rank in
                     dismissCompare()
                     viewModel.updateMovieRanking(updatedMovie: updatedMovie, newRank: rank)
@@ -852,8 +853,8 @@ private extension ListView {
             } else if added.count > 1 {
                 showToast("Added to \(added.count) lists")
             }
-            // New films land at the bottom, so ask where it belongs in each list that has other films
-            otherListQueue = added.filter { $0.list.movies.count > 1 }
+            // New films land at the bottom, so ask where it belongs in each ranked list that has other films
+            otherListQueue = added.filter { $0.list.movies.count > 1 && ListRanking.isRanked($0.list.id) }
             if !startNextOtherListRanking(), added.count == 1, let only = added.first {
                 showToast("Added to \(only.list.name ?? "your list") at #\(only.movie.rank)")
             }
@@ -892,7 +893,8 @@ private extension ListView {
             onSmartPlace: Personalization.aiAllowed ? {
                 model.smartPlace(movie) { message in showToast("\(message) in \(listName)") }
                 finishOtherListRanking(skipped: false)
-            } : nil
+            } : nil,
+            findStart: { model.compareStart(for: movie, completion: $0) }
         ) { rankedMovie, rank in
             model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
             showToast("Ranked #\(rank) in \(listName)")

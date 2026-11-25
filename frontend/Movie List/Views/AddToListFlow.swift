@@ -149,7 +149,8 @@ struct AddToListFlow: ViewModifier {
             onSmartPlace: Personalization.aiAllowed ? {
                 endRanking()
                 model.smartPlace(movie) { message in showToast("\(message) in \(listName)") }
-            } : nil
+            } : nil,
+            findStart: { model.compareStart(for: movie, completion: $0) }
         ) { rankedMovie, rank in
             model.updateMovieRanking(updatedMovie: rankedMovie, newRank: rank)
             endRanking()

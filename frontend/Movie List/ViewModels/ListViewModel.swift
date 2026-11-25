@@ -376,6 +376,26 @@ class ListViewModel: ObservableObject {
         movies.contains(where: isAIPlaced)
     }
 
+    /// Where Compare should start for a film that was just added, from what the user liked and disliked in Discover:
+    /// a position among the list's other films, or nil for the plain middle. Calls back on the main thread
+    func compareStart(for movie: CDMovie, completion: @escaping (Int?) -> Void) {
+        let others = movies.filter { $0.id != movie.id }.count
+        // The server gives no hint for fewer films than this
+        guard isRanked, others >= 4 else {
+            completion(nil)
+            return
+        }
+        APIService.shared.placementHint(listID: movieList.id, movieID: movie.id) { result in
+            // A different count means the list on this phone isn't the one the server looked at
+            guard let hint = try? result.get(), hint.count == others,
+                  let start = hint.startIndex, (0..<others).contains(start) else {
+                completion(nil)
+                return
+            }
+            completion(start)
+        }
+    }
+
     /// Asks the AI where the film belongs and moves it there. Calls back on the main thread with a message to
     /// show: where it went, or why it couldn't
     func smartPlace(_ movie: CDMovie, completion: @escaping (String) -> Void) {
