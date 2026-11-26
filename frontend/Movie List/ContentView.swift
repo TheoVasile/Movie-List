@@ -42,7 +42,7 @@ struct ContentView: View {
     @ObservedObject private var notifications = NotificationManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
-    enum Tab { case lists, discover, profile }
+    enum Tab { case lists, discover, profile, search }
     // A film opened from a Home Screen widget or a shared link
     @State private var linkedMovie: CDMovie? = nil
     // Opened from shared links (see LinkRouter): a person's profile, a list (the user's own, or someone else's
@@ -84,40 +84,7 @@ struct ContentView: View {
     }
     
     var body: some View {
-        TabView(selection: $tab) {
-            Home()
-                .environmentObject(viewModel)
-                .environmentObject(network)
-                .environmentObject(db)
-                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
-                .tabItem {
-                    Label("Lists", systemImage: "film.stack")
-                }
-                .tag(Tab.lists)
-                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-            DiscoverView()
-                .environmentObject(viewModel)
-                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
-                .tabItem {
-                    Label("Discover", systemImage: discoverIcon)
-                }
-                .tag(Tab.discover)
-                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-            UserProfileView()
-                .environmentObject(viewModel)
-                .environmentObject(network)
-                .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
-                .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle.fill")
-                }
-                // Follow requests waiting to be answered, and films friends sent that haven't been looked at
-                .badge(social.requests.count + (social.profile?.recommendations_unseen ?? 0))
-                .tag(Tab.profile)
-                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
-                .toolbarBackground(.visible, for: .tabBar)
-        }
+        tabs
         // e.g. Taste Match's "Find Films to Rank"
         .onReceive(NotificationCenter.default.publisher(for: .openDiscoverTab)) { _ in tab = .discover }
         .onAppear {
@@ -254,6 +221,84 @@ struct ContentView: View {
                 break
             }
             notifications.destination = nil
+        }
+    }
+
+    // MARK: Tabs
+
+    // iOS 18 and later show Search the system way: on iOS 26 it's the round search button at the end of the tab bar,
+    // with its field at the bottom of the screen. Earlier versions get an ordinary Search tab
+    @ViewBuilder
+    private var tabs: some View {
+        if #available(iOS 18.0, *) {
+            TabView(selection: $tab) {
+                SwiftUI.Tab("Lists", systemImage: "film.stack", value: Tab.lists) { listsTab }
+                SwiftUI.Tab("Discover", systemImage: discoverIcon, value: Tab.discover) { discoverTab }
+                SwiftUI.Tab("Profile", systemImage: "person.crop.circle.fill", value: Tab.profile) { profileTab }
+                    .badge(profileBadge)
+                SwiftUI.Tab("Search", systemImage: "magnifyingglass", value: Tab.search, role: .search) { searchTab }
+            }
+        } else {
+            TabView(selection: $tab) {
+                listsTab
+                    .tabItem { Label("Lists", systemImage: "film.stack") }
+                    .tag(Tab.lists)
+                discoverTab
+                    .tabItem { Label("Discover", systemImage: discoverIcon) }
+                    .tag(Tab.discover)
+                profileTab
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+                    .badge(profileBadge)
+                    .tag(Tab.profile)
+                searchTab
+                    .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                    .tag(Tab.search)
+            }
+        }
+    }
+
+    // Follow requests waiting to be answered, and films friends sent that haven't been looked at
+    private var profileBadge: Int {
+        social.requests.count + (social.profile?.recommendations_unseen ?? 0)
+    }
+
+    private var listsTab: some View {
+        Home()
+            .environmentObject(viewModel)
+            .environmentObject(network)
+            .environmentObject(db)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+            .modifier(TabBarBackground())
+    }
+
+    private var discoverTab: some View {
+        DiscoverView()
+            .environmentObject(viewModel)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+            .modifier(TabBarBackground())
+    }
+
+    private var profileTab: some View {
+        UserProfileView()
+            .environmentObject(viewModel)
+            .environmentObject(network)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+            .modifier(TabBarBackground())
+    }
+
+    // Finding a film or show you already know of, to like, mark Not for Me or add to a list
+    private var searchTab: some View {
+        SearchView()
+            .environmentObject(viewModel)
+            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+            .modifier(TabBarBackground())
+    }
+
+    private struct TabBarBackground: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .toolbarBackground(Theme.background.opacity(0.92), for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
         }
     }
 

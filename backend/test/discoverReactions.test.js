@@ -137,3 +137,9 @@ test("the history is paged by a cursor and checks what it's asked", () => withSe
         assert.strictEqual((await call("GET", `/history${query}`)).status, 400, query);
     }
 }));
+
+test("a reaction from the Search tab keeps its source", () => withServer(async ({ call, rows }) => {
+    const saved = await call("POST", "", { tmdb_id: -1399, reaction: "like", source: "search" });
+    assert.strictEqual(saved.status, 200);
+    assert.strictEqual(rows.get(-1399).source, "search");
+}));
