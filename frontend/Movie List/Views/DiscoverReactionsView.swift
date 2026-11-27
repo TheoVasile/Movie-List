@@ -31,7 +31,7 @@ final class DiscoverReactions {
     static let deviceKeys = [
         DiscoverViewModel.profileKey, DiscoverViewModel.likedKey, DiscoverViewModel.dislikedKey, DiscoverViewModel.deckKey,
         DiscoverViewModel.genreFilterKey, DiscoverViewModel.filtersKey, DiscoverViewModel.kindKey, "discover.passedMovieIDs",
-        // The Search tab's recent searches, so the next account to sign in doesn't see them
+        // Recent searches from Discover's search field, so the next account to sign in doesn't see them
         FilmSearchModel.recentKey,
     ] + oldHistoryKeys
 

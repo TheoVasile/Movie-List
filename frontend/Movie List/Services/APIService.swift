@@ -1457,7 +1457,7 @@ class APIService {
             }
         }
     }
-    /// Films and TV shows (negative ids) matching a title, best match first, for the Search tab. Uses the same
+    /// Films and TV shows (negative ids) matching a title, best match first, for searching in Discover. Uses the same
     /// endpoint as adding a film to a list. Cancelling the calling task cancels the request, so a stale search never
     /// finishes. A result that can't be read is left out rather than failing the rest
     func searchTitles(_ query: String) async throws -> [Movie] {

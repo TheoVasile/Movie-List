@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Searching for a film or TV show by title, for the Search tab. Each search waits for a short pause in typing, and a
+/// Searching for a film or TV show by title, from the search field in Discover. Each search waits for a short pause in typing, and a
 /// newer one cancels the one before it. Recent searches are kept on this device only, and cleared with the rest of
 /// Discover's data when the account signs out
 @MainActor
@@ -124,13 +124,15 @@ final class FilmSearchModel: ObservableObject {
     }
 }
 
-struct SearchView: View {
+/// Search results and the search start page, shown in place of Discover's deck while its search field is in use.
+/// The search field itself, and the text, belong to Discover; this shows what goes with them
+struct FilmSearchResults: View {
     @Environment(\.managedObjectContext) private var context
     @EnvironmentObject private var authViewModel: AuthenticationViewModel
     @FetchRequest(fetchRequest: CDMovieList.fetch()) private var movieLists: FetchedResults<CDMovieList>
-    @StateObject private var model = FilmSearchModel()
+    @Binding var text: String
+    @ObservedObject var model: FilmSearchModel
 
-    @State private var text = ""
     // The film being added, while the user picks its lists
     @State private var adding: Movie? = nil
     @State private var isAdding = false
@@ -141,28 +143,12 @@ struct SearchView: View {
     @State private var disliked: Set<Int64> = []
     @State private var toast: String? = nil
 
-    private var searchPlacement: SearchFieldPlacement {
-        // iOS 26 puts a search tab's field at the bottom of the screen; earlier versions keep it in view under the title
-        if #available(iOS 26.0, *) { return .automatic }
-        return .navigationBarDrawer(displayMode: .always)
-    }
-
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                content
-            }
-            .overlay(alignment: .top) { toastView }
-            .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $text, placement: searchPlacement, prompt: "Films and TV shows")
-            .autocorrectionDisabled()
-            .onSubmit(of: .search) {
-                model.remember(text)
-                model.update(text, immediately: FilmSearchModel.clean(text) != model.resultsQuery)
-            }
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            content
         }
+        .overlay(alignment: .top) { toastView }
         .addToListFlow(movie: $adding, source: .search, isBusy: $isAdding)
         .sheet(isPresented: Binding(get: { details != nil }, set: { if !$0 { details = nil } })) {
             if let details {
@@ -174,12 +160,9 @@ struct SearchView: View {
                 })
             }
         }
-        .onChange(of: text) { model.update($0) }
         .onAppear {
             loadReactions()
             model.loadSuggestions()
-            // e.g. text kept from before the tab was left
-            if !FilmSearchModel.clean(text).isEmpty { model.update(text) }
         }
         // Liked or Not for Me changed elsewhere: Discover, Liked & Not for Me, or brought in from the account
         .onReceive(DiscoverReactions.shared.changed.receive(on: RunLoop.main)) { _ in loadReactions() }

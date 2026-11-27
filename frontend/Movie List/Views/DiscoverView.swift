@@ -43,6 +43,11 @@ struct DiscoverView: View {
     @AppStorage(DiscoverReactions.gesturesSeenKey) private var gesturesSeen = false
     @State private var showIntro = false
     @ObservedObject private var social = SocialStore.shared
+    // The search field above the deck. While it's in use, results take the deck's place; the deck stays as it was,
+    // underneath, out of sight and out of reach, until the search is cancelled
+    @StateObject private var search = FilmSearchModel()
+    @State private var searchText = ""
+    @State private var searchFieldActive = false
 
     private let swipeThreshold: CGFloat = 110
 
@@ -53,7 +58,7 @@ struct DiscoverView: View {
                 PosterBackdrop(path: viewModel.topMovie?.poster_path)
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.5), value: viewModel.topMovie?.id)
-                VStack(spacing: 22) {
+                VStack(spacing: 18) {
                     tasteSummary
                         .transition(.opacity)
                     cardStack
@@ -64,11 +69,29 @@ struct DiscoverView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+                // Kept in place while searching, so the deck comes back exactly as it was
+                .opacity(isSearching ? 0 : 1)
+                .allowsHitTesting(!isSearching)
+                .accessibilityHidden(isSearching)
+                if isSearching {
+                    FilmSearchResults(text: $searchText, model: search)
+                        .transition(.opacity)
+                }
             }
+            .background { SearchStateReader(isActive: $searchFieldActive) }
+            .animation(.easeInOut(duration: 0.2), value: isSearching)
             .overlay(alignment: .top) { toastView }
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search films & shows")
+            .autocorrectionDisabled()
+            .onSubmit(of: .search) {
+                search.remember(searchText)
+                search.update(searchText, immediately: FilmSearchModel.clean(searchText) != search.resultsQuery)
+            }
+            .onChange(of: searchText) { search.update($0) }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     undoButton
@@ -77,6 +100,8 @@ struct DiscoverView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         optionsMenu
+                            // Filters and Reset would change the deck while it's out of sight
+                            .disabled(isSearching)
                         addButton
                     }
                     .fixedSize()
@@ -770,8 +795,14 @@ private extension DiscoverView {
     }
 
     // While a card is flying away, being added, or coming back out of its lists, nothing else can be done to the deck
+    // While searching, the deck is out of sight, so nothing (+, Undo, VoiceOver actions) can act on its top card
     var isBlocked: Bool {
-        isSwiping || isAdding || adding != nil || viewModel.isUndoing
+        isSwiping || isAdding || adding != nil || viewModel.isUndoing || isSearching
+    }
+
+    // The search field is focused, or has something in it: results or the search start page show instead of the deck
+    var isSearching: Bool {
+        searchFieldActive || !FilmSearchModel.clean(searchText).isEmpty
     }
 
     // What swiping does, as buttons, so nothing is gesture-only. Add and Undo are in the navigation bar
@@ -1000,6 +1031,20 @@ private extension DiscoverView {
         let ids = seedPool.map(\.id)
         viewModel.updateListGenres(for: ids)
         MovieInfoCache.shared.fetchMissing(ids, onBatch: { viewModel.updateListGenres(for: ids) }, completion: { viewModel.updateListGenres(for: ids) })
+    }
+}
+
+// MARK: - Search
+
+// Whether the search field is in use. isSearching can only be read below .searchable, and isPresented needs iOS 17
+private struct SearchStateReader: View {
+    @Environment(\.isSearching) private var isSearching
+    @Binding var isActive: Bool
+
+    var body: some View {
+        Color.clear
+            .onAppear { isActive = isSearching }
+            .onChange(of: isSearching) { isActive = $0 }
     }
 }
 
