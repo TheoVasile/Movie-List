@@ -1457,6 +1457,35 @@ class APIService {
             }
         }
     }
+    /// Films and TV shows (negative ids) matching a title, best match first, for searching in Discover. Uses the same
+    /// endpoint as adding a film to a list. Cancelling the calling task cancels the request, so a stale search never
+    /// finishes. A result that can't be read is left out rather than failing the rest
+    func searchTitles(_ query: String) async throws -> [Movie] {
+        // .urlQueryAllowed leaves "&", "+" and "=" alone, which would cut titles like "Fast & Furious" short
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?#")
+        let name = query.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        guard let url = URL(string: "\(baseURL)/movies/search?include_tv=1&name=\(name)") else {
+            throw NSError(domain: "Invalid URL", code: 0, userInfo: nil)
+        }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let authorized: URLRequest = try await withCheckedThrowingContinuation { continuation in
+            authorize(request) { continuation.resume(with: $0) }
+        }
+        try Task.checkCancellation()
+        let (data, response) = try await URLSession.shared.data(for: authorized)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200...299).contains(status) else { throw Self.requestError("Search failed", status: status, data: data) }
+        return try JSONDecoder().decode([Lossy<Movie>].self, from: data).compactMap(\.value)
+    }
+
+    /// Decodes a value, or nil when it can't be, so one bad item doesn't fail a whole array
+    private struct Lossy<T: Decodable>: Decodable {
+        let value: T?
+        init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+    }
+
     /// Films for the Discover tab, recommended from the given TMDb ids (the user's favourites) and genres, plus trending films
     /// onlyGenres: the user picked these genres themselves, so every film returned has one of them
     /// The films Discover's next batch is based on, as the server reads them: "550:1.000,-1399:0.600" (id:weight,

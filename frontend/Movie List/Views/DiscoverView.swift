@@ -43,6 +43,14 @@ struct DiscoverView: View {
     @AppStorage(DiscoverReactions.gesturesSeenKey) private var gesturesSeen = false
     @State private var showIntro = false
     @ObservedObject private var social = SocialStore.shared
+    // The search field above the deck. While it's in use, results take the deck's place; the deck stays as it was,
+    // underneath, out of sight and out of reach, until the search is cancelled
+    @StateObject private var search = FilmSearchModel()
+    @State private var searchText = ""
+    // From tapping Search until Cancel, even once the keyboard is dismissed to look through results
+    @State private var searchFieldActive = false
+    @FocusState private var searchFocused: Bool
+    @AccessibilityFocusState private var searchVoiceOverFocused: Bool
 
     private let swipeThreshold: CGFloat = 110
 
@@ -53,34 +61,33 @@ struct DiscoverView: View {
                 PosterBackdrop(path: viewModel.topMovie?.poster_path)
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.5), value: viewModel.topMovie?.id)
-                VStack(spacing: 22) {
-                    tasteSummary
-                        .transition(.opacity)
-                    cardStack
-                        .frame(maxHeight: .infinity)
-                    if viewModel.topMovie != nil {
-                        actionButtons
-                            .transition(.opacity)
+                    .opacity(isSearching ? 0 : 1)
+                VStack(spacing: 0) {
+                    header
+                    ZStack {
+                        deck
+                            // Kept in place while searching, so the deck comes back exactly as it was
+                            .opacity(isSearching ? 0 : 1)
+                            .allowsHitTesting(!isSearching)
+                            .accessibilityHidden(isSearching)
+                            // The keyboard doesn't squeeze the hidden deck
+                            .ignoresSafeArea(.keyboard)
+                        if isSearching {
+                            FilmSearchResults(text: $searchText, model: search)
+                                .transition(.opacity)
+                        }
                     }
+                    .overlay(alignment: .top) { toastView }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
             }
-            .overlay(alignment: .top) { toastView }
+            .animation(.easeInOut(duration: 0.2), value: isSearching)
+            // The search field and Discover's actions take the navigation bar's place. The tab is already labelled
+            // Discover, so the title isn't repeated on screen
             .navigationTitle("Discover")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    undoButton
-                }
-                // ••• and + in one item, so they never collapse into an overflow menu, with + in the corner
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        optionsMenu
-                        addButton
-                    }
-                    .fixedSize()
-                }
+            .toolbar(.hidden, for: .navigationBar)
+            .onChange(of: searchText) { search.update($0) }
+            .onChange(of: searchFocused) { focused in
+                if focused { searchFieldActive = true }
             }
         }
         // The same list picker and Compare as adding anywhere else, over the whole screen so nothing else can be
@@ -163,6 +170,145 @@ struct DiscoverView: View {
         }
         .onChange(of: listedIDs) { _ in syncWithLists() }
         .onChange(of: viewModel.filters.listIDs) { _ in syncWithLists() }
+    }
+}
+
+// MARK: - Header
+private extension DiscoverView {
+    // One row at the top: Undo on the left; Search, ••• and + on the right. Search turns the row into the search field
+    // with Cancel, until the search is cancelled
+    var header: some View {
+        ZStack {
+            if isSearching {
+                HStack(spacing: 12) {
+                    searchField
+                    Button("Cancel") {
+                        Haptics.tap()
+                        cancelSearch()
+                    }
+                    .foregroundColor(Theme.accent)
+                    .fixedSize()
+                }
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+            } else {
+                HStack {
+                    undoButton
+                    Spacer(minLength: 0)
+                    HStack(spacing: 10) {
+                        searchButton
+                        optionsMenu
+                        addButton
+                    }
+                    .fixedSize()
+                }
+                .buttonStyle(PressableButtonStyle(scale: 0.9))
+                .transition(.opacity)
+            }
+        }
+        .frame(height: 44)
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+    }
+
+    // Never disabled: searching doesn't touch the deck, so it works with an empty or loading one too
+    var searchButton: some View {
+        Button {
+            Haptics.tap()
+            startSearch()
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .modifier(HeaderIcon())
+        }
+        .accessibilityLabel("Search films & shows")
+        .accessibilityHint("Find a film or show by its title")
+    }
+
+    func startSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) { searchFieldActive = true }
+        // Once the field is on screen
+        DispatchQueue.main.async {
+            searchFocused = true
+            searchVoiceOverFocused = true
+        }
+    }
+
+    var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(Theme.textSecondary)
+                .accessibilityHidden(true)
+            TextField("Search films & shows", text: $searchText)
+                .focused($searchFocused)
+                .accessibilityFocused($searchVoiceOverFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .foregroundColor(Theme.textPrimary)
+                .onSubmit {
+                    // Return on an empty field goes back to the deck
+                    guard !FilmSearchModel.clean(searchText).isEmpty else { return cancelSearch() }
+                    search.remember(searchText)
+                    search.update(searchText, immediately: FilmSearchModel.clean(searchText) != search.resultsQuery)
+                }
+                .accessibilityAddTraits(.isSearchField)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(Theme.textTertiary)
+                        .frame(minWidth: 28, minHeight: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear Search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+        .contentShape(Capsule())
+        .onTapGesture { searchFocused = true }
+    }
+
+    // Back to the deck, exactly as it was left
+    func cancelSearch() {
+        searchFocused = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            searchText = ""
+            searchFieldActive = false
+        }
+    }
+
+    var deck: some View {
+        VStack(spacing: 18) {
+            tasteSummary
+                .transition(.opacity)
+            cardStack
+                .frame(maxHeight: .infinity)
+            if viewModel.topMovie != nil {
+                actionButtons
+                    .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+}
+
+// Undo, ••• and + under the search field: round, tinted, and greyed out while they can't be used
+private struct HeaderIcon: ViewModifier {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundColor(isEnabled ? Theme.accent : Theme.textTertiary)
+            .frame(width: 40, height: 40)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+            .contentShape(Circle())
     }
 }
 
@@ -405,7 +551,8 @@ private extension DiscoverView {
                 .disabled(!viewModel.hasLearned)
             }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "ellipsis")
+                .modifier(HeaderIcon())
         }
         .disabled(isBlocked)
         .accessibilityLabel("Discover Options")
@@ -770,8 +917,14 @@ private extension DiscoverView {
     }
 
     // While a card is flying away, being added, or coming back out of its lists, nothing else can be done to the deck
+    // While searching, the deck is out of sight, so nothing (+, Undo, VoiceOver actions) can act on its top card
     var isBlocked: Bool {
-        isSwiping || isAdding || adding != nil || viewModel.isUndoing
+        isSwiping || isAdding || adding != nil || viewModel.isUndoing || isSearching
+    }
+
+    // The search field is focused, or has something in it: results or the search start page show instead of the deck
+    var isSearching: Bool {
+        searchFieldActive || !FilmSearchModel.clean(searchText).isEmpty
     }
 
     // What swiping does, as buttons, so nothing is gesture-only. Add and Undo are in the navigation bar
@@ -809,12 +962,15 @@ private extension DiscoverView {
                 showDetails = false
             }
         } label: {
-            if viewModel.isUndoing {
-                ProgressView()
-                    .tint(Theme.accent)
-            } else {
-                Image(systemName: "arrow.uturn.backward")
+            Group {
+                if viewModel.isUndoing {
+                    ProgressView()
+                        .tint(Theme.accent)
+                } else {
+                    Image(systemName: "arrow.uturn.backward")
+                }
             }
+            .modifier(HeaderIcon())
         }
         .disabled(!viewModel.canUndo || isBlocked)
         .accessibilityLabel(viewModel.isUndoing ? "Undoing" : "Undo")
@@ -828,6 +984,7 @@ private extension DiscoverView {
             addTopMovie()
         } label: {
             Image(systemName: "plus")
+                .modifier(HeaderIcon())
         }
         .disabled(isBlocked || viewModel.topMovie == nil)
         .accessibilityLabel("Add to a List")
