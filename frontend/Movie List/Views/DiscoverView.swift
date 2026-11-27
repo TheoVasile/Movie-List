@@ -47,9 +47,10 @@ struct DiscoverView: View {
     // underneath, out of sight and out of reach, until the search is cancelled
     @StateObject private var search = FilmSearchModel()
     @State private var searchText = ""
-    // From focusing the search field until Cancel, even once the keyboard is dismissed to look through results
+    // From tapping Search until Cancel, even once the keyboard is dismissed to look through results
     @State private var searchFieldActive = false
     @FocusState private var searchFocused: Bool
+    @AccessibilityFocusState private var searchVoiceOverFocused: Bool
 
     private let swipeThreshold: CGFloat = 110
 
@@ -174,34 +175,61 @@ struct DiscoverView: View {
 
 // MARK: - Header
 private extension DiscoverView {
-    // The search field at the top, and Discover's actions under it: Undo on the left, ••• and + on the right
+    // One row at the top: Undo on the left; Search, ••• and + on the right. Search turns the row into the search field
+    // with Cancel, until the search is cancelled
     var header: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 12) {
-                searchField
-                if searchFieldActive {
+        ZStack {
+            if isSearching {
+                HStack(spacing: 12) {
+                    searchField
                     Button("Cancel") {
                         Haptics.tap()
                         cancelSearch()
                     }
                     .foregroundColor(Theme.accent)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .fixedSize()
                 }
-            }
-            HStack {
-                undoButton
-                Spacer(minLength: 0)
-                HStack(spacing: 10) {
-                    optionsMenu
-                    addButton
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+            } else {
+                HStack {
+                    undoButton
+                    Spacer(minLength: 0)
+                    HStack(spacing: 10) {
+                        searchButton
+                        optionsMenu
+                        addButton
+                    }
+                    .fixedSize()
                 }
-                .fixedSize()
+                .buttonStyle(PressableButtonStyle(scale: 0.9))
+                .transition(.opacity)
             }
-            .buttonStyle(PressableButtonStyle(scale: 0.9))
         }
+        .frame(height: 44)
         .padding(.horizontal, 20)
         .padding(.top, 4)
-        .animation(Theme.spring, value: searchFieldActive)
+    }
+
+    // Never disabled: searching doesn't touch the deck, so it works with an empty or loading one too
+    var searchButton: some View {
+        Button {
+            Haptics.tap()
+            startSearch()
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .modifier(HeaderIcon())
+        }
+        .accessibilityLabel("Search films & shows")
+        .accessibilityHint("Find a film or show by its title")
+    }
+
+    func startSearch() {
+        withAnimation(.easeInOut(duration: 0.2)) { searchFieldActive = true }
+        // Once the field is on screen
+        DispatchQueue.main.async {
+            searchFocused = true
+            searchVoiceOverFocused = true
+        }
     }
 
     var searchField: some View {
@@ -211,10 +239,13 @@ private extension DiscoverView {
                 .accessibilityHidden(true)
             TextField("Search films & shows", text: $searchText)
                 .focused($searchFocused)
+                .accessibilityFocused($searchVoiceOverFocused)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
                 .foregroundColor(Theme.textPrimary)
                 .onSubmit {
+                    // Return on an empty field goes back to the deck
+                    guard !FilmSearchModel.clean(searchText).isEmpty else { return cancelSearch() }
                     search.remember(searchText)
                     search.update(searchText, immediately: FilmSearchModel.clean(searchText) != search.resultsQuery)
                 }
@@ -242,9 +273,11 @@ private extension DiscoverView {
 
     // Back to the deck, exactly as it was left
     func cancelSearch() {
-        searchText = ""
         searchFocused = false
-        searchFieldActive = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            searchText = ""
+            searchFieldActive = false
+        }
     }
 
     var deck: some View {
@@ -259,7 +292,7 @@ private extension DiscoverView {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 2)
+        .padding(.top, 8)
         .padding(.bottom, 12)
     }
 }
