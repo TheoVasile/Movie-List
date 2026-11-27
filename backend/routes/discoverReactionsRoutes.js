@@ -3,7 +3,7 @@ const express = require("express");
 // Discover reactions, mounted at /movies/discover/reactions (signed in and rate limited like every /movies route):
 //   POST   /                { tmdb_id, reaction: "like" | "dislike" | "skip", source?, at? } -> { ok: true, reaction:
 //                            { tmdb_id, reaction, updated_at } }, the one kept: an earlier at than the saved
-//                            reaction's changes nothing. Newer builds never send skips
+//                            reaction's changes nothing. A skip is Discover's Skip
 //   POST   /bulk            { reactions: [{ tmdb_id, reaction, at? }] } (at most 2000; the newest reaction to a film
 //                            wins) -> { ok: true, saved }. For moving a device's history to the server once
 //   GET    /                -> { reactions: [{ tmdb_id, reaction, updated_at }] }, newest first
@@ -11,7 +11,7 @@ const express = require("express");
 //                            movie }], next_cursor, counts: { like, dislike } }, newest first. movie is null when
 //                            its details can't be had right now
 //   DELETE /                deletes them all (Reset Taste Profile); ?tmdb_id= deletes one (Undo); ?reaction=skip
-//                            deletes every skip (Show Skipped Again) -> { ok: true, deleted }
+//                            deletes every skip (Show Skipped Again, in older builds) -> { ok: true, deleted }
 // Skips keep a film out of Discover for 30 days; likes and dislikes for good
 // TV shows have negative ids. The model (models/reactionsModel.js), onChange (called with the user's id after a
 // change, to forget their cached taste) and saveFilm (called with a liked or disliked film's id, to have its details
