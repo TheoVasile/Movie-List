@@ -47,7 +47,9 @@ struct DiscoverView: View {
     // underneath, out of sight and out of reach, until the search is cancelled
     @StateObject private var search = FilmSearchModel()
     @State private var searchText = ""
+    // From focusing the search field until Cancel, even once the keyboard is dismissed to look through results
     @State private var searchFieldActive = false
+    @FocusState private var searchFocused: Bool
 
     private let swipeThreshold: CGFloat = 110
 
@@ -58,54 +60,33 @@ struct DiscoverView: View {
                 PosterBackdrop(path: viewModel.topMovie?.poster_path)
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 0.5), value: viewModel.topMovie?.id)
-                VStack(spacing: 18) {
-                    tasteSummary
-                        .transition(.opacity)
-                    cardStack
-                        .frame(maxHeight: .infinity)
-                    if viewModel.topMovie != nil {
-                        actionButtons
-                            .transition(.opacity)
+                    .opacity(isSearching ? 0 : 1)
+                VStack(spacing: 0) {
+                    header
+                    ZStack {
+                        deck
+                            // Kept in place while searching, so the deck comes back exactly as it was
+                            .opacity(isSearching ? 0 : 1)
+                            .allowsHitTesting(!isSearching)
+                            .accessibilityHidden(isSearching)
+                            // The keyboard doesn't squeeze the hidden deck
+                            .ignoresSafeArea(.keyboard)
+                        if isSearching {
+                            FilmSearchResults(text: $searchText, model: search)
+                                .transition(.opacity)
+                        }
                     }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 4)
-                .padding(.bottom, 12)
-                // Kept in place while searching, so the deck comes back exactly as it was
-                .opacity(isSearching ? 0 : 1)
-                .allowsHitTesting(!isSearching)
-                .accessibilityHidden(isSearching)
-                if isSearching {
-                    FilmSearchResults(text: $searchText, model: search)
-                        .transition(.opacity)
+                    .overlay(alignment: .top) { toastView }
                 }
             }
-            .background { SearchStateReader(isActive: $searchFieldActive) }
             .animation(.easeInOut(duration: 0.2), value: isSearching)
-            .overlay(alignment: .top) { toastView }
+            // The search field and Discover's actions take the navigation bar's place. The tab is already labelled
+            // Discover, so the title isn't repeated on screen
             .navigationTitle("Discover")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search films & shows")
-            .autocorrectionDisabled()
-            .onSubmit(of: .search) {
-                search.remember(searchText)
-                search.update(searchText, immediately: FilmSearchModel.clean(searchText) != search.resultsQuery)
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .onChange(of: searchText) { search.update($0) }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    undoButton
-                }
-                // ••• and + in one item, so they never collapse into an overflow menu, with + in the corner
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        optionsMenu
-                            // Filters and Reset would change the deck while it's out of sight
-                            .disabled(isSearching)
-                        addButton
-                    }
-                    .fixedSize()
-                }
+            .onChange(of: searchFocused) { focused in
+                if focused { searchFieldActive = true }
             }
         }
         // The same list picker and Compare as adding anywhere else, over the whole screen so nothing else can be
@@ -188,6 +169,113 @@ struct DiscoverView: View {
         }
         .onChange(of: listedIDs) { _ in syncWithLists() }
         .onChange(of: viewModel.filters.listIDs) { _ in syncWithLists() }
+    }
+}
+
+// MARK: - Header
+private extension DiscoverView {
+    // The search field at the top, and Discover's actions under it: Undo on the left, ••• and + on the right
+    var header: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                searchField
+                if searchFieldActive {
+                    Button("Cancel") {
+                        Haptics.tap()
+                        cancelSearch()
+                    }
+                    .foregroundColor(Theme.accent)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            HStack {
+                undoButton
+                Spacer(minLength: 0)
+                HStack(spacing: 10) {
+                    optionsMenu
+                    addButton
+                }
+                .fixedSize()
+            }
+            .buttonStyle(PressableButtonStyle(scale: 0.9))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+        .animation(Theme.spring, value: searchFieldActive)
+    }
+
+    var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(Theme.textSecondary)
+                .accessibilityHidden(true)
+            TextField("Search films & shows", text: $searchText)
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .foregroundColor(Theme.textPrimary)
+                .onSubmit {
+                    search.remember(searchText)
+                    search.update(searchText, immediately: FilmSearchModel.clean(searchText) != search.resultsQuery)
+                }
+                .accessibilityAddTraits(.isSearchField)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(Theme.textTertiary)
+                        .frame(minWidth: 28, minHeight: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear Search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+        .contentShape(Capsule())
+        .onTapGesture { searchFocused = true }
+    }
+
+    // Back to the deck, exactly as it was left
+    func cancelSearch() {
+        searchText = ""
+        searchFocused = false
+        searchFieldActive = false
+    }
+
+    var deck: some View {
+        VStack(spacing: 18) {
+            tasteSummary
+                .transition(.opacity)
+            cardStack
+                .frame(maxHeight: .infinity)
+            if viewModel.topMovie != nil {
+                actionButtons
+                    .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 2)
+        .padding(.bottom, 12)
+    }
+}
+
+// Undo, ••• and + under the search field: round, tinted, and greyed out while they can't be used
+private struct HeaderIcon: ViewModifier {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundColor(isEnabled ? Theme.accent : Theme.textTertiary)
+            .frame(width: 40, height: 40)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+            .contentShape(Circle())
     }
 }
 
@@ -430,7 +518,8 @@ private extension DiscoverView {
                 .disabled(!viewModel.hasLearned)
             }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "ellipsis")
+                .modifier(HeaderIcon())
         }
         .disabled(isBlocked)
         .accessibilityLabel("Discover Options")
@@ -840,12 +929,15 @@ private extension DiscoverView {
                 showDetails = false
             }
         } label: {
-            if viewModel.isUndoing {
-                ProgressView()
-                    .tint(Theme.accent)
-            } else {
-                Image(systemName: "arrow.uturn.backward")
+            Group {
+                if viewModel.isUndoing {
+                    ProgressView()
+                        .tint(Theme.accent)
+                } else {
+                    Image(systemName: "arrow.uturn.backward")
+                }
             }
+            .modifier(HeaderIcon())
         }
         .disabled(!viewModel.canUndo || isBlocked)
         .accessibilityLabel(viewModel.isUndoing ? "Undoing" : "Undo")
@@ -859,6 +951,7 @@ private extension DiscoverView {
             addTopMovie()
         } label: {
             Image(systemName: "plus")
+                .modifier(HeaderIcon())
         }
         .disabled(isBlocked || viewModel.topMovie == nil)
         .accessibilityLabel("Add to a List")
@@ -1031,20 +1124,6 @@ private extension DiscoverView {
         let ids = seedPool.map(\.id)
         viewModel.updateListGenres(for: ids)
         MovieInfoCache.shared.fetchMissing(ids, onBatch: { viewModel.updateListGenres(for: ids) }, completion: { viewModel.updateListGenres(for: ids) })
-    }
-}
-
-// MARK: - Search
-
-// Whether the search field is in use. isSearching can only be read below .searchable, and isPresented needs iOS 17
-private struct SearchStateReader: View {
-    @Environment(\.isSearching) private var isSearching
-    @Binding var isActive: Bool
-
-    var body: some View {
-        Color.clear
-            .onAppear { isActive = isSearching }
-            .onChange(of: isSearching) { isActive = $0 }
     }
 }
 
