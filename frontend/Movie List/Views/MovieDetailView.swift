@@ -35,6 +35,11 @@ struct MovieDetailView: View {
     @State private var recommending = false
     @State private var showingMoreLikeThis = false
     @State private var shareItem: ShareItem? = nil
+    // Liked or Not for Me, as Discover keeps it on this device, and the one being saved meanwhile
+    @State private var reaction: DiscoverReaction? = nil
+    @State private var savingReaction: DiscoverReaction? = nil
+    @State private var isSavingReaction = false
+    @State private var toast: String? = nil
     @ObservedObject private var social = SocialStore.shared
     @ObservedObject private var noteReview = NoteReview.shared
 
@@ -53,6 +58,7 @@ struct MovieDetailView: View {
             }
             .ignoresSafeArea(edges: .top)
         }
+        .overlay(alignment: .top) { toastView }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
@@ -61,6 +67,7 @@ struct MovieDetailView: View {
             }
             loadIMDbID()
             loadInfo()
+            loadReaction()
             if movie.tmdb_id != 0 {
                 APIService.shared.fetchFriendTakes(tmdbID: Int64(movie.tmdb_id)) { result in
                     if case .success(let takes) = result {
@@ -71,6 +78,124 @@ struct MovieDetailView: View {
             WatchProvidersStore.shared.load(tmdbID: Int64(movie.tmdb_id)) { loaded in
                 withAnimation(Theme.spring) { providers = loaded }
             }
+        }
+        // Liked or Not for Me changed elsewhere: Discover, search, Liked & Not for Me, or brought in from the account
+        .onReceive(DiscoverReactions.shared.changed.receive(on: RunLoop.main)) { _ in loadReaction() }
+        .onReceive(DiscoverReactions.shared.cleared.receive(on: RunLoop.main)) { _ in reaction = nil }
+    }
+
+    // MARK: Like / Not for Me
+
+    private func loadReaction() {
+        let id = Int(movie.tmdb_id)
+        let defaults = UserDefaults.standard
+        if (defaults.array(forKey: DiscoverViewModel.likedKey) as? [Int] ?? []).contains(id) {
+            reaction = .liked
+        } else if (defaults.array(forKey: DiscoverViewModel.dislikedKey) as? [Int] ?? []).contains(id) {
+            reaction = .disliked
+        } else {
+            reaction = nil
+        }
+    }
+
+    /// Like or Not for Me, the same as in Discover: saved with the account, it teaches Discover and takes the film out
+    /// of the deck. Tapping the chosen one again takes it back; the other one replaces it. The buttons wait, with a
+    /// spinner, until it's saved, and nothing changes if it can't be
+    private func react(_ tapped: DiscoverReaction) {
+        guard !isSavingReaction, movie.tmdb_id != 0 else { return }
+        let id = Int64(movie.tmdb_id)
+        let old = reaction
+        let new: DiscoverReaction? = old == tapped ? nil : tapped
+        var film = Movie(movie)
+        film.genre_ids = info?.genres
+        isSavingReaction = true
+        savingReaction = tapped
+        DiscoverReactionSync.shared.change(id, to: new, source: "detail") { saved in
+            isSavingReaction = false
+            savingReaction = nil
+            guard saved else {
+                showToast("Couldn't save that. Check your connection.")
+                return
+            }
+            withAnimation(Theme.spring) { reaction = new }
+            DiscoverReactions.shared.apply(id, movie: film, from: old, to: new)
+            if let new {
+                Haptics.success()
+                showToast(new == .liked ? "Liked" : "Marked Not for Me")
+            } else {
+                showToast(tapped == .liked ? "Like taken back" : "Not for Me taken back")
+            }
+        }
+    }
+
+    private var reactionButtons: some View {
+        HStack(spacing: 10) {
+            reactionButton(.liked)
+            reactionButton(.disliked)
+        }
+        .disabled(isSavingReaction)
+    }
+
+    private func reactionButton(_ kind: DiscoverReaction) -> some View {
+        let selected = reaction == kind
+        let title = kind == .liked ? (selected ? "Liked" : "Like") : "Not for Me"
+        let icon = kind == .liked ? (selected ? "heart.fill" : "heart") : (selected ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+        return Button {
+            Haptics.tap()
+            react(kind)
+        } label: {
+            HStack(spacing: 6) {
+                if savingReaction == kind {
+                    ProgressView()
+                        .tint(selected ? Theme.onAccent : Theme.accent)
+                } else {
+                    Image(systemName: icon)
+                }
+                Text(title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(selected ? Theme.onAccent : Theme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(selected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.surface), in: Capsule())
+            .overlay(Capsule().stroke(selected ? Color.clear : Theme.stroke, lineWidth: 1))
+            .opacity(isSavingReaction && savingReaction != kind ? 0.5 : 1)
+        }
+        .buttonStyle(PressableButtonStyle(scale: 0.94))
+        .accessibilityLabel(kind == .liked ? "Like" : "Not for Me")
+        .accessibilityValue(isSavingReaction && savingReaction == kind ? "Saving" : selected ? "Selected" : "")
+        .accessibilityHint(selected ? (kind == .liked ? "Takes back your like" : "Takes back Not for Me")
+                                    : (kind == .liked ? "Shows more films like this in Discover" : "Shows fewer films like this in Discover"))
+    }
+
+    private func showToast(_ message: String) {
+        withAnimation(Theme.spring) { toast = message }
+        UIAccessibility.post(notification: .announcement, argument: message)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(Theme.spring) {
+                if toast == message { toast = nil }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var toastView: some View {
+        if let toast {
+            Text(toast)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Theme.textPrimary)
+                .lineLimit(1)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Theme.stroke, lineWidth: 1))
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .accessibilityHidden(true)
         }
     }
 
@@ -447,6 +572,12 @@ struct MovieDetailView: View {
             .sheet(item: $shareItem) { item in
                 ShareSheet(item: item)
                     .presentationDetents([.medium, .large])
+            }
+
+            // Rating it here is the same as in Discover
+            if movie.tmdb_id != 0 {
+                reactionButtons
+                    .appearAnimation(delay: 0.2)
             }
 
             // The overview comes straight after the title, so it's readable without scrolling

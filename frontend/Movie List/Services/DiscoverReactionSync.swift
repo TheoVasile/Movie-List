@@ -15,7 +15,7 @@ final class DiscoverReactionSync {
     static let shared = DiscoverReactionSync()
 
     private struct Pending: Codable {
-        // clearSkips is from builds that had skips, and is only still here so their queue can be read
+        // clearSkips is from older builds' Show Skipped Again, and is only still here so their queue can be read
         enum Kind: String, Codable { case react, remove, clear, clearSkips }
         let kind: Kind
         var tmdbID: Int64? = nil
@@ -88,8 +88,8 @@ final class DiscoverReactionSync {
         self.uid = uid
         pending = (defaults.data(forKey: Self.key(Self.pendingKey, uid))
             .flatMap { try? JSONDecoder().decode([Pending].self, from: $0) } ?? [])
-            // Skips waiting from an earlier build mean nothing now
-            .filter { $0.kind != .clearSkips && $0.reaction != "skip" }
+            // Skips are sent again (see recordSkip); clearing them is no longer offered
+            .filter { $0.kind != .clearSkips }
         save()
     }
 
@@ -127,6 +127,12 @@ final class DiscoverReactionSync {
         enqueue(Pending(kind: .react, tmdbID: movie.id, reaction: Self.name(reaction), source: movie.source, date: Date()))
     }
 
+    /// Skip in Discover, sent in the background. It's no rating: the server only keeps the film out of Discover for
+    /// a while (30 days), and it teaches nothing about taste. A like or dislike later replaces it
+    func recordSkip(_ movie: Movie) {
+        enqueue(Pending(kind: .react, tmdbID: movie.id, reaction: "skip", source: movie.source, date: Date()))
+    }
+
     /// Takes back one film's reaction, e.g. after Undo
     func remove(_ tmdbID: Int64) {
         enqueue(Pending(kind: .remove, tmdbID: tmdbID))
@@ -134,7 +140,7 @@ final class DiscoverReactionSync {
 
     /// Changes one film's reaction, or takes it back when nil, and calls back with whether the account has it now.
     /// Nothing is queued when it can't be sent, so the screen can put it back the way it was
-    func change(_ tmdbID: Int64, to reaction: DiscoverReaction?, completion: @escaping (Bool) -> Void) {
+    func change(_ tmdbID: Int64, to reaction: DiscoverReaction?, source: String? = nil, completion: @escaping (Bool) -> Void) {
         // Anything waiting goes first, so an older swipe on the film can't land after this
         flush { [weak self] allSent in
             guard let self, allSent, let uid = self.uid else { return completion(false) }
@@ -144,7 +150,7 @@ final class DiscoverReactionSync {
                 completion(true)
             }
             if let reaction {
-                APIService.shared.sendDiscoverReaction(tmdbID: tmdbID, reaction: Self.name(reaction), source: nil, completion: done)
+                APIService.shared.sendDiscoverReaction(tmdbID: tmdbID, reaction: Self.name(reaction), source: source, completion: done)
             } else {
                 APIService.shared.deleteDiscoverReactions(tmdbID: tmdbID, completion: done)
             }
@@ -310,7 +316,8 @@ final class DiscoverReactionSync {
 
     // MARK: From the account
 
-    /// Makes the likes and dislikes on this device the account's. Skips, which only earlier builds send, are left out
+    /// Makes the likes and dislikes on this device the account's. Skips are left out: the server keeps those films
+    /// out of Discover itself
     private func adopt(_ records: [APIService.DiscoverReactionRecord]) {
         let defaults = UserDefaults.standard
         // Newest first from the server, oldest first on this device

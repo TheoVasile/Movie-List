@@ -360,6 +360,7 @@ private extension DiscoverView {
             .accessibilityHidden(index != 0)
             .accessibilityAction(named: "Like") { if index == 0 { rate(.liked) } }
             .accessibilityAction(named: "Not for Me") { if index == 0 { rate(.disliked) } }
+            .accessibilityAction(named: "Skip") { if index == 0 { skip() } }
             .accessibilityAction(named: "Add to a List") { if index == 0 { addTopMovie() } }
             .accessibilityAction(named: showDetails ? "Hide Details" : "Show Details") { if index == 0 { toggleDetails() } }
     }
@@ -449,6 +450,7 @@ private extension DiscoverView {
                         .frame(maxWidth: .infinity)
                     introRow("heart.fill", "Swipe Right to Like", "Discover recommends more films like it.")
                     introRow("hand.thumbsdown.fill", "Swipe Left for Not for Me", "Discover shows fewer films like it.")
+                    introRow("forward.fill", "Tap Skip to Decide Later", "The film goes away for a while. Skipping doesn't rate it.")
                     introRow("plus", "Tap + to Add to a List", "Choose where it goes. Adding doesn't rate the film.")
                     Text("See what you've rated any time in ••• under Liked & Not for Me.")
                         .font(.caption)
@@ -927,14 +929,21 @@ private extension DiscoverView {
         searchFieldActive || !FilmSearchModel.clean(searchText).isEmpty
     }
 
-    // What swiping does, as buttons, so nothing is gesture-only. Add and Undo are in the navigation bar
+    // What swiping does, as buttons, so nothing is gesture-only, with Skip between them. Add and Undo are at the top
     var actionButtons: some View {
-        HStack(alignment: .top, spacing: 48) {
+        HStack(alignment: .top, spacing: 28) {
             circleButton(icon: "hand.thumbsdown.fill", size: 64, style: AnyShapeStyle(Theme.accentSecondary), caption: "Not for Me") {
                 rate(.disliked)
             }
             .accessibilityLabel("Not for Me")
             .accessibilityHint("Same as swiping left. Shows fewer films like this")
+            // Smaller and lower-key, since it says nothing about taste; centred on the other two
+            circleButton(icon: "forward.fill", size: 52, style: AnyShapeStyle(Theme.textSecondary), caption: "Skip") {
+                skip()
+            }
+            .padding(.top, 6)
+            .accessibilityLabel("Skip")
+            .accessibilityHint("Moves on without rating it. It won't be shown again for a while")
             circleButton(icon: "heart.fill", size: 64, style: AnyShapeStyle(Theme.accentGradient), caption: "Like") {
                 rate(.liked)
             }
@@ -974,7 +983,7 @@ private extension DiscoverView {
         }
         .disabled(!viewModel.canUndo || isBlocked)
         .accessibilityLabel(viewModel.isUndoing ? "Undoing" : "Undo")
-        .accessibilityHint("Brings back the last card you liked, marked Not for Me or added. An added film is taken back out of its lists")
+        .accessibilityHint("Brings back the last card you liked, marked Not for Me, skipped or added. An added film is taken back out of its lists")
     }
 
     // Always asks which lists, the one added to most recently first
@@ -1070,6 +1079,25 @@ private extension DiscoverView {
             withAnimation(Theme.spring) {
                 // Gone already if it was rated or added elsewhere meanwhile
                 if viewModel.topMovie?.id == movie.id { viewModel.rate(movie, reaction) }
+                dragOffset = .zero
+                showDetails = false
+            }
+            isSwiping = false
+        }
+    }
+
+    // Moves on without a rating: the card goes up and away, and comes back only after a while (see skip in the
+    // view model)
+    func skip() {
+        guard !isBlocked, let movie = viewModel.topMovie else { return }
+        isSwiping = true
+        Haptics.tap()
+        withAnimation(.easeIn(duration: 0.22)) {
+            dragOffset = CGSize(width: 0, height: -900)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            withAnimation(Theme.spring) {
+                if viewModel.topMovie?.id == movie.id { viewModel.skip(movie) }
                 dragOffset = .zero
                 showDetails = false
             }

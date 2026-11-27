@@ -5,8 +5,8 @@ const { mapWithConcurrency } = require("../services/letterboxdService");
 
 // Discover reactions: films the user liked or disliked ("Not for Me") in Discover, one per film, so their taste
 // profile follows them across devices and reinstalls and shapes recommendations on the server. Only ever shown to
-// the user themselves. Deleted by Reset Taste Profile and, through ON DELETE CASCADE, with the account. Older app
-// builds also send skips, which newer ones don't have
+// the user themselves. Deleted by Reset Taste Profile and, through ON DELETE CASCADE, with the account. Skips
+// (Discover's Skip) are kept too, only to keep a film out of Discover for SKIP_DAYS; they say nothing about taste
 
 const REACTIONS = ["like", "dislike", "skip"];
 const MAX_BULK = 2000;

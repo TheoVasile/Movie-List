@@ -458,6 +458,8 @@ class DiscoverViewModel: ObservableObject {
     struct UndoStep {
         enum Action {
             case rated(DiscoverReaction)
+            // Skipped: no rating, only kept out of Discover for a while
+            case skipped
             // With the copies made, which undo takes back out
             case added([AddedCopy])
         }
@@ -554,10 +556,12 @@ class DiscoverViewModel: ObservableObject {
         profile = DiscoverReactions.savedProfile
         profileVersion += 1
         if let id {
-            // Undo would bring back the rating from before it was changed, and the film may be shown again
+            // Undo would bring back the rating (or skip) from before it was changed, and the film may be shown again
             undoHistory.removeAll {
-                if case .rated = $0.action { return $0.movie.id == id }
-                return false
+                switch $0.action {
+                case .rated, .skipped: return $0.movie.id == id
+                case .added: return false
+                }
             }
             shownIDs.remove(id)
         }
@@ -574,6 +578,8 @@ class DiscoverViewModel: ObservableObject {
     // The server turned a rating down for good, so it's taken back here too
     private func ratingRejected(_ id: Int64) {
         let step = undoHistory.last { $0.movie.id == id }
+        // A skip teaches nothing, so there's nothing here to take back
+        if let step, case .skipped = step.action { return }
         if let step, case .rated(let reaction) = step.action {
             DiscoverReactions.shared.apply(id, movie: step.movie, from: reaction, to: nil)
         } else {
@@ -665,7 +671,18 @@ class DiscoverViewModel: ObservableObject {
         profile.record(movie, reaction)
         saveProfile()
         DiscoverReactionSync.shared.record(movie, reaction)
-        logSwipe(movie, reaction)
+        logSwipe(movie, DiscoverReactionSync.name(reaction))
+        refillIfNeeded()
+    }
+
+    /// Skip: the card leaves without a rating, so nothing is learned. The server keeps it out of Discover for 30
+    /// days, and it isn't in Liked & Not for Me
+    func skip(_ movie: Movie) {
+        undoHistory.append(UndoStep(movie: movie, action: .skipped, profile: profile, profileVersion: profileVersion))
+        if undoHistory.count > Self.undoLimit { undoHistory.removeFirst() }
+        deck.removeAll { $0.id == movie.id }
+        DiscoverReactionSync.shared.recordSkip(movie)
+        logSwipe(movie, "skip")
         refillIfNeeded()
     }
 
@@ -680,8 +697,8 @@ class DiscoverViewModel: ObservableObject {
         }
     }
 
-    private func logSwipe(_ movie: Movie, _ reaction: DiscoverReaction) {
-        AppAnalytics.log(.discoverSwipe(reaction, ai: usesAI, tmdbID: movie.id, source: analyticsSource(movie), position: position(of: movie)))
+    private func logSwipe(_ movie: Movie, _ direction: String) {
+        AppAnalytics.log(.discoverSwipe(direction: direction, ai: usesAI, tmdbID: movie.id, source: analyticsSource(movie), position: position(of: movie)))
     }
 
     // MARK: Analytics
@@ -770,7 +787,7 @@ class DiscoverViewModel: ObservableObject {
         return !last.copies.contains { placing.contains($0.movieID) }
     }
 
-    /// Brings back the last card rated or added, on top, as if it was never swiped. An add is first taken back out
+    /// Brings back the last card rated, skipped or added, on top, as if it was never swiped. An add is first taken back out
     /// of the lists it went into; any rating the film has is left alone. Calls back with the lists it was taken out
     /// of and the ones that couldn't let it go, in which case the add can be undone again
     func undo(completion: @escaping (_ removed: [String], _ failed: [String]) -> Void = { _, _ in }) {
@@ -787,6 +804,11 @@ class DiscoverViewModel: ObservableObject {
                 profile.forget(last.movie, reaction)
             }
             saveProfile()
+            DiscoverReactionSync.shared.remove(last.movie.id)
+            bringBack(last.movie)
+            completion([], [])
+        case .skipped:
+            undoHistory.removeLast()
             DiscoverReactionSync.shared.remove(last.movie.id)
             bringBack(last.movie)
             completion([], [])
@@ -883,8 +905,8 @@ class DiscoverViewModel: ObservableObject {
         dislikedIDs = RecentIDs([], limit: Self.dislikedLimit)
         likedIDs = RecentIDs([], limit: Self.likedLimit)
         saveReactions()
-        // Adds aren't ratings, so they can still be undone
-        undoHistory.removeAll { if case .rated = $0.action { return true } else { return false } }
+        // Adds aren't ratings, so they can still be undone. Skips are cleared on the server with the rest
+        undoHistory.removeAll { if case .added = $0.action { return false } else { return true } }
         page = 1
         isExhausted = false
         loadFailed = false
